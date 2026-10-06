@@ -15,13 +15,14 @@ create table perfiles (
   creado timestamptz not null default now()
 );
 
--- Tarifas por tramo de cantidad de empresas (Quetzales por periodo).
+-- Tarifas por tramo de cantidad de empresas (Quetzales por MES).
 create table tarifas (
   desde_empresas int primary key,
   hasta_empresas int,                            -- null = sin tope
-  precio_gtq numeric(10,2) not null
+  precio_gtq numeric(10,2) not null,
+  periodo text not null default 'mensual'
 );
-insert into tarifas values (1,10,300),(11,20,500),(21,50,1000),(51,null,1500);
+insert into tarifas (desde_empresas,hasta_empresas,precio_gtq) values (1,10,300),(11,20,500),(21,50,1000),(51,null,1500);
 
 -- Licencia de cada administrador. El superadmin la activa, renueva o suspende a mano.
 create table licencias (
@@ -145,6 +146,3 @@ create function toca_actualizado() returns trigger language plpgsql as $$
 begin new.actualizado = now(); return new; end $$;
 create trigger empresas_actualizado before update on empresas
   for each row execute function toca_actualizado();
-
--- ---------- Crear TU superadmin (tras registrarte en Auth > Users) ----------
--- insert into perfiles (id, nombre, rol) values ('<TU-UUID-DE-AUTH>', 'Superadministrador', 'superadmin');
