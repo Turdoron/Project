@@ -392,7 +392,7 @@ const VACIO=()=>({empresas:[],activa:null,usuarios:[],sesion:null,bitacora:[]});
 const modo='nube';
 let tGuardar=null, sincronizando=false, pendiente=false, cacheEmpresas={};
 const sbOk=r=>{ if(r.error) throw new Error(r.error.message); return r.data||[]; };
-const msgError=m=>/row-level security|violates/i.test(m)?'La licencia no está vigente o llegaste al límite de tu plan.':m;
+const msgError=m=>/row-level security|violates/i.test(m)?'El servidor no permitió la operación ('+m+'). Puede que la licencia no esté vigente o que hayas llegado al límite de tu plan.':m;
 
 async function cargar(){
   const sb=window.sb;
@@ -460,7 +460,7 @@ async function sincronizar(){
         if(r.error){
           BD.empresas=BD.empresas.filter(x=>x.id!==e.id);
           if(BD.activa===e.id) BD.activa=BD.empresas[0]?BD.empresas[0].id:null;
-          pintar(); avisar('No se pudo crear la empresa: '+msgError(r.error.message),'Atención');
+          cerrarModal(); VISTA='empresas'; pintar(); avisar('No se pudo crear la empresa: '+msgError(r.error.message),'Atención');
           continue;
         }
         cacheEmpresas[e.id]={json,version:r.data.version};
@@ -882,7 +882,7 @@ function registrarLog(accion,detalle){
     usuarioId:u.id,usuarioNombre:u.nombre||u.usuario,rol:(ROLES[u.rol]||{}).nombre||u.rol,
     empresaNombre:(emp()&&emp().nombre)||'',accion,detalle:detalle||''});
   const ult=BD.bitacora[BD.bitacora.length-1];
-  if(window.sb) window.sb.from('bitacora').insert({user_id:u.id,empresa_id:BD.activa||null,accion,
+  if(window.sb) window.sb.from('bitacora').insert({user_id:u.id,empresa_id:(cacheEmpresas[BD.activa]?BD.activa:null),accion,
     detalle:{texto:detalle||'',usuarioNombre:ult.usuarioNombre,rol:ult.rol,empresaNombre:ult.empresaNombre}}).then(()=>{},()=>{});
 }
 
