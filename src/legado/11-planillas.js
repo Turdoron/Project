@@ -378,8 +378,8 @@ function capasDeCompra(e,producto){
       });
     });
   /* Lo producido entra como una capa más, en el orden de su fecha de cierre. */
-  (e.ordenesProduccion||[]).filter(o=>o.estado==='cerrada'&&o.producto===producto&&o.cantidadTerminada>0)
-    .forEach(o=>capas.push({cantidad:o.cantidadTerminada,total:o.costoTerminado,fecha:o.fechaCierre}));
+  (e.ordenesProduccion||[]).flatMap(entradasProduccion).filter(x=>x.producto===producto)
+    .forEach(x=>capas.push({cantidad:x.cantidad,total:x.costo,fecha:x.fecha}));
   if((e.ordenesProduccion||[]).length) capas.sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
   return capas.filter(c=>c.cantidad>1e-9);
 }
@@ -447,11 +447,11 @@ function inventarioDetalle(e){
      inventario solo sumaría entradas para siempre y nunca bajaría, aunque
      ya no quede nada en existencia. */
   /* Lo que se fabricó entra al kardex a su costo de producción (órdenes y corridas ya cerradas). */
-  (e.ordenesProduccion||[]).filter(o=>o.estado==='cerrada'&&o.cantidadTerminada>0).forEach(o=>{
-    const k=o.producto;
+  (e.ordenesProduccion||[]).flatMap(entradasProduccion).forEach(x=>{
+    const k=x.producto;
     productos[k]=productos[k]||{producto:k,cantidad:0,total:0,movimientos:0};
-    productos[k].cantidad=r2(productos[k].cantidad+o.cantidadTerminada);
-    productos[k].total=r2(productos[k].total+o.costoTerminado);
+    productos[k].cantidad=r2(productos[k].cantidad+x.cantidad);
+    productos[k].total=r2(productos[k].total+x.costo);
     productos[k].movimientos++;
   });
   (e.salidasInventario||[]).forEach(s=>{

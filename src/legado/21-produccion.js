@@ -80,11 +80,12 @@ function vistaProduccion(){
   const filas=lista.map(o=>{const t=totalesOrden(o); return `<tr><td>${etiqueta} ${o.numero}</td><td>${esc(o.producto)}</td><td>${fFecha(o.fechaInicio)}</td>
     <td>${o.estado==='cerrada'?`Cerrada ${fFecha(o.fechaCierre)}`:'<span style="color:var(--alerta)">Abierta</span>'}</td>
     <td class="num">${Q(t.mat)}</td><td class="num">${Q(t.mod+t.cif)}</td><td class="num">${Q(t.total)}</td>
-    <td class="num">${o.estado==='cerrada'&&o.cantidadTerminada?`${Q(o.cantidadTerminada)} u. a Q${Q(o.costoUnitario)}`:'—'}</td>
+    <td class="num">${o.estado==='cerrada'&&o.productosConjuntos?`${o.productosConjuntos.length} productos conjuntos`:o.estado==='cerrada'&&o.cantidadTerminada?`${Q(o.cantidadTerminada)} u. a Q${Q(o.costoUnitario)}`:'—'}</td>
     <td class="num"><button class="btn mini" data-accion="abrirOrdenProduccion" data-id="${o.id}">Abrir</button></td></tr>`;}).join('');
   return cab('Producción',`Método de costeo: ${METODOS_PRODUCCION[m].nombre}`,
     `${m==='estandar'?'<button class="btn sec" data-accion="costosEstandar">Costos estándar</button>':''}
      <button class="btn sec" data-accion="cambiarMetodoProduccion">Cambiar método</button>
+     ${lista.filter(o=>o.estado==='abierta').length>=2?'<button class="btn sec" data-accion="repartirCostoComun">Repartir costo común</button>':''}
      <button class="btn" data-accion="nuevaOrdenProduccion">${m==='continuo'?'Nueva corrida (período)':'Nueva orden'}</button>`)
   + `<div class="cifras">
       <div class="cifra"><span>Productos en proceso (en libros)</span><strong>${Q(wip)}</strong></div>
@@ -125,7 +126,10 @@ function vistaOrdenProduccion(e,o){
       ${o.cantidadTerminada} u. terminadas, ${m==='estandar'?`al costo estándar de Q${Q(o.costoUnitario)} c/u (costo real de la orden Q${Q(t.total)})`:`Q${Q(o.costoTerminado)} a Q${Q(o.costoUnitario)} c/u`}.
       ${o.wipFinal&&o.wipFinal.unidades>0?` En proceso: ${o.wipFinal.unidades} u. (Q${Q(r2(o.wipFinal.mat+o.wipFinal.conv))}).`:''}
       ${o.variaciones?` Variaciones: materiales Q${Q(o.variaciones.mat)}, mano de obra Q${Q(o.variaciones.mod)}, indirectos Q${Q(o.variaciones.cif)} (positivo = gastó más que el estándar).`:''}
-      Partida No. ${o.partidaCierreNumero}.</div>`:'');
+      Partida No. ${o.partidaCierreNumero}.</div>
+      ${o.productosConjuntos?`<h3 style="color:var(--verde);margin:18px 0 6px;font-size:15px">Productos conjuntos — ${esc(METODOS_CONJUNTOS[o.metodoConjunto]||'')}</h3>
+      <table style="font-size:13px"><thead><tr><th>Producto</th><th>Tipo</th><th class="num">Cantidad</th><th class="num">Precio de venta</th><th class="num">Costo unitario</th><th class="num">Costo</th></tr></thead>
+      <tbody>${o.productosConjuntos.map(x=>`<tr><td>${esc(x.producto)}</td><td>${x.tipo==='subproducto'?'Subproducto':'Principal'}</td><td class="num">${x.cantidad}</td><td class="num">${x.precio!=null?Q(x.precio):'—'}</td><td class="num">${Q(x.costoUnitario)}</td><td class="num">${Q(x.costo)}</td></tr>`).join('')}</tbody></table>`:''}`:'');
 }
 
 ACCIONES.elegirMetodoProduccion=d=>{
@@ -281,6 +285,7 @@ ACCIONES.cerrarOrdenProduccion=d=>{
       <div class="campo"><label>% de avance de mano de obra e indirectos</label><input name="avConv" type="number" step="1" min="0" max="100" value="50"></div>`:''}
     </div>
     <table id="tablaCierre" style="font-size:13px;margin-top:10px"></table>
+    ${m!=='estandar'?camposConjuntos(o):''}
     <div class="aviso">${m==='ordenes'?'Todo el costo de la orden pasa al producto terminado; el costo unitario es el total entre las unidades terminadas.'
       :m==='continuo'?'Se calculan unidades equivalentes con promedio ponderado. Lo que queda en proceso sigue en Productos en proceso y la próxima corrida del producto arranca con ello.'
       :'El producto entra al inventario al costo estándar; la diferencia contra el costo real queda como variación en resultados.'}</div>`,
@@ -316,17 +321,29 @@ ACCIONES.cerrarOrdenProduccion=d=>{
         extra={variaciones:v.var};
       }
       costoTerm=r2(costoTerm);
+      let titulo=`${o.producto} × ${T}`;
+      if(m!=='estandar'&&f.conjunto==='on'){
+        const cj=costearConjuntos(costoTerm,leerConjuntos(f),f.cj_metodo);
+        if(cj.error){avisar(cj.error);return false}
+        const i=lineas.findIndex(l=>l.cta==='1.1.08'&&l.debe>0);
+        lineas.splice(i,1,...cj.productos.map(x=>({cta:'1.1.08',desc:`${x.producto} × ${x.cantidad}${x.tipo==='subproducto'?' (subproducto)':''}`,debe:x.costo,haber:0})));
+        extra.productosConjuntos=cj.productos.map(x=>({producto:x.producto,cantidad:x.cantidad,precio:isFinite(x.precio)?x.precio:null,tipo:x.tipo,costo:x.costo,costoUnitario:x.costoUnitario}));
+        extra.metodoConjunto=f.cj_metodo;
+        titulo=`productos conjuntos: ${cj.productos.map(x=>x.producto).join(', ')}`;
+      }
       const p={id:uid(),numero:e.correlativo++,fecha:f.fecha,
-        concepto:`Producción terminada — ${m==='continuo'?'corrida':'orden'} ${o.numero} — ${o.producto} × ${T}`,
+        concepto:`Producción terminada — ${m==='continuo'?'corrida':'orden'} ${o.numero} — ${titulo}`,
         docTipo:'',docSerie:'',docNum:'',nit:'',contraparte:'',lineas};
       const dif=r2(lineas.reduce((s,l)=>s+l.debe-l.haber,0));
       if(Math.abs(dif)>0.004){ avisar('La partida no cuadra por Q'+Q(dif)+'. Revisá los costos de la orden.'); e.correlativo--; return false; }
       e.partidas.push(p);
       Object.assign(o,{estado:'cerrada',fechaCierre:f.fecha,cantidadTerminada:T,costoTerminado:costoTerm,costoUnitario:cu,
         partidaCierreId:p.id,partidaCierreNumero:p.numero},extra);
-      registrarLog('Cerró una orden de producción',`${o.producto} × ${T} — Q${Q(costoTerm)}`);
+      registrarLog('Cerró una orden de producción',`${titulo} — Q${Q(costoTerm)}`);
       guardar(); pintar();
-      avisar(`${m==='continuo'?'Corrida':'Orden'} cerrada: ${T} u. de ${o.producto} entran al inventario a Q${Q(cu)} c/u. Partida No. ${p.numero}.`,'Listo');
+      avisar(extra.productosConjuntos
+        ? `${m==='continuo'?'Corrida':'Orden'} cerrada. Entran al inventario:\n${extra.productosConjuntos.map(x=>`· ${x.producto}: ${x.cantidad} u. a Q${Q(x.costoUnitario)} c/u (Q${Q(x.costo)})${x.tipo==='subproducto'?' — subproducto':''}`).join('\n')}\nPartida No. ${p.numero}.`
+        : `${m==='continuo'?'Corrida':'Orden'} cerrada: ${T} u. de ${o.producto} entran al inventario a Q${Q(cu)} c/u. Partida No. ${p.numero}.`,'Listo');
     },'Cerrar y pasar a inventario');
   const act=()=>{
     const g=n=>mForm.querySelector(`[name="${n}"]`), T=+g('terminadas').value||0;
@@ -349,8 +366,20 @@ ACCIONES.cerrarOrdenProduccion=d=>{
         <tr class="total"><td>Variación total (positivo = gastó más)</td><td class="num">${Q(r2(t.total-v.estTotal))}</td></tr></tbody>`;
     }
     document.getElementById('tablaCierre').innerHTML=html;
+    const chk=g('conjunto'); if(!chk) return;
+    document.getElementById('cjBloque').hidden=!chk.checked;
+    if(!chk.checked) return;
+    const datos={}; mForm.querySelectorAll('[name]').forEach(i=>datos[i.name]=i.value);
+    const conjunto=m==='ordenes'?t.total:costeoContinuo(o,T,+g('proceso').value||0,+g('avMat').value||0,+g('avConv').value||0).transferido;
+    const filas=leerConjuntos(datos), cj=costearConjuntos(r2(conjunto),filas,datos.cj_metodo);
+    [0,1,2,3,4,5].forEach(i=>{
+      const nom=(datos['cj_prod_'+i]||'').trim(), x=cj.productos&&cj.productos.find(y=>y.producto===nom);
+      document.getElementById('cj_costo_'+i).textContent=x?`${Q(x.costo)} (Q${Q(x.costoUnitario)} c/u)`:'—';
+    });
+    document.getElementById('tablaCierre').insertAdjacentHTML('beforeend',`<tbody><tr class="total"><td>Costo conjunto a repartir${cj.valorSubs?` (menos subproductos Q${Q(cj.valorSubs)})`:''}</td>
+      <td class="num">${cj.error?`<span style="color:var(--peligro)">${esc(cj.error)}</span>`:Q(cj.neto)}</td></tr></tbody>`);
   };
-  mForm.querySelectorAll('input').forEach(i=>{i.oninput=act;});
+  mForm.querySelectorAll('input,select').forEach(i=>{i.oninput=act;i.onchange=act;});
   act();
 };
 
@@ -388,7 +417,8 @@ ACCIONES.pdfOrdenProduccion=async d=>{
     sec('Mano de obra directa',['Fecha','Detalle','Pasada desde','Monto'],(o.manoObra||[]).map(x=>[fFecha(x.fecha),x.descripcion||'',x.origen||'',Q(x.monto)]));
     sec('Costos indirectos de fabricación',['Fecha','Detalle','Pasada desde','Monto'],(o.cif||[]).map(x=>[fFecha(x.fecha),x.descripcion||'',x.origen||'',Q(x.monto)]));
     const resumen=[['Materiales',Q(t.mat)],['Mano de obra directa',Q(t.mod)],['Costos indirectos',Q(t.cif)],[{content:'Costo total del período',styles:{fontStyle:'bold',textColor:VERDE}},{content:Q(t.total),styles:{fontStyle:'bold',halign:'right',textColor:VERDE}}]];
-    if(o.estado==='cerrada') resumen.push([`Producto terminado: ${o.cantidadTerminada} u. a Q${Q(o.costoUnitario)} c/u`,Q(o.costoTerminado)]);
+    if(o.estado==='cerrada'&&o.productosConjuntos) o.productosConjuntos.forEach(x=>resumen.push([`${x.tipo==='subproducto'?'Subproducto':'Producto conjunto'}: ${x.producto}, ${x.cantidad} u. a Q${Q(x.costoUnitario)} c/u`,Q(x.costo)]));
+    else if(o.estado==='cerrada') resumen.push([`Producto terminado: ${o.cantidadTerminada} u. a Q${Q(o.costoUnitario)} c/u`,Q(o.costoTerminado)]);
     if(o.wipFinal&&o.wipFinal.unidades>0) resumen.push([`En proceso al cierre: ${o.wipFinal.unidades} u.`,Q(r2(o.wipFinal.mat+o.wipFinal.conv))]);
     if(o.variaciones) resumen.push(['Variaciones vs. estándar (mat. / M.O. / indirectos)',`${Q(o.variaciones.mat)} / ${Q(o.variaciones.mod)} / ${Q(o.variaciones.cif)}`]);
     sec('Resumen',['Concepto','Monto'],resumen);

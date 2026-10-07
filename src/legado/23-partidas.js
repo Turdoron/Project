@@ -328,7 +328,7 @@ function limpiarDependenciasPartida(e,p){
     });
     if(o.partidaCierreId===id){
       o.estado='abierta';
-      ['fechaCierre','cantidadTerminada','costoTerminado','costoUnitario','partidaCierreId','partidaCierreNumero','wipFinal','variaciones'].forEach(k=>delete o[k]);
+      ['fechaCierre','cantidadTerminada','costoTerminado','costoUnitario','partidaCierreId','partidaCierreNumero','wipFinal','variaciones','productosConjuntos','metodoConjunto'].forEach(k=>delete o[k]);
       notas.push(`la orden de producción ${o.numero} vuelve a quedar abierta`);
     }
   });
