@@ -1,11 +1,10 @@
 /* ============ PLANILLA RÁPIDA — llenar novedades de muchos empleados a la vez ============ */
-/* Cuatro formas de no escribir casilla por casilla (las novedades son días de falta, horas extra,
+/* Tres formas de no escribir casilla por casilla (las novedades son días de falta, horas extra,
    horas de domingo, horas de menos y bono adicional):
    1. Plantilla de Excel: se descarga con los empleados de la planilla, se llena y se vuelve a subir.
       Lee también un Excel propio si sus encabezados se parecen (Nombre, Horas extra, Bono…).
-   2. Bono fijo mensual en la ficha del empleado: aparece solo en cada planilla, prorrateado al período.
-   3. Aplicar un mismo dato a todos los incluidos o a los de un puesto.
-   4. Como en Excel: Enter baja al siguiente empleado, se puede pegar una columna (o varias) copiada
+   2. Aplicar un mismo dato a todos los incluidos o a los de un puesto.
+   3. Como en Excel: Enter baja al siguiente empleado, se puede pegar una columna (o varias) copiada
       de Excel, y un filtro deja solo a quienes tienen novedades. */
 const CAMPOS_NOVEDAD=[
   {k:'diasFalta',        t:'Días falta',     paso:1,    ancho:64},
@@ -18,12 +17,8 @@ const NOMBRE_NOVEDAD={diasFalta:'Días de falta',horasExtra:'Horas extra',horasE
 /* Dónde poner el cursor después de redibujar la planilla (por empleado, no por fila: el filtro cambia las filas). */
 let focoPlanilla=null;
 
-const bonoFijoPeriodo=(empleado,periodo)=>empleado&&+empleado.bonoFijo>0 ? prorratear(+empleado.bonoFijo,periodo) : 0;
-/* Novedades con las que arranca un empleado en una planilla nueva: solo su bono fijo, si tiene. */
-function filaInicialPlanilla(empleado,periodo,fechas,excluido){
-  const bono=bonoFijoPeriodo(empleado,periodo);
-  return {...calcularPlanillaEmpleado(empleado,periodo,{bonoAdicional:bono},fechas),excluido:!!excluido,bonoDeFicha:bono>0};
-}
+/* A propósito NO hay "bono fijo" guardado en la ficha del empleado: un bono que se repite igual cada mes
+   puede tomarse en juicio como parte del salario ordinario. El bono adicional se escribe en cada planilla. */
 const filaTieneNovedad=f=>CAMPOS_NOVEDAD.some(c=>+f[c.k]);
 
 /* Recalcula filas del borrador sin redibujar (quien llama decide cuándo pintar). */
@@ -35,13 +30,8 @@ function recalcularFilasPlanilla(indices){
     if(!empleado) return;
     const extras={}; CAMPOS_NOVEDAD.forEach(c=>extras[c.k]=f[c.k]);
     b.detalle[i]=Object.assign(calcularPlanillaEmpleado(empleado,b.periodo,extras,{desde:b.desde,hasta:b.hasta}),
-      {excluido:f.excluido,bonoDeFicha:f.bonoDeFicha});
+      {excluido:f.excluido});
   });
-}
-/* Si cambia el período, el bono que vino de la ficha se vuelve a prorratear (el que se escribió a mano, no). */
-function reprorratearBonosFijos(){
-  const b=borradorPlanilla, e=emp();
-  b.detalle.forEach(f=>{ if(f.bonoDeFicha) f.bonoAdicional=bonoFijoPeriodo(e.empleados.find(x=>x.id===f.empleadoId),b.periodo); });
 }
 
 /* "1,250.50", "Q 300", " 8 " → número; vacío → 0; texto que no es número → null. */
@@ -71,9 +61,8 @@ function revisarNovedad(campo,valor,b,nombre){
 }
 
 function inputNovedad(f,i,c){
-  const deFicha=c.k==='bonoAdicional'&&f.bonoDeFicha;
   return `<input type="number" min="0" step="${c.paso}" value="${f[c.k]||0}" data-campo-emp="${c.k}" data-fila="${i}" data-emp="${f.empleadoId}"
-    style="width:${c.ancho}px"${deFicha?' title="Bono fijo de la ficha del empleado, prorrateado al período"':''}>`;
+    style="width:${c.ancho}px">`;
 }
 
 /* Barra "Llenar más rápido" que va encima de la tabla de la planilla. */
@@ -123,7 +112,6 @@ function enlazarPlanillaRapida(){
     if(r.error){ b.nota={tipo:'malo',texto:r.error}; inp.value=f[campo]||0; return false; }
     if((+f[campo]||0)===v) return false;
     f[campo]=v;
-    if(campo==='bonoAdicional') f.bonoDeFicha=false;
     b.nota=r.aviso?{tipo:'malo',texto:r.aviso}:null;
     recalcularFilasPlanilla([i]);
     return true;
@@ -180,7 +168,7 @@ function pegarEnPlanilla(inp,texto,entradas){
       const v=leerNumeroNovedad(celda), rev=revisarNovedad(campo.k,v,b,f.nombre);
       if(rev.error){ errores.push(rev.error); return; }
       if(rev.aviso) avisos.push(rev.aviso);
-      f[campo.k]=v; if(campo.k==='bonoAdicional') f.bonoDeFicha=false;
+      f[campo.k]=v;
       tocadas.add(i); n++;
     });
   });
@@ -211,7 +199,7 @@ ACCIONES.aplicarNovedadVarios=()=>{
     const f=b.detalle[i], rev=revisarNovedad(campo,valor,b,f.nombre);
     if(rev.error){ errores.push(rev.error); return; }
     if(rev.aviso) avisos.push(rev.aviso);
-    f[campo]=valor; if(campo==='bonoAdicional') f.bonoDeFicha=false; usados.push(i);
+    f[campo]=valor; usados.push(i);
   });
   if(!usados.length){ avisar(errores[0]||'No se aplicó a nadie.'); return; }
   recalcularFilasPlanilla(usados);
@@ -238,7 +226,7 @@ ACCIONES.plantillaNovedades=async()=>{
     ['3. Horas extra: entre semana, a tiempo y medio. Máximo legal: 4 por día.'],
     ['4. Horas domingo: horas trabajadas en domingo o día de descanso.'],
     ['5. Horas de menos: llegadas tarde o salidas antes. Se descuentan al valor normal de la hora.'],
-    ['6. Bono adic.: monto en quetzales para este período (si el empleado tiene bono fijo, ya viene escrito).'],
+    ['6. Bono adic.: monto en quetzales para este período.'],
     ['7. No cambies ni borres la columna oculta "Código": sirve para reconocer a cada empleado aunque cambies el nombre.'],
     ['8. Guardá el archivo y subilo en la planilla con "Cargar novedades desde Excel". Antes de aplicar, el sistema te muestra los cambios.'],
   ]);
@@ -332,7 +320,7 @@ function mostrarVistaPreviaNovedades(cambios,prob,nombreArchivo){
      ${bloque('Están excluidos de esta planilla (se cargan sus datos, pero siguen sin incluirse):',excluidos)}`,
     ()=>{
       if(!lista.length) return;
-      lista.forEach(([i,c])=>{ Object.assign(b.detalle[i],c); if('bonoAdicional' in c) b.detalle[i].bonoDeFicha=false; });
+      lista.forEach(([i,c])=>Object.assign(b.detalle[i],c));
       recalcularFilasPlanilla(lista.map(([i])=>i));
       b.nota={tipo:'bien',texto:`Se cargaron ${nValores} valor${nValores===1?'':'es'} desde Excel en ${lista.length} empleado${lista.length===1?'':'s'}.`};
     },lista.length?'Aplicar cambios':'Cerrar');

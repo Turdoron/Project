@@ -229,7 +229,7 @@ VISTAS.empleados=()=>{
     <td>${esc(x.nombre)}${x.activo===false?' <span style="color:var(--alerta);font-size:12px">(baja)</span>':''}</td>
     <td>${esc(x.puesto||'—')}</td>
     <td>${x.fechaIngreso?fFecha(x.fechaIngreso):'<span style="color:var(--alerta)">sin definir</span>'}</td>
-    <td class="num">${Q(x.salarioBase)}${+x.bonoFijo?`<br><span style="font-size:12px;color:var(--tinta-suave)">+ bono fijo ${Q(x.bonoFijo)}</span>`:''}</td>
+    <td class="num">${Q(x.salarioBase)}</td>
     <td class="num">
       <button class="btn mini sec" data-accion="editarEmpleado" data-id="${x.id}">Editar</button>
       ${x.activo===false?'':`<button class="btn mini" data-accion="liquidarEmpleado" data-id="${x.id}">Liquidar</button>`}
@@ -264,26 +264,22 @@ function formEmpleado(existente){
       <div class="campo"><label>Salario base mensual</label><input name="salarioBase" type="number" step="0.01" min="0" value="${x.salarioBase||''}" placeholder="Sin la bonificación de Q250"></div>
       <div class="campo"><label>Fecha de ingreso</label><input name="fechaIngreso" type="date" value="${x.fechaIngreso||''}"></div>
       <div class="campo"><label>Correo (para avisarle de sus pagos)</label><input name="email" type="email" value="${esc(x.email||'')}" placeholder="nombre@correo.com"></div>
-      <div class="campo"><label>Bono fijo mensual (opcional)</label><input name="bonoFijo" type="number" step="0.01" min="0" value="${x.bonoFijo||''}" placeholder="0.00"></div>
     </div>
     <p style="margin:6px 0 0;font-size:13px;color:var(--tinta-suave)">La fecha de ingreso se usa para calcular el
       aguinaldo y el Bono 14 proporcional si entró a mitad del período legal — no hace falta tocar nada más,
-      el sistema lo prorratea solo. El bono fijo aparece solo en cada planilla como bono adicional (prorrateado si la
-      planilla es semanal o quincenal); en cada planilla se puede cambiar.</p>`,
+      el sistema lo prorratea solo.</p>`,
     d=>{
       const e=emp();
       if(!d.nombre.trim()){avisar('Escribí el nombre del empleado.');return false}
       const salario=+d.salarioBase;
       if(!salario||salario<=0){avisar('Escribí el salario base mensual.');return false}
-      const bonoFijo=r2(+d.bonoFijo||0);
-      if(bonoFijo<0){avisar('El bono fijo no puede ser negativo.');return false}
       if(existente){
         existente.nombre=d.nombre.trim(); existente.puesto=d.puesto.trim(); existente.salarioBase=r2(salario);
-        existente.fechaIngreso=d.fechaIngreso||existente.fechaIngreso||''; existente.email=(d.email||'').trim(); existente.bonoFijo=bonoFijo;
+        existente.fechaIngreso=d.fechaIngreso||existente.fechaIngreso||''; existente.email=(d.email||'').trim();
       }else{
         e.empleados=e.empleados||[];
         e.empleados.push({id:uid(),nombre:d.nombre.trim(),puesto:d.puesto.trim(),salarioBase:r2(salario),
-          fechaIngreso:d.fechaIngreso||'',email:(d.email||'').trim(),bonoFijo,activo:true});
+          fechaIngreso:d.fechaIngreso||'',email:(d.email||'').trim(),activo:true});
       }
       guardar();
     },existente?'Guardar cambios':'Agregar empleado');

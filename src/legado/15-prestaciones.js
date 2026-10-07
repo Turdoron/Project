@@ -475,7 +475,7 @@ function enlazarFormularioPlanilla(){
   const b=borradorPlanilla;
   const recalcular=(i)=>{ recalcularFilasPlanilla(i===undefined?undefined:[i]); pintar(); };
   const pPeriodo=document.getElementById('pPeriodo');
-  if(pPeriodo) pPeriodo.onchange=()=>{ b.periodo=pPeriodo.value; reprorratearBonosFijos(); recalcular(); };
+  if(pPeriodo) pPeriodo.onchange=()=>{ b.periodo=pPeriodo.value; recalcular(); };
   const pDesde=document.getElementById('pDesde'); if(pDesde) pDesde.onchange=()=>b.desde=pDesde.value;
   const pHasta=document.getElementById('pHasta'); if(pHasta) pHasta.onchange=()=>b.hasta=pHasta.value;
   const pFechaPago=document.getElementById('pFechaPago'); if(pFechaPago) pFechaPago.onchange=()=>b.fechaPago=pFechaPago.value;
@@ -497,7 +497,7 @@ ACCIONES.nuevaPlanilla=()=>{
   const desdeInicial=h.slice(0,8)+'01', hastaInicial=h;
   borradorPlanilla={periodo:'mensual',desde:desdeInicial,hasta:hastaInicial,fechaPago:h,
     cuentaPago:cajaBanco[0].c,
-    detalle:activos.map(x=>filaInicialPlanilla(x,'mensual',{desde:desdeInicial,hasta:hastaInicial},false))};
+    detalle:activos.map(x=>({...calcularPlanillaEmpleado(x,'mensual',{},{desde:desdeInicial,hasta:hastaInicial}),excluido:false}))};
   pintar();
 };
 ACCIONES.cancelarPlanilla=()=>{
@@ -602,7 +602,7 @@ ACCIONES.editarPlanilla=d=>{
   if(pl.partidaNumero){avisar('Esa planilla ya tiene partida en libros: ya no se puede editar.');return}
   const enPlanilla=new Set(pl.detalle.map(f=>f.empleadoId));
   const otros=(e.empleados||[]).filter(x=>x.activo!==false&&!enPlanilla.has(x.id))
-    .map(x=>filaInicialPlanilla(x,pl.periodo,{desde:pl.desde,hasta:pl.hasta},true));
+    .map(x=>({...calcularPlanillaEmpleado(x,pl.periodo,{},{desde:pl.desde,hasta:pl.hasta}),excluido:true}));
   borradorPlanilla={editandoId:pl.id,periodo:pl.periodo,desde:pl.desde,hasta:pl.hasta,fechaPago:pl.fechaPago,cuentaPago:pl.cuentaPago,
     detalle:[...pl.detalle.map(f=>({...f,excluido:false})),...otros]};
   VISTA='planillas'; pintar();
