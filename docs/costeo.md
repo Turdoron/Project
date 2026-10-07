@@ -43,11 +43,20 @@ La mano de obra que no se aplica a órdenes queda como gasto: es mano de obra in
   - Un período de baja producción no encarece cada unidad: el CIF no absorbido (capacidad ociosa) es gasto del período.
   - Por eso la variación va a resultados y no al inventario.
 
+**Una tasa para la planta o una por proceso.** Con varios procesos se puede elegir:
+- **Tasa única de planta**: un solo presupuesto y una sola capacidad. Es lo más sencillo y sirve cuando los procesos consumen CIF parecido.
+- **Tasa por proceso (departamental)**: cada proceso tiene su base, su capacidad normal y su presupuesto. Ejemplo: Corte por horas de MOD y Montaje por horas máquina.
+  - Cada boleta aplica la tasa del proceso donde se trabajó. Los CIF **no se duplican**: cada presupuesto cubre solo los gastos de su proceso, y la suma de los presupuestos es el CIF de la planta.
+  - Cada cuenta de CIF real puede asignarse a un proceso (por ejemplo, la depreciación de la máquina de montaje) o quedar **compartida** (por ejemplo, el alquiler de la nave).
+  - En el cierre de CIF, cada proceso compara lo aplicado con sus CIF propios más su parte de los compartidos. Esa parte se reparte según lo aplicado en cada proceso. La partida sigue siendo una sola para toda la planta.
+
 **Empresa nueva, sin historia:** el estimador arma la tasa con lo que se espera:
 - capacidad normal = trabajadores (o máquinas) × horas al mes × 12 × % de aprovechamiento;
 - CIF del año = gastos indirectos esperados por mes × 12.
 
-Con unos meses de operación, «Calcular con lo registrado» la ajusta con el promedio real de CIF y de horas.
+Con tasa por proceso, el estimador se usa proceso por proceso.
+
+Con unos meses de operación, «Calcular con lo registrado» la ajusta con el promedio real de CIF y de horas. Por proceso, toma las cuentas propias de cada uno más las compartidas repartidas según sus horas de MOD.
 
 **Alternativa, costeo real:** los CIF reales del período se reparten al final entre las órdenes con «Repartir costo común». La base de reparto puede ser unidades, horas, costo de materiales, porcentajes o partes iguales.
 

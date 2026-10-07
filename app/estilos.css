@@ -397,6 +397,7 @@ dialog::backdrop{background:var(--backdrop);backdrop-filter:blur(3px)}
 .recuadro-admin [data-v].on{border-left-color:var(--acento);background:var(--activo);color:var(--tinta);font-weight:600}
 .modal-cuerpo{padding:30px 30px 26px}
 .modal-cuerpo h3{font:400 23px/1.25 var(--tipo-titulo);letter-spacing:-.015em;margin-bottom:20px}
+[hidden]{display:none!important}
 .rej{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
 .rej .full{grid-column:1/-1}
 .pie-modal{display:flex;justify-content:flex-end;gap:10px;padding:16px 30px;
