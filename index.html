@@ -381,28 +381,114 @@ document.documentElement.setAttribute('data-theme',osc?'dark':'light');})();
 <dialog id="modal"><div id="modalForm"></div></dialog>
 <dialog id="aviso"><div id="avisoCuerpo"></div></dialog>
 
+<script>window.sbListo=new Promise(r=>{window.__sbResolve=r});</script>
+<script type="module" src="/src/supabase.js"></script>
 <script>
-/* ============ ALMACENAMIENTO ============ */
-const LLAVE='contagt_v1';
+/* ============ ALMACENAMIENTO (Supabase) ============ */
+/* Los datos viven en la nube: cada persona recibe SOLO lo que el servidor le permite ver
+   (reglas RLS por administrador, empresa y rol). Aquí se arma, en memoria, el mismo objeto
+   BD que usaba la app, y guardar() sincroniza al servidor lo que cambió. */
 const VACIO=()=>({empresas:[],activa:null,usuarios:[],sesion:null,bitacora:[]});
-let modo='memoria', memoria=VACIO();
-try{localStorage.setItem('_t','1');localStorage.removeItem('_t');modo='local'}catch(e){}
-if(modo==='memoria' && window.storage && typeof window.storage.get==='function') modo='vista';
+const modo='nube';
+let tGuardar=null, sincronizando=false, pendiente=false, cacheEmpresas={};
+const sbOk=r=>{ if(r.error) throw new Error(r.error.message); return r.data||[]; };
+const msgError=m=>/row-level security|violates/i.test(m)?'La licencia no está vigente o llegaste al límite de tu plan.':m;
 
 async function cargar(){
-  try{
-    if(modo==='local') return JSON.parse(localStorage.getItem(LLAVE))||VACIO();
-    if(modo==='vista'){const r=await window.storage.get(LLAVE); return r&&r.value?JSON.parse(r.value):VACIO()}
-  }catch(e){}
-  return VACIO();
+  const sb=window.sb;
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session) return VACIO();
+  const uid0=session.user.id;
+  const per=sbOk(await sb.from('perfiles').select('*'));
+  const yo=per.find(p=>p.id===uid0);
+  if(!yo) return VACIO();
+  const esSuper=yo.rol==='superadmin';
+  const [lic,emps,mie,bit]=await Promise.all([
+    sb.from('licencias').select('*').then(sbOk),
+    esSuper?Promise.resolve([]):sb.from('empresas').select('id,admin_id,nombre,datos,version').then(sbOk),
+    sb.from('miembros').select('empresa_id,user_id').then(sbOk),
+    sb.from('bitacora').select('*').order('fecha',{ascending:false}).limit(500).then(sbOk)
+  ]);
+  const aRol=p=>p.rol==='superadmin'?'superadmin':p.rol==='administrador'?'administrador':(p.rol_app||'cont_auxiliar');
+  const bd=VACIO();
+  bd.sesion=uid0;
+  bd.usuarios=per.map(p=>({id:p.id,usuario:p.email||p.usuario||'',nombre:p.nombre,rol:aRol(p),
+    administradorId:p.admin_id||null,activo:p.activo,iaPermitida:p.ia_permitida,debeCambiarClave:p.debe_cambiar_clave,
+    empresasAsignadas:p.rol==='empleado'?mie.filter(m=>m.user_id===p.id).map(m=>m.empresa_id):undefined,
+    licencia:lic.find(l=>l.admin_id===p.id)||null}));
+  cacheEmpresas={};
+  bd.empresas=emps.map(e=>{
+    const datos=e.datos||{};
+    cacheEmpresas[e.id]={json:JSON.stringify(datos),version:e.version};
+    return {...datos,id:e.id,nombre:e.nombre,administradorId:e.admin_id};
+  });
+  const admin=yo.rol==='administrador'?yo.id:yo.admin_id;
+  bd.bitacora=bit.map(b=>({id:String(b.id),fecha:b.fecha,administradorId:admin,usuarioId:b.user_id,
+    usuarioNombre:(b.detalle||{}).usuarioNombre||'',rol:(b.detalle||{}).rol||'',
+    empresaNombre:(b.detalle||{}).empresaNombre||'',accion:b.accion,detalle:(b.detalle||{}).texto||''}));
+  let activa=null; try{ activa=localStorage.getItem('contagt_activa_'+uid0); }catch(e){}
+  bd.activa=bd.empresas.some(e=>e.id===activa)?activa:(bd.empresas[0]?bd.empresas[0].id:null);
+  return bd;
+}
+async function recargarDatos(){
+  const activa=BD.activa;
+  BD=await cargar();
+  if(BD.empresas.some(e=>e.id===activa)) BD.activa=activa;
 }
 function guardar(){
-  try{
-    if(modo==='local') localStorage.setItem(LLAVE,JSON.stringify(BD));
-    else if(modo==='vista') window.storage.set(LLAVE,JSON.stringify(BD)).catch(()=>{});
-    else memoria=BD;
-  }catch(e){avisar('No se pudo guardar: '+e.message)}
+  if(!window.sb||!BD.sesion) return;
+  try{ localStorage.setItem('contagt_activa_'+BD.sesion,BD.activa||''); }catch(e){}
+  clearTimeout(tGuardar);
+  tGuardar=setTimeout(sincronizar,700);
 }
+async function sincronizar(){
+  tGuardar=null;
+  if(sincronizando){ pendiente=true; return; }
+  const u=usuarioActual();
+  if(!u||u.rol==='superadmin') return;
+  sincronizando=true;
+  const sb=window.sb;
+  try{
+    const vivos=new Set();
+    for(const e of [...BD.empresas]){
+      vivos.add(e.id);
+      const {id,administradorId,...datos}=e;
+      const json=JSON.stringify(datos);
+      const c=cacheEmpresas[e.id];
+      if(!c){
+        const r=await sb.from('empresas').insert({id:e.id,admin_id:u.id,nombre:e.nombre||'',datos}).select('version').single();
+        if(r.error){
+          BD.empresas=BD.empresas.filter(x=>x.id!==e.id);
+          if(BD.activa===e.id) BD.activa=BD.empresas[0]?BD.empresas[0].id:null;
+          pintar(); avisar('No se pudo crear la empresa: '+msgError(r.error.message),'Atención');
+          continue;
+        }
+        cacheEmpresas[e.id]={json,version:r.data.version};
+      }else if(c.json!==json){
+        const r=await sb.from('empresas').update({nombre:e.nombre||'',datos}).eq('id',e.id).eq('version',c.version).select('version');
+        if(r.error) throw new Error(r.error.message);
+        if(!r.data.length){
+          await recargarDatos(); pintar();
+          avisar('Otra persona modificó esta empresa al mismo tiempo. Se cargó la versión más reciente; repetí tu último cambio.','Atención');
+          return;
+        }
+        cacheEmpresas[e.id]={json,version:r.data[0].version};
+      }
+    }
+    for(const id of Object.keys(cacheEmpresas)){
+      if(vivos.has(id)) continue;
+      const r=await sb.from('empresas').delete().eq('id',id);
+      if(r.error) throw new Error(r.error.message);
+      delete cacheEmpresas[id];
+    }
+  }catch(err){
+    avisar('No se pudo guardar en la nube: '+msgError(err.message)+'\nTus cambios siguen en pantalla; se reintentará en el próximo guardado.','Sin conexión');
+  }finally{
+    sincronizando=false;
+    if(pendiente){ pendiente=false; guardar(); }
+  }
+}
+addEventListener('beforeunload',ev=>{ if(tGuardar||sincronizando){ ev.preventDefault(); ev.returnValue=''; } });
 let BD=VACIO();
 const emp=()=>{
   const e=BD.empresas.find(x=>x.id===BD.activa);
@@ -451,7 +537,7 @@ async function conSnapshot(etiqueta,fn){
 }
 
 /* ============ UTILIDADES ============ */
-const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const uid=()=>crypto.randomUUID();
 const Q=n=>(n||0).toLocaleString('es-GT',{minimumFractionDigits:2,maximumFractionDigits:2});
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 /* Fecha LOCAL (Guatemala, UTC−6). toISOString() devuelve la fecha en UTC, que
@@ -759,26 +845,12 @@ function sincronizarRegimenActual(e){
 }
 
 /* ============ USUARIOS, ROLES Y PERMISOS ============ */
-/* Candado organizativo, no seguridad real: este sistema no tiene servidor, así
-   que cualquiera con acceso a las herramientas de desarrollador del navegador
-   puede saltárselo. Sirve para ordenar el trabajo entre varias personas del
-   mismo despacho y evitar que alguien borre algo por error, no para proteger
-   contra alguien que decida forzarlo a propósito. La seguridad real —
-   contraseñas que ni el sistema puede leer, sesiones validadas en un
-   servidor— es parte de la versión con backend, todavía no de esta.
-
-   MAQUETADO para la migración a Next.js: esta pantalla, sus roles y su tabla
-   de usuarios están pensados para trasladarse casi tal cual a la versión con
-   servidor (Next.js en la nube de Vercel, con base de datos). Ahí es donde el
-   rol de Superadministrador cobra su sentido completo: hoy solo administra
-   Administradores dentro de ESTE despacho porque no hay nada centralizado que
-   administrar; en la nube va a poder gestionar todas las firmas contables que
-   usen el sistema, porque ahí sí van a compartir un mismo servidor y una
-   misma base de datos. La estructura de roles, el árbol de permisos por
-   departamento y las pantallas ya están armadas — lo que cambia en la
-   migración es reemplazar este candado de navegador por autenticación real
-   del lado del servidor (sesiones firmadas, contraseñas con hash y sal como
-   corresponde, verificación en cada llamada a la base de datos). */
+/* Cuentas y permisos. La identidad, las contraseñas, las licencias y el acceso a los datos de cada
+   empresa los controla el servidor (Supabase con reglas por fila + la función api/usuarios.js, que es la
+   única que usa la llave secreta). Lo que se decide aquí es qué módulos ve cada cargo: eso se aplica en
+   esta aplicación, por lo que ordena el trabajo del equipo pero no sustituye al servidor.
+   Jerarquía: Superadministrador > Administrador (cliente con licencia) > empresas > personal. */
+*/
 const ROLES={
   superadmin:{nombre:'Superadministrador', grupo:'Dirección'},
   administrador:{nombre:'Administrador', grupo:'Dirección'},
@@ -799,13 +871,6 @@ const ROLES_ASIGNABLES=['administrador','cont_gerente','cont_auxiliar','rrhh_ger
   'prod_gerente','prod_auxiliar','ventas_gerente','ventas_auxiliar','ventas_vendedor',
   'compras_gerente','compras_auxiliar'];
 
-/* No es un hash con sal ni lento como bcrypt — es SHA-256 con lo único que trae
-   el navegador de fábrica. Evita que la contraseña quede escrita tal cual en
-   el respaldo, pero no es criptografía de verdad para proteger contraseñas. */
-async function hashClave(texto){
-  const buf=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(texto));
-  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
-}
 /* Bitácora: solo la ve el Administrador dueño del espacio (y de rebote el
    superadmin no, porque no administra empresas). Guarda quién hizo qué,
    cuándo, y en qué empresa, para poder revisar después sin tener que
@@ -817,8 +882,9 @@ function registrarLog(accion,detalle){
   BD.bitacora.push({id:uid(),fecha:new Date().toISOString(),administradorId:admin,
     usuarioId:u.id,usuarioNombre:u.nombre||u.usuario,rol:(ROLES[u.rol]||{}).nombre||u.rol,
     empresaNombre:(emp()&&emp().nombre)||'',accion,detalle:detalle||''});
-  /* No se guarda aparte con guardar() para no duplicar escrituras — queda
-     dentro del mismo BD y se persiste con el resto en el próximo guardar(). */
+  const ult=BD.bitacora[BD.bitacora.length-1];
+  if(window.sb) window.sb.from('bitacora').insert({user_id:u.id,empresa_id:BD.activa||null,accion,
+    detalle:{texto:detalle||'',usuarioNombre:ult.usuarioNombre,rol:ult.rol,empresaNombre:ult.empresaNombre}}).then(()=>{},()=>{});
 }
 
 function usuarioActual(){
@@ -898,37 +964,32 @@ function empresasVisibles(){
   return propias;   // sin el campo definido: compatibilidad con cuentas viejas
 }
 
-/* Contraseñas con sal por usuario: el mismo texto ya no da el mismo hash en
-   dos cuentas. Las cuentas viejas (sin sal) siguen entrando y se migran solas
-   la próxima vez que inician sesión. */
-const salAleatoria=()=>[...crypto.getRandomValues(new Uint8Array(16))].map(b=>b.toString(16).padStart(2,'0')).join('');
-async function fijarClave(u,clave){ u.sal=salAleatoria(); u.passHash=await hashClave(u.sal+clave); }
-async function verificarClave(u,clave){ return u.passHash===await hashClave((u.sal||'')+clave); }
-const CLAVE_INICIAL_SUPERADMIN='Xela2026$';
-
-/* Si nadie se ha registrado todavía, se crea sola la cuenta de
-   Superadministrador con una clave inicial, pero OBLIGADA a cambiarse en el
-   primer ingreso — la clave inicial está escrita en este archivo y no puede
-   quedar como clave real. */
-async function asegurarSuperadmin(){
-  BD.usuarios=BD.usuarios||[];
-  if(BD.usuarios.some(u=>u.rol==='superadmin')) return;
-  const s={id:uid(),usuario:'admin',nombre:'Superadministrador',rol:'superadmin',activo:true,debeCambiarClave:true};
-  await fijarClave(s,CLAVE_INICIAL_SUPERADMIN);
-  BD.usuarios.push(s);
-  guardar();
+/* Motivo por el que una cuenta no puede entrar (o null si puede). La fuerza real la pone
+   el servidor: sin licencia vigente, las empresas simplemente no se entregan. */
+function motivoBloqueo(u){
+  if(!u) return 'Tu cuenta no está configurada en el sistema. Consultá con tu administrador.';
+  if(u.activo===false) return 'Este usuario está bloqueado. Consultá con tu administrador.';
+  if(u.rol==='superadmin') return null;
+  const jefeId=u.rol==='administrador'?u.id:u.administradorId;
+  const jefe=(BD.usuarios||[]).find(x=>x.id===jefeId);
+  if(jefe && jefe.activo===false) return 'El Administrador del que depende esta cuenta está bloqueado, así que esta cuenta tampoco puede entrar.';
+  const lic=jefe&&jefe.licencia;
+  if(!lic) return 'Esta cuenta no tiene una licencia asignada. Consultá con tu proveedor.';
+  if(lic.estado!=='activa') return 'La licencia está suspendida. Consultá con tu proveedor.';
+  if(lic.vence && lic.vence<new Date().toISOString().slice(0,10)) return 'La licencia venció el '+lic.vence+'. Consultá con tu proveedor para renovarla.';
+  return null;
 }
 
-/* Si el Administrador del que depende este usuario está bloqueado, el usuario
-   queda bloqueado con él — bloquear al jefe bloquea a todo su equipo. */
-function cuentaBloqueada(u){
-  if(!u) return true;
-  if(u.activo===false) return true;
-  if(u.administradorId){
-    const jefe=(BD.usuarios||[]).find(x=>x.id===u.administradorId);
-    if(jefe && jefe.activo===false) return true;
-  }
-  return false;
+async function apiUsuarios(payload){
+  const {data:{session}}=await window.sb.auth.getSession();
+  if(!session) throw new Error('Tu sesión terminó. Iniciá sesión de nuevo.');
+  let r;
+  try{
+    r=await fetch('/api/usuarios',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.access_token},body:JSON.stringify(payload)});
+  }catch(e){ throw new Error('No hay conexión con el servidor.'); }
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.error||('Error '+r.status));
+  return j;
 }
 
 function entrarConSesion(u){
@@ -940,49 +1001,54 @@ function entrarConSesion(u){
   pintar();
 }
 
+const traduceAuth=m=>/invalid login|credentials/i.test(m)?'Correo o contraseña incorrectos.':/rate limit|too many/i.test(m)?'Demasiados intentos. Esperá unos minutos.':m;
+
+async function iniciarSesionApp(){
+  try{ BD=await cargar(); }
+  catch(err){ try{ await window.sb.auth.signOut(); }catch(e){} BD=VACIO(); pantallaLogin('No se pudo cargar tu información: '+err.message); return; }
+  const u=usuarioActual();
+  const motivo=motivoBloqueo(u);
+  if(motivo){ try{ await window.sb.auth.signOut(); }catch(e){} BD=VACIO(); pantallaLogin(motivo); return; }
+  if(u.debeCambiarClave){ pantallaCambioClave(u); return; }
+  const eA=emp(); if(eA) asegurarCatalogoMinimo(eA);
+  entrarConSesion(u);
+}
+
 function pantallaLogin(mensajeError){
   const cont=document.getElementById('loginScreen');
   cont.innerHTML=`<div class="login-caja">
     <h2>Módulo Contable TINBREW</h2>
     <p class="sub">Iniciá sesión para continuar</p>
     ${mensajeError?`<div class="login-error">${esc(mensajeError)}</div>`:''}
-    <div class="campo-login"><label>Usuario</label><input id="loginUsuario" autocomplete="username"></div>
+    <div class="campo-login"><label>Correo electrónico</label><input id="loginUsuario" type="email" autocomplete="username"></div>
     <div class="campo-login"><label>Contraseña</label><input id="loginClave" type="password" autocomplete="current-password"></div>
     <button class="btn" id="btnLogin" type="button">Ingresar</button>
     <p style="text-align:center;margin-top:14px">
-      <a href="#" id="linkRestablecer" style="font-size:12.5px;color:var(--tinta-suave)">¿Olvidaste la clave del Superadministrador?</a></p>
+      <a href="#" id="linkRestablecer" style="font-size:12.5px;color:var(--tinta-suave)">¿Olvidaste tu contraseña?</a></p>
   </div>`;
   cont.style.display='flex';
   document.getElementById('app').style.display='none';
   const intentar=async()=>{
-    const usuario=document.getElementById('loginUsuario').value.trim();
+    const correo=document.getElementById('loginUsuario').value.trim().toLowerCase();
     const clave=document.getElementById('loginClave').value;
-    if(!usuario||!clave){ pantallaLogin('Escribí el usuario y la contraseña.'); return; }
-    const u=(BD.usuarios||[]).find(x=>x.usuario.toLowerCase()===usuario.toLowerCase());
-    if(!u||!(await verificarClave(u,clave))){ pantallaLogin('Usuario o contraseña incorrectos.'); return; }
-    if(u.activo===false){ pantallaLogin('Este usuario está bloqueado. Consultá con tu administrador.'); return; }
-    if(cuentaBloqueada(u)){ pantallaLogin('El Administrador del que depende esta cuenta está bloqueado, así que esta cuenta tampoco puede entrar.'); return; }
-    /* Migración a contraseña con sal, sin pedir nada al usuario. */
-    if(!u.sal){ await fijarClave(u,clave); guardar(); }
-    if(u.debeCambiarClave || (u.rol==='superadmin' && clave===CLAVE_INICIAL_SUPERADMIN)){ pantallaCambioClave(u); return; }
-    entrarConSesion(u);
+    if(!correo||!clave){ pantallaLogin('Escribí el correo y la contraseña.'); return; }
+    const btn=document.getElementById('btnLogin'); btn.disabled=true; btn.textContent='Entrando…';
+    const {error}=await window.sb.auth.signInWithPassword({email:correo,password:clave});
+    if(error){ pantallaLogin(traduceAuth(error.message)); return; }
+    await iniciarSesionApp();
   };
-  /* Antes este enlace restablecía la cuenta de Superadministrador a una clave
-     conocida SIN pedir nada: cualquiera podía tomar el control. Ahora exige el
-     código de recuperación que se le mostró al Superadministrador al fijar su clave. */
   document.getElementById('linkRestablecer').onclick=ev=>{ ev.preventDefault(); pantallaRecuperar(); };
   document.getElementById('btnLogin').onclick=intentar;
   cont.querySelectorAll('input').forEach(i=>i.onkeydown=ev=>{ if(ev.key==='Enter') intentar(); });
   setTimeout(()=>{ const x=document.getElementById('loginUsuario'); if(x) x.focus(); },0);
 }
 
-/* Cambio obligatorio de clave (primer ingreso o clave inicial). Al
-   Superadministrador se le genera además un código de recuperación. */
+/* Cambio obligatorio de clave (primer ingreso, o tras pedir un enlace de recuperación). */
 function pantallaCambioClave(u,mensajeError){
   const cont=document.getElementById('loginScreen');
   cont.innerHTML=`<div class="login-caja">
     <h2>Definí tu contraseña</h2>
-    <p class="sub">${esc(u.nombre||u.usuario)}: por seguridad tenés que cambiar la contraseña antes de seguir.</p>
+    <p class="sub">${esc(u.nombre||u.usuario||'Tu cuenta')}: por seguridad tenés que elegir una contraseña nueva antes de seguir.</p>
     ${mensajeError?`<div class="login-error">${esc(mensajeError)}</div>`:''}
     <div class="campo-login"><label>Nueva contraseña (mínimo 8 caracteres)</label><input id="nuevaClave" type="password" autocomplete="new-password"></div>
     <div class="campo-login"><label>Repetila</label><input id="nuevaClave2" type="password" autocomplete="new-password"></div>
@@ -994,53 +1060,42 @@ function pantallaCambioClave(u,mensajeError){
     const c1=document.getElementById('nuevaClave').value, c2=document.getElementById('nuevaClave2').value;
     if(c1.length<8){ pantallaCambioClave(u,'La contraseña tiene que tener al menos 8 caracteres.'); return; }
     if(c1!==c2){ pantallaCambioClave(u,'Las dos contraseñas no coinciden.'); return; }
-    if(c1===CLAVE_INICIAL_SUPERADMIN){ pantallaCambioClave(u,'No podés usar la contraseña inicial.'); return; }
-    await fijarClave(u,c1); u.debeCambiarClave=false;
-    if(u.rol==='superadmin'){
-      const codigo=salAleatoria().slice(0,16).toUpperCase().match(/.{4}/g).join('-');
-      u.recuperacionHash=await hashClave('REC:'+codigo);
-      guardar();
-      cont.innerHTML=`<div class="login-caja">
-        <h2>Código de recuperación</h2>
-        <p class="sub">Anotalo y guardalo en un lugar seguro. Es la única forma de recuperar la cuenta de Superadministrador si olvidás la contraseña. No se vuelve a mostrar.</p>
-        <p style="text-align:center;font:600 20px monospace;letter-spacing:.06em;margin:18px 0">${codigo}</p>
-        <button class="btn" id="btnYaAnote" type="button">Ya lo anoté — entrar</button></div>`;
-      document.getElementById('btnYaAnote').onclick=()=>entrarConSesion(u);
-      return;
-    }
-    guardar();
-    entrarConSesion(u);
+    const {error}=await window.sb.auth.updateUser({password:c1});
+    if(error){ pantallaCambioClave(u,traduceAuth(error.message)); return; }
+    await window.sb.rpc('clave_cambiada');
+    window.__recuperando=false;
+    await iniciarSesionApp();
   };
   document.getElementById('btnGuardarClave').onclick=guardarClave;
   cont.querySelectorAll('input').forEach(i=>i.onkeydown=ev=>{ if(ev.key==='Enter') guardarClave(); });
   setTimeout(()=>{ const x=document.getElementById('nuevaClave'); if(x) x.focus(); },0);
 }
 
-function pantallaRecuperar(mensajeError){
+function pantallaRecuperar(mensaje){
   const cont=document.getElementById('loginScreen');
   cont.innerHTML=`<div class="login-caja">
-    <h2>Recuperar Superadministrador</h2>
-    <p class="sub">Escribí el código de recuperación que se te mostró al definir la contraseña.</p>
-    ${mensajeError?`<div class="login-error">${esc(mensajeError)}</div>`:''}
-    <div class="campo-login"><label>Código de recuperación</label><input id="codigoRec" autocomplete="off" placeholder="XXXX-XXXX-XXXX-XXXX"></div>
-    <button class="btn" id="btnRecuperar" type="button">Continuar</button>
+    <h2>Recuperar contraseña</h2>
+    <p class="sub">Escribí tu correo y te enviamos un enlace para elegir una contraseña nueva.</p>
+    ${mensaje?`<div class="login-error">${esc(mensaje)}</div>`:''}
+    <div class="campo-login"><label>Correo electrónico</label><input id="correoRec" type="email" autocomplete="email"></div>
+    <button class="btn" id="btnRecuperar" type="button">Enviar enlace</button>
     <p style="text-align:center;margin-top:14px"><a href="#" id="linkVolver" style="font-size:12.5px;color:var(--tinta-suave)">Volver</a></p>
   </div>`;
-  const recuperar=async()=>{
-    const codigo=document.getElementById('codigoRec').value.trim().toUpperCase();
-    const s=(BD.usuarios||[]).find(x=>x.rol==='superadmin');
-    if(!s||!s.recuperacionHash){ pantallaRecuperar('Esta cuenta todavía no tiene código de recuperación. Entrá con la contraseña que tenés.'); return; }
-    if(!codigo||(await hashClave('REC:'+codigo))!==s.recuperacionHash){ pantallaRecuperar('Código incorrecto.'); return; }
-    s.activo=true; s.debeCambiarClave=true; guardar();
-    pantallaCambioClave(s);
+  const enviar=async()=>{
+    const correo=document.getElementById('correoRec').value.trim().toLowerCase();
+    if(!correo){ pantallaRecuperar('Escribí tu correo.'); return; }
+    await window.sb.auth.resetPasswordForEmail(correo,{redirectTo:location.origin});
+    pantallaRecuperar('Si el correo está registrado, te enviamos un enlace. Revisá también la carpeta de spam.');
   };
-  document.getElementById('btnRecuperar').onclick=recuperar;
+  document.getElementById('btnRecuperar').onclick=enviar;
   document.getElementById('linkVolver').onclick=ev=>{ ev.preventDefault(); pantallaLogin(); };
-  setTimeout(()=>{ const x=document.getElementById('codigoRec'); if(x) x.focus(); },0);
+  setTimeout(()=>{ const x=document.getElementById('correoRec'); if(x) x.focus(); },0);
 }
 function cerrarSesion(){
-  confirmar('Se cerrará la sesión actual.',()=>{
-    BD.sesion=null; guardar();
+  confirmar('Se cerrará la sesión actual.',async()=>{
+    tGuardar&&clearTimeout(tGuardar); await sincronizar();
+    BD=VACIO();
+    try{ await window.sb.auth.signOut(); }catch(e){}
     VISTA='home'; borrador=null; borradorPlanilla=null; lote=[];
     pantallaLogin();
   },'Cerrar sesión');
@@ -3400,10 +3455,8 @@ VISTAS.usuarios=()=>{
         <button class="btn sec" data-accion="guardarClaveIA">Guardar</button>
         ${claveIA()?'<button class="btn peligro" data-accion="borrarClaveIA">Quitar clave</button>':''}
       </div></div>`:'')
-  + `<div class="aviso" style="margin-top:18px">Esto ordena el trabajo entre varias personas y evita borrados por
-      error, pero no es una protección de verdad: alguien con conocimientos técnicos podría saltárselo abriendo
-      las herramientas de desarrollador del navegador. La seguridad real llega con la versión del sistema que
-      corra en un servidor.</div>`;
+  + `<div class="aviso" style="margin-top:18px">Las cuentas, contraseñas y licencias las controla el servidor. Qué módulos ve cada cargo se
+      aplica en esta aplicación; el acceso a los datos de cada empresa lo controla la base de datos, según el Administrador al que pertenezca.</div>`;
 };
 
 VISTAS.config=()=>cab('Configuración','Ajustes del sistema, no de una empresa en particular.')
@@ -7498,24 +7551,30 @@ ACCIONES.editarUsuario=d=>{
 function formUsuario(existente){
   const actual=usuarioActual(), esSuper=actual.rol==='superadmin';
   const x=existente||{};
+  const lic=x.licencia||{};
   const opsRol = esSuper
     ? `<option value="administrador">Administrador</option>`
     : ROLES_ASIGNABLES.filter(r=>r!=='administrador')
         .map(r=>`<option value="${r}"${x.rol===r?' selected':''}>${ROLES[r].nombre}</option>`).join('');
   const misEmpresas = esSuper ? [] : BD.empresas.filter(e=>e.administradorId===actual.id);
-  const asignadasActuales = Array.isArray(x.empresasAsignadas) ? x.empresasAsignadas : null;   // null = todas (compatibilidad)
+  const asignadasActuales = Array.isArray(x.empresasAsignadas) ? x.empresasAsignadas : null;   // null = cuenta nueva
   const checksEmpresas = misEmpresas.map(e=>`<label style="display:flex;align-items:center;gap:6px;font-weight:400;margin-bottom:4px">
       <input type="checkbox" name="emp_${e.id}" style="width:auto"
         ${asignadasActuales===null || asignadasActuales.includes(e.id) ? 'checked' : ''}>
       ${esc(e.nombre)}</label>`).join('');
+  const limites=[10,20,50,100,500];
+  const opsLimite=limites.map(n=>`<option value="${n}"${(lic.max_empresas||10)===n?' selected':''}>Hasta ${n} empresas</option>`).join('');
   abrirModal(existente?'Editar usuario':(esSuper?'Agregar administrador':'Agregar usuario'),
     `<div class="rej">
       <div class="campo full"><label>Nombre completo</label><input name="nombre" value="${esc(x.nombre||'')}"></div>
-      <div class="campo"><label>Usuario</label><input name="usuario" value="${esc(x.usuario||'')}" ${existente?'':''}></div>
+      <div class="campo"><label>Correo electrónico (con él inicia sesión)</label><input name="usuario" type="email" value="${esc(x.usuario||'')}"></div>
       <div class="campo"><label>Rol</label><select name="rol" ${esSuper?'disabled':''}>${opsRol}</select></div>
-      <div class="campo full"><label>${existente?'Nueva contraseña (dejar en blanco para no cambiarla)':'Contraseña'}</label>
-        <input name="clave" type="password"></div>
-      ${esSuper ? `<div class="campo full"><label style="display:flex;gap:8px;align-items:flex-start;font-weight:400">
+      <div class="campo full"><label>${existente?'Nueva contraseña (dejar en blanco para no cambiarla)':'Contraseña inicial (la persona tendrá que cambiarla al entrar)'}</label>
+        <input name="clave" type="password" autocomplete="new-password"></div>
+      ${esSuper ? `<div class="campo"><label>Plan (tramo de empresas)</label><select name="limiteEmpresas">${opsLimite}</select></div>
+      <div class="campo"><label>Máximo de usuarios</label><input name="maxUsuarios" type="number" min="1" value="${lic.max_usuarios||25}"></div>
+      <div class="campo"><label>La licencia vence (vacío = sin vencimiento)</label><input name="vence" type="date" value="${esc(lic.vence||'')}"></div>
+      <div class="campo full"><label style="display:flex;gap:8px;align-items:flex-start;font-weight:400">
         <input type="checkbox" name="iaPermitida" style="width:auto;margin-top:4px"${x.iaPermitida?' checked':''}>
         <span><strong>Puede usar el asistente de IA</strong> — lo usa también todo el personal de este Administrador.
         Cada consulta se cobra a la clave de API que guardaste en Usuarios.</span></label></div>` : ''}
@@ -7526,48 +7585,42 @@ function formUsuario(existente){
     </div>`,
     async d=>{
       if(!d.nombre.trim()){avisar('Escribí el nombre.');return false}
-      if(!d.usuario.trim()){avisar('Escribí el usuario.');return false}
-      const yaExiste=(BD.usuarios||[]).some(u=>u.usuario.toLowerCase()===d.usuario.trim().toLowerCase() && u.id!==(existente&&existente.id));
-      if(yaExiste){avisar('Ya existe un usuario con ese nombre de usuario.');return false}
+      if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.usuario.trim())){avisar('Escribí un correo electrónico válido.');return false}
       if(!existente && !d.clave){avisar('Escribí una contraseña.');return false}
-      if(!existente && d.clave.length<8){avisar('La contraseña tiene que tener al menos 8 caracteres.');return false}
+      if(d.clave && d.clave.length<8){avisar('La contraseña tiene que tener al menos 8 caracteres.');return false}
       const rol = esSuper ? 'administrador' : d.rol;
-      const empresasAsignadas = esSuper ? undefined : misEmpresas.filter(e=>d['emp_'+e.id]==='on').map(e=>e.id);
-      if(existente){
-        existente.nombre=d.nombre.trim(); existente.usuario=d.usuario.trim(); existente.rol=rol;
-        if(!esSuper) existente.empresasAsignadas=empresasAsignadas;
-        if(esSuper) existente.iaPermitida=d.iaPermitida==='on';
-        if(d.clave){ if(d.clave.length<8){avisar('La contraseña tiene que tener al menos 8 caracteres.');return false} await fijarClave(existente,d.clave); }
-        registrarLog('Editó una cuenta de usuario',`${existente.nombre} (${existente.usuario})`);
-      }else{
-        BD.usuarios=BD.usuarios||[];
-        BD.usuarios.push({id:uid(),usuario:d.usuario.trim(),nombre:d.nombre.trim(),rol,
-          administradorId: esSuper ? null : actual.id,   // a quién le reporta este personal
-          empresasAsignadas: esSuper ? undefined : empresasAsignadas,
-          iaPermitida: esSuper ? d.iaPermitida==='on' : undefined,
-          activo:true});
-        await fijarClave(BD.usuarios[BD.usuarios.length-1],d.clave);
-        registrarLog('Creó una cuenta de usuario',`${d.nombre.trim()} (${d.usuario.trim()}) — ${ROLES[rol].nombre}`);
-      }
-      guardar();
+      const payload={accion:existente?'editar':'crear',id:existente&&existente.id,nombre:d.nombre.trim(),
+        email:d.usuario.trim(),clave:d.clave||undefined,rol,
+        empresas:esSuper?undefined:misEmpresas.filter(e=>d['emp_'+e.id]==='on').map(e=>e.id),
+        iaPermitida:esSuper?d.iaPermitida==='on':undefined,
+        limiteEmpresas:d.limiteEmpresas,maxUsuarios:d.maxUsuarios,vence:d.vence||null};
+      try{
+        await apiUsuarios(payload);
+        await recargarDatos();
+      }catch(err){ avisar(err.message); return false; }
+      registrarLog(existente?'Editó una cuenta de usuario':'Creó una cuenta de usuario',`${d.nombre.trim()} (${d.usuario.trim()}) — ${ROLES[rol].nombre}`);
+      pintar();
     },existente?'Guardar cambios':'Crear cuenta');
 }
-ACCIONES.alternarUsuario=d=>{
+ACCIONES.alternarUsuario=async d=>{
   const x=usuarioEnAlcance(d.id);
   if(!x){avisar('Esa cuenta no está a tu alcance.');return}
   if(x.id===BD.sesion){avisar('No podés bloquear tu propia cuenta mientras la estás usando.');return}
-  x.activo = x.activo===false;
-  registrarLog(x.activo?'Desbloqueó una cuenta':'Bloqueó una cuenta',`${x.nombre} (${x.usuario})`);
-  guardar(); pintar();
+  try{ await apiUsuarios({accion:'alternar',id:x.id}); await recargarDatos(); }
+  catch(err){ avisar(err.message); return; }
+  registrarLog(x.activo===false?'Bloqueó una cuenta':'Desbloqueó una cuenta',`${x.nombre} (${x.usuario})`);
+  pintar();
 };
 ACCIONES.borrarUsuario=d=>{
   const x=usuarioEnAlcance(d.id);
   if(!x){avisar('Esa cuenta no está a tu alcance.');return}
   if(x.id===BD.sesion){avisar('No podés eliminar tu propia cuenta mientras la estás usando.');return}
-  confirmar(`Se eliminará la cuenta de ${x.nombre} (${x.usuario}).`,()=>{
-    BD.usuarios=BD.usuarios.filter(u=>u.id!==d.id);
+  const extra=x.rol==='administrador'?'\n\nSe eliminarán también TODAS sus empresas y su personal. No se puede deshacer.':'';
+  confirmar(`Se eliminará la cuenta de ${x.nombre} (${x.usuario}).${extra}`,async()=>{
+    try{ await apiUsuarios({accion:'borrar',id:x.id}); await recargarDatos(); }
+    catch(err){ avisar(err.message); return; }
     registrarLog('Eliminó una cuenta de usuario',`${x.nombre} (${x.usuario})`);
-    guardar(); pintar();
+    pintar();
   },'Eliminar cuenta');
 };
 
@@ -10361,13 +10414,12 @@ ACCIONES.importar=()=>{
       if(!d.empresas)throw new Error('El archivo no tiene el formato esperado.');
       const admin=administradorDeSesion();
       const n=d.empresas.length;
-      confirmar(`El respaldo trae ${n} empresa${n===1?'':'s'}.\n\nSe reemplazará TU información actual (tus empresas y tu personal) por lo que trae este archivo. No toca los datos de ningún otro Administrador que use este mismo sistema.`,()=>{
+      confirmar(`El respaldo trae ${n} empresa${n===1?'':'s'}.\n\nSe reemplazará TU información actual (tus empresas) por lo que trae este archivo. No toca los datos de ningún otro Administrador que use este mismo sistema.`,()=>{
         /* Se re-marcan como propias, por si el archivo se exportó desde otra
            sesión o quedó con un id de administrador distinto. */
         BD.empresas=BD.empresas.filter(e=>e.administradorId!==admin)
-          .concat(d.empresas.map(e=>({...e,administradorId:admin})));
-        BD.usuarios=(BD.usuarios||[]).filter(u=>u.administradorId!==admin)
-          .concat((d.usuarios||[]).map(u=>({...u,administradorId:admin})));
+          .concat(d.empresas.map(e=>({...e,id:crypto.randomUUID(),administradorId:admin})));
+        /* Las cuentas de personal no se importan: ahora viven en el servidor y se crean desde Usuarios. */
         if(!BD.empresas.some(e=>e.id===BD.activa)) BD.activa=empresasVisibles()[0]?empresasVisibles()[0].id:null;
         guardar();VISTA='empresas';pintar();
       },'Restaurar');
@@ -10412,22 +10464,18 @@ ACCIONES.borrarTodo=()=>{
 };
 
 (async()=>{
-  BD=await cargar();
-  await asegurarSuperadmin();
+  await window.sbListo;
   let guardado=null;
   try{ guardado=localStorage.getItem('contagt_panel'); }catch(err){}
   /* En pantalla grande el panel arranca visible; en la chica, oculto. */
   alternarPanel(guardado!==null ? guardado==='1' : innerWidth>820);
   aplicarEscala(escalaActual());
-  const usuarioSesion=(BD.usuarios||[]).find(u=>u.id===BD.sesion);
-  const sesionValida=usuarioSesion && !cuentaBloqueada(usuarioSesion);
-  if(!sesionValida){ BD.sesion=null; pantallaLogin(); }
-  else if(usuarioSesion.debeCambiarClave){ BD.sesion=null; pantallaLogin('Tenés que definir una contraseña nueva: iniciá sesión de nuevo.'); }
-  else{
-    const u=usuarioActual();
-    if(u.rol==='superadmin') VISTA='usuarios';
-    const eActiva=emp(); if(eActiva){ asegurarCatalogoMinimo(eActiva); guardar(); }
-    pintar();
-  }
+  window.sb.auth.onAuthStateChange(ev=>{
+    if(ev==='SIGNED_OUT' && BD.sesion){ BD=VACIO(); pantallaLogin('Tu sesión terminó. Iniciá sesión de nuevo.'); }
+  });
+  if(window.__recuperando){ BD=VACIO(); pantallaCambioClave({nombre:'Recuperación de contraseña'}); return; }
+  const {data:{session}}=await window.sb.auth.getSession();
+  if(!session){ pantallaLogin(); return; }
+  await iniciarSesionApp();
 })();
 </script>
