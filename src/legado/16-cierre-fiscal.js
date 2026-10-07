@@ -43,14 +43,16 @@ function pasosCierreFiscal(e,c){
       :`Hay facturas en todos los meses del período (${(e.documentos||[]).filter(d=>d.fecha>=R.desde&&d.fecha<=R.hasta).length} documentos).`,
     btn('irFacturas','Cargar facturas'));
 
-  /* 2. Planillas */
+  /* 2. Planillas: solo si la empresa tiene personal. Que un mes no tenga planilla no bloquea el cierre
+     (puede no haber habido empleados); sí queda pendiente una planilla generada sin su partida. */
   const activos=(e.empleados||[]).filter(x=>x.activo!==false);
-  if(activos.length||(e.planillas||[]).length){
-    const sinPartida=(e.planillas||[]).filter(p=>!p.partidaId&&p.fechaPago>=R.desde&&p.fechaPago<=R.hasta);
+  const sinPartida=(e.planillas||[]).filter(p=>!p.partidaId&&p.fechaPago>=R.desde&&p.fechaPago<=R.hasta);
+  if(activos.length||sinPartida.length){
     const sinPlanilla=meses.filter(m=>!(e.planillas||[]).some(p=>p.fechaPago>=m.desde&&p.fechaPago<=m.hasta)).map(m=>m.nombre);
-    paso('Planillas registradas en libros',sinPartida.length?'pend':sinPlanilla.length?'aviso':'ok',
+    paso('Planillas registradas en libros',sinPartida.length?'pend':sinPlanilla.length?'opcional':'ok',
       sinPartida.length?`${sinPartida.length} planilla(s) del período todavía no tienen partida: entrá a la planilla y usá "Generar partida".`
-        :sinPlanilla.length?`No hay planilla pagada en ${listaNombres(sinPlanilla)}.`:'Todas las planillas del período tienen su partida.',
+        :sinPlanilla.length?`No hay planilla pagada en ${listaNombres(sinPlanilla)}. Si en esos meses hubo personal trabajando, registrala; si no, podés seguir.`
+        :'Todas las planillas del período tienen su partida.',
       btn('irPlanillas','Ir a planillas'));
   }
 
@@ -152,8 +154,8 @@ VISTAS.cierreFiscal=()=>{
     '<div class="vacio">Esta empresa no está en el régimen General en este ejercicio. Sus impuestos se pagan en el Tablero fiscal.</div>';
   const id=CORTES_CF.some(c=>c.id===filtros.corteCF)?filtros.corteCF:(filtros.corteCF=corteSugeridoCF(e));
   const c=CORTES_CF.find(x=>x.id===id), {R,pasos}=pasosCierreFiscal(e,c);
-  const listos=pasos.filter(p=>p.estado==='ok').length;
-  const icono={ok:'✓',pend:'',aviso:'!'};
+  const listos=pasos.filter(p=>p.estado==='ok'||p.estado==='opcional').length;
+  const icono={ok:'✓',pend:'',aviso:'!',opcional:'–'};
   return cab('Cierre fiscal (ISR 25 %)',`${esc(e.nombre)} · ejercicio ${e.ejercicio} · del ${fFecha(R.desde)} al ${fFecha(R.hasta)}. Todo lo del cierre en un solo lugar, en orden: cada paso tiene su botón.`,`<button class="btn sec" data-accion="irTablero">Tablero fiscal</button>`)
     +`<div class="barra"><div class="campo ancho"><label for="selCorteCF">Cierre de</label>
         <select id="selCorteCF" data-filtro="corteCF">${CORTES_CF.map(x=>`<option value="${x.id}"${x.id===id?' selected':''}>${x.nombre}</option>`).join('')}</select></div>
@@ -161,7 +163,7 @@ VISTAS.cierreFiscal=()=>{
         <span class="barra-cf"><span style="width:${Math.round(listos/pasos.length*100)}%"></span></span></div></div>
     <ol class="pasos-cf">${pasos.map((p,i)=>`<li class="paso-cf cf-${p.estado}">
         <span class="num-cf" aria-hidden="true">${icono[p.estado]||i+1}</span>
-        <div class="cuerpo-cf"><h3>${p.titulo} <span class="estado-cf">${p.estado==='ok'?'Listo':p.estado==='aviso'?'Revisar':'Pendiente'}</span></h3>
+        <div class="cuerpo-cf"><h3>${p.titulo} <span class="estado-cf">${p.estado==='ok'?'Listo':p.estado==='aviso'?'Revisar':p.estado==='opcional'?'Opcional':'Pendiente'}</span></h3>
           <div class="det-cf">${p.detalle}</div>${p.botones?`<div class="acc-cf">${p.botones}</div>`:''}</div></li>`).join('')}</ol>`;
 };
 ACCIONES.irProduccion=()=>{VISTA='produccion';filtros={};pintar()};

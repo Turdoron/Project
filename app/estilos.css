@@ -323,6 +323,7 @@ nav .sub-cuerpo .app-sec:first-child{margin-top:6px}
   border:1.5px solid var(--linea-fuerte);color:var(--tinta-suave);font-variant-numeric:tabular-nums}
 .paso-cf.cf-ok .num-cf{background:var(--ok);border-color:var(--ok);color:#fff}
 .paso-cf.cf-pend .num-cf{border-color:var(--acento);color:var(--acento-texto)}
+.paso-cf.cf-opcional .num-cf{border-style:dashed;color:var(--tinta-suave)}
 .paso-cf.cf-aviso .num-cf{border-color:var(--alerta);color:var(--alerta)}
 .cuerpo-cf{flex:1;min-width:0}
 .cuerpo-cf h3{margin:4px 0 6px;font-size:15.5px;font-weight:600;display:flex;flex-wrap:wrap;align-items:baseline;gap:10px}
