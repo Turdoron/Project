@@ -311,6 +311,14 @@ nav .sub-cuerpo .app-sec:first-child{margin-top:6px}
 .pestana.on{color:var(--tinta);font-weight:600}
 .pestana.on::after{content:'';position:absolute;left:10px;right:10px;bottom:-1px;height:2px;border-radius:2px;background:var(--acento)}
 .pestana:focus-visible{outline:2px solid var(--acento);outline-offset:-2px}
+/* Conciliación: detalle de la diferencia */
+.diag-conc{margin-top:10px;padding:12px 14px;border:1px solid var(--linea);border-left:3px solid var(--alerta);border-radius:var(--radio-chico);background:var(--papel);font-size:13px;line-height:1.5;max-width:90ch}
+.diag-conc .diag-tit{margin:0 0 6px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--tinta-suave)}
+.diag-conc ul{margin:0;padding-left:18px}
+.diag-conc li{margin:6px 0}
+.diag-conc li .btn{margin-left:6px;vertical-align:baseline}
+.diag-conc p{margin:6px 0 0}
+.diag-conc .diag-pie{font-weight:600;color:var(--tinta)}
 /* Cierre fiscal paso a paso */
 .progreso-cf{display:flex;flex-direction:column;gap:6px;justify-content:flex-end;font-size:13.5px;color:var(--tinta-suave);min-width:220px}
 .progreso-cf strong{color:var(--tinta)}

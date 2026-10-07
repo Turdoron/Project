@@ -58,7 +58,7 @@ VISTAS.conciliacion=()=>{
       ?`${problemas.length} revisión(es) no cuadran. Abajo está dónde buscar.`
       :'Todo cuadra: los libros auxiliares coinciden con la contabilidad.'}</div>
     <table><thead><tr><th>Revisión</th><th class="num">Libro / registro</th><th class="num">Contabilidad</th><th class="num">Diferencia</th><th>Estado</th></tr></thead><tbody>
-    ${filas.map(f=>`<tr><td>${esc(f.nombre)}${!f.ok&&f.ayuda?`<br><span style="font-size:12.5px;color:var(--tinta-suave)">${esc(f.ayuda)}</span>`:''}</td>
+    ${filas.map(f=>`<tr><td>${esc(f.nombre)}${!f.ok&&f.ayuda?`<br><span style="font-size:12.5px;color:var(--tinta-suave)">${esc(f.ayuda)}</span>`:''}${!f.ok&&!f.informativo?htmlDiagnostico(e,d,h,f):''}</td>
       <td class="num">${f.cantidad?f.libro:Q(f.libro)}</td><td class="num">${f.cantidad?'—':Q(f.contable)}</td>
       <td class="num">${f.cantidad?f.dif:Q(f.dif)}</td>
       <td>${f.ok?'<span style="color:var(--ok)">✔ cuadra</span>':f.informativo?'<span style="color:var(--tinta-suave)">ⓘ informativo</span>':'<span style="color:var(--alerta)">✖ revisar</span>'}</td></tr>`).join('')}
