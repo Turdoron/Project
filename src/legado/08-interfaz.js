@@ -21,10 +21,11 @@ function ocultarEsqueleto(){
    al cambiar la fecha (filtros Desde/Hasta de libros y reportes) sacaban el cursor del campo y
    nunca se podía terminar de escribir el año. Aquí, mientras se escribe, esos avisos se retienen,
    y se entregan una sola vez al terminar: al salir del campo, con Enter, o al elegir del calendario
-   (eso llega sin teclas y pasa directo). Una fecha con año menor a 1900 se toma como incompleta. */
+   (eso llega sin teclas y pasa directo). Una fecha con año menor a 1900 se toma como incompleta:
+   si se sale del campo así, vuelve a mostrar la fecha que tenía (para no dejar a la vista un "0002" que no se aplicó). */
 (()=>{
   const esFecha=el=>el&&el.tagName==='INPUT'&&el.type==='date';
-  const tecleando=new WeakSet(), retenido=new WeakSet();
+  const tecleando=new WeakSet(), retenido=new WeakSet(), previo=new WeakMap();
   const incompleta=el=>!!el.value&&+el.value.slice(0,4)<1900;
   const entregar=el=>{
     retenido.delete(el);
@@ -32,6 +33,7 @@ function ocultarEsqueleto(){
     el.dispatchEvent(new Event('input',{bubbles:true}));
     el.dispatchEvent(new Event('change',{bubbles:true}));
   };
+  document.addEventListener('focusin',ev=>{ if(esFecha(ev.target)) previo.set(ev.target,ev.target.value); },true);
   document.addEventListener('keydown',ev=>{
     const el=ev.target; if(!esFecha(el)) return;
     if(ev.key==='Enter'){ if(retenido.has(el)){ ev.preventDefault(); entregar(el); } return; }
@@ -56,6 +58,7 @@ function ocultarEsqueleto(){
   document.addEventListener('focusout',ev=>{
     const el=ev.target; if(!esFecha(el)) return;
     tecleando.delete(el);
+    if(incompleta(el)){ el.value=previo.has(el)?previo.get(el):''; retenido.delete(el); return; }
     if(!retenido.has(el)) return;
     const t=tocado&&Date.now()-tocado.t<1000?tocado:null;
     entregar(el);
