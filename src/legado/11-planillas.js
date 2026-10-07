@@ -358,6 +358,14 @@ const metodoCosteo=e=>(e&&e.metodoCosteo==='peps')?'peps':'ppp';
    bienes con detalle es una capa con su cantidad y su costo neto de IVA.
    Una nota de crédito (signo negativo) es una devolución al proveedor: se
    descuenta de las capas más recientes, que son las que se compraron último. */
+/* Costo de una línea de compra en el kardex: lo mismo que quedó cargado en Inventarios. Sin el IVA
+   solo cuando ese IVA se tomó como crédito fiscal (el documento lo separó); en Pequeño Contribuyente,
+   Primario y Pecuario no hay crédito fiscal y el IVA es parte del costo. */
+function netoItemCompra(d,it){
+  if(!((+d.iva||0)>0)) return +it.total||0;
+  const ivaItem=(it.impuestos||[]).filter(im=>(im.nombre||'').toUpperCase()==='IVA').reduce((a,im)=>a+(im.monto||0),0);
+  return (+it.total||0)-ivaItem;
+}
 function capasDeCompra(e,producto){
   const capas=[];
   (e.documentos||[]).map((d,i)=>({d,i})).filter(x=>x.d.tipo==='compra'&&x.d.cta==='1.1.08'&&x.d.items&&x.d.items.length)
@@ -365,8 +373,7 @@ function capasDeCompra(e,producto){
     .forEach(({d})=>{
       d.items.filter(it=>it.bs==='B'&&(it.descripcion||'Sin descripción').trim()===producto).forEach(it=>{
         const s=d.signo||1;
-        const ivaItem=(it.impuestos||[]).filter(im=>(im.nombre||'').toUpperCase()==='IVA').reduce((a,im)=>a+(im.monto||0),0);
-        const neto=(it.total||0)-ivaItem, cant=it.cantidad||0;
+        const neto=netoItemCompra(d,it), cant=it.cantidad||0;
         if(s>0){ if(cant>0) capas.push({cantidad:cant,total:neto,fecha:d.fecha}); }
         else{
           let quitar=cant;
@@ -428,11 +435,7 @@ function inventarioDetalle(e){
         const k=(it.descripcion||'Sin descripción').trim();
         productos[k]=productos[k]||{producto:k,cantidad:0,total:0,movimientos:0};
         const s=d.signo||1;
-        /* Se valúa sin IVA: lo que de verdad queda cargado en la cuenta de
-           Inventarios es el neto, el IVA se va aparte a crédito fiscal. */
-        const ivaItem=(it.impuestos||[]).filter(im=>(im.nombre||'').toUpperCase()==='IVA')
-          .reduce((s2,im)=>s2+(im.monto||0),0);
-        const neto=r2((it.total||0)-ivaItem);
+        const neto=r2(netoItemCompra(d,it));
         productos[k].cantidad=r2(productos[k].cantidad+s*(it.cantidad||0));
         productos[k].total=r2(productos[k].total+s*neto);
         productos[k].movimientos++;
