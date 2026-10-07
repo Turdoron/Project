@@ -1,4 +1,4 @@
--- TINBREW Contable: esquema multi-cliente con seguridad por fila (RLS).
+-- ADCONTIS Módulo Contable: esquema multi-cliente con seguridad por fila (RLS).
 -- Jerarquía: superadmin > administrador (cliente) > empresas > empleados (miembros).
 -- Decisiones: el superadmin puede LEER los datos de todas las empresas (no editarlos);
 -- cobro manual por tramos de empresas; la app siempre requiere conexión.

@@ -8,7 +8,6 @@ const inter = Inter({ subsets: ['latin'], axes: ['opsz'], display: 'swap', varia
 // Fraunces: solo los títulos de pantalla (sin cifras). No se precarga: así no le quita velocidad al programa en la primera visita.
 const fraunces = Fraunces({ subsets: ['latin'], axes: ['opsz'], display: 'swap', variable: '--fuente-fraunces', preload: false })
 
-export const metadata = { title: 'Módulo Contable TINBREW' }
 export const viewport = { width: 'device-width', initialScale: 1 }
 
 // Tema guardado (claro, oscuro o el del sistema): se aplica antes de dibujar nada, para que no parpadee.
@@ -19,7 +18,9 @@ document.documentElement.setAttribute('data-theme',osc?'dark':'light');})();`
 // El programa espera a que la conexión con Supabase esté lista (window.sbListo).
 // El enlace del correo de recuperación trae "type=recovery" en la dirección. Supabase lo lee y lo borra enseguida,
 // y su aviso llega después de que la app ya eligió pantalla: por eso se lee aquí, al instante, antes de todo.
-const PREVIO = `window.sbListo=new Promise(function(r){window.__sbResolve=r});
+// El título de la pestaña lo maneja el programa (cambia por pantalla); si lo diera Next.js, React lo volvería a poner al hidratar.
+const PREVIO = `document.title='Módulo Contable ADCONTIS';
+window.sbListo=new Promise(function(r){window.__sbResolve=r});
 window.__recuperando=/[#&]type=recovery(&|$)/.test(location.hash);`
 
 export default function RaizLayout({ children }) {

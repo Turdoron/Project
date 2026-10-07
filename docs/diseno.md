@@ -1,9 +1,9 @@
-# Reglas de diseño — TINBREW Contable
+# Reglas de diseño — ADCONTIS Módulo Contable
 
 Estas reglas se aplican a toda pantalla nueva. El programa está en `src/legado/` (un archivo por módulo) y la estructura de la pantalla en `src/marcado.html`; los estilos, en `app/estilos.css`.
 
 ## 1. Estilo: minimalismo editorial
-- **Neutros cálidos** (tiza y grises cálidos) para todo y **un solo acento** bermellón (`--acento`), usado de forma quirúrgica: elemento activo del menú, foco del teclado, selección y casillas. Nunca en fondos grandes ni en el botón principal.
+- **Neutros cálidos** (tiza y grises cálidos) para todo y **un solo acento** azul ADCONTIS (`--acento`, #2B2E83; más claro en tema oscuro), usado de forma quirúrgica: elemento activo del menú, foco del teclado, selección y casillas. Nunca en fondos grandes ni en el botón principal.
 - **Botón principal en tinta** (casi negro), porque aparece muchas veces por pantalla. Secundario: blanco con filete; destructivo: `peligro`.
 - **Tipografía con jerarquía estricta**:
   - Títulos de pantalla en Fraunces **ligera** (300, 36 px, tracking negativo); cifras grandes en Inter ligera (300, 30 px).

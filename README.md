@@ -1,4 +1,4 @@
-# TINBREW Contable
+# ADCONTIS — Módulo Contable
 
 Sistema contable multi-cliente hecho con Next.js. Los datos y el login viven en Supabase y el sitio se despliega en Vercel.
 

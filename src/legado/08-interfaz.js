@@ -77,7 +77,7 @@ function marcarNavegacion(){
     if(x.dataset.v===VISTA){ x.setAttribute('aria-current','page'); actual=actual||x; } else x.removeAttribute('aria-current');
   });
   const nombre=actual?actual.childNodes[0].textContent.trim():'';
-  document.title=(nombre?nombre+' — ':'')+'Módulo Contable TINBREW';
+  document.title=(nombre?nombre+' — ':'')+'Módulo Contable ADCONTIS';
 }
 /* Cada ventana (formulario o aviso) se nombra con su título, y sus campos se etiquetan al abrirse. */
 ['modalForm','avisoCuerpo'].forEach(id=>{

@@ -1,7 +1,7 @@
 /* ============ ESTILOS — Sistema de diseño editorial: neutros cálidos, un solo acento ============ */
 /* SISTEMA DE COLOR
    Los componentes usan SOLO estos roles, nunca un color suelto. Así un cambio de marca o de tema se hace aquí, una vez.
-   Idea: tonos tiza y grises cálidos para todo; el ACENTO (bermellón) se usa de forma quirúrgica, solo donde la vista
+   Idea: tonos tiza y grises cálidos para todo; el ACENTO (azul ADCONTIS) se usa de forma quirúrgica, solo donde la vista
    tiene que ir: el elemento activo del menú, el foco del teclado, la selección y los indicadores puntuales.
    La acción principal (.btn) va en tinta, no en acento, porque aparece muchas veces por pantalla.
    Contraste (WCAG 2.2 AA, verificado en claro y oscuro): texto ≥ 4.5:1 sobre las tres superficies;
@@ -22,7 +22,7 @@
   --linea:#ECE8E1; --linea-fuerte:#D9D3C8; --borde-campo:#8C867B;
   /* Énfasis, acción principal y acento */
   --verde:#1B1A17; --boton:#1B1A17; --boton-hover:#3A3732; --boton-texto:#FFFFFF;
-  --acento:#E2532A; --acento-texto:#B13E16; --acento-suave:rgba(226,83,42,.10); --anillo:rgba(226,83,42,.30);
+  --acento:#2B2E83; --acento-texto:#2B2E83; --acento-suave:rgba(43,46,131,.08); --anillo:rgba(43,46,131,.24);
   --dorado:var(--acento); --crema:var(--advertencia-borde);
   /* Contabilidad */
   --debe:#2C5B43; --haber:#94561A;
@@ -54,13 +54,13 @@
   --fondo-suave:var(--activo); --borde:var(--linea-fuerte);
   color-scheme:light;
 }
-/* ---- Tema oscuro: carbón cálido, mismo acento algo más luminoso ---- */
+/* ---- Tema oscuro: carbón cálido; el azul de marca se aclara para que se vea sobre fondo oscuro ---- */
 :root[data-theme="dark"]{
   --papel:#141311; --panel:#1C1B18; --activo:#292723;
   --tinta:#EEEBE5; --tinta-suave:#A9A398;
   --linea:#2A2824; --linea-fuerte:#3B3833; --borde-campo:#7E786E;
   --verde:#EEEBE5; --boton:#EEEBE5; --boton-hover:#FFFFFF; --boton-texto:#141311;
-  --acento:#FF7148; --acento-texto:#FF8D6A; --acento-suave:rgba(255,113,72,.14); --anillo:rgba(255,113,72,.38);
+  --acento:#A3A7F4; --acento-texto:#B7BAF7; --acento-suave:rgba(163,167,244,.14); --anillo:rgba(163,167,244,.36);
   --debe:#93C9AA; --haber:#E6AE6E;
   --exito:#93C9AA;       --exito-bg:#18261E;       --exito-borde:#34533F;
   --advertencia:#E6B565; --advertencia-bg:#262013; --advertencia-borde:#54431F;
@@ -74,9 +74,10 @@
   --seg-sub:#4E4A43;
   color-scheme:dark;
 }
-/* El logo es oscuro sobre transparente: en tema oscuro se le da un fondo claro */
-:root[data-theme="dark"] .marca .logo,:root[data-theme="dark"] .login-caja img{
-  background:#F6F4EF;border-radius:var(--radio-chico);padding:8px}
+/* Logo ADCONTIS: azul en tema claro, blanco en tema oscuro (la otra versión queda oculta también para lectores de pantalla) */
+.logo-oscuro{display:none!important}
+:root[data-theme="dark"] .logo-claro{display:none!important}
+:root[data-theme="dark"] .logo-oscuro{display:block!important}
 *{box-sizing:border-box}
 ::selection{background:var(--acento-suave);color:inherit}
 /* ---- Esqueletos de carga: siluetas mientras el sistema carga ---- */
@@ -190,7 +191,7 @@ body.panel-abierto .menu-btn{display:none}
 }
 @media(prefers-reduced-motion:reduce){nav{transition:none}}
 .marca{padding:6px 22px 20px;border-bottom:1px solid var(--linea);margin-bottom:16px;text-align:center}
-.marca .logo{width:100%;max-width:140px;height:auto;display:block;margin:0 auto 10px}
+.marca .logo{width:100%;max-width:112px;height:auto;display:block;margin:0 auto 12px}
 .marca .lema{margin:0;font-size:10.5px;letter-spacing:.26em;color:var(--tinta-suave);
   text-transform:uppercase;font-weight:600}
 #cajaUsuario{padding:0 16px}
@@ -255,7 +256,7 @@ nav button .atajo{flex:none;white-space:nowrap;font-size:10.5px;font-weight:500;
   display:flex;align-items:center;justify-content:center;padding:20px}
 .login-caja{width:100%;max-width:408px;background:var(--panel);border:1px solid var(--linea);
   border-radius:var(--radio-grande);padding:44px 40px 40px;box-shadow:var(--sombra-flot);animation:aparecer .3s var(--suave)}
-.login-caja img{display:block;max-width:132px;margin:0 auto 28px}
+.login-caja .login-logo{display:block;width:118px;height:auto;margin:0 auto 26px}
 .login-caja h1{text-align:center;color:var(--tinta);font:300 28px/1.2 var(--tipo-titulo);letter-spacing:-.02em;margin-bottom:8px}
 .login-caja p.sub{text-align:center;color:var(--tinta-suave);font-size:13.5px;margin:0 0 30px}
 .login-caja label{display:block;font-size:12px;font-weight:500;color:var(--tinta-suave);margin:0 0 6px;letter-spacing:.01em}

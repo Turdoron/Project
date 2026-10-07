@@ -171,10 +171,11 @@ async function iniciarSesionApp(){
 
 function pantallaLogin(mensajeError){
   ocultarEsqueleto();
-  document.title='Iniciar sesión — Módulo Contable TINBREW';
+  document.title='Iniciar sesión — Módulo Contable ADCONTIS';
   const cont=document.getElementById('loginScreen');
   cont.innerHTML=`<div class="login-caja">
-    <h1>Módulo Contable TINBREW</h1>
+    <img class="login-logo logo-claro" alt="ADCONTIS" src="/logo-azul.png" width="378" height="363"><img class="login-logo logo-oscuro" alt="ADCONTIS" src="/logo-blanco.png" width="378" height="363">
+    <h1>Módulo Contable</h1>
     <p class="sub">Iniciá sesión para continuar</p>
     ${mensajeError?`<div class="login-error" role="alert">${esc(mensajeError)}</div>`:''}
     <div class="campo-login"><label>Correo electrónico</label><input id="loginUsuario" type="email" autocomplete="username"></div>
