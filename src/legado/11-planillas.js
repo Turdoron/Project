@@ -266,8 +266,9 @@ function mesesDelEjercicio(){
   return out;
 }
 
-VISTAS.home=()=>{
-  const e=emp(), meses=mesesDelEjercicio();
+/* Resumen del ejercicio (debajo de las aplicaciones en Inicio, para quien ve la parte contable). */
+function resumenInicio(e){
+  const meses=mesesDelEjercicio();
   const conMov=meses.filter(x=>x.ingresos||x.cg);
   const ingresos=r2(meses.reduce((s,x)=>s+x.ingresos,0));
   const gastos=r2(meses.reduce((s,x)=>s+x.cg,0));
@@ -283,10 +284,7 @@ VISTAS.home=()=>{
   const igssPatronalAcum=r2((movAnio['2.1.08']||{haber:0}).haber||0);
   const cantEmpleados=(e.empleados||[]).filter(x=>x.activo!==false).length;
 
-  return cab('Inicio',`${esc(e.nombre)} · ejercicio ${e.ejercicio} · ${esc(REGIMENES[e.regimen]||'—')}`,
-    `<button class="btn" data-accion="irFacturas">Cargar facturas</button>`)
-
-  + (()=>{
+  return (()=>{
       /* Aviso automático si algún libro auxiliar dejó de coincidir con la contabilidad. */
       const prob=conciliacionLibros(e,`${e.ejercicio}-01-01`,`${e.ejercicio}-12-31`).filter(f=>!f.ok&&!f.informativo);
       return prob.length?`<div class="aviso malo">${prob.length} libro(s) no coinciden con la contabilidad: ${prob.map(f=>esc(f.nombre.split(' — ')[0])).join(', ')}.
@@ -330,6 +328,21 @@ VISTAS.home=()=>{
       <tbody>${conMov.map(x=>`<tr><td>${x.nombre}</td><td class="num">${Q(x.ingresos)}</td>
         <td class="num">${Q(x.cg)}</td><td class="num">${Q(r2(x.ingresos-x.cg))}</td></tr>`).join('')}</tbody></table>`
       : `<div class="vacio">Todavía no hay movimiento registrado en el ejercicio ${e.ejercicio}.</div>`}`;
+}
+
+/* Inicio: las aplicaciones a las que la persona tiene acceso, como el menú de un teléfono. */
+VISTAS.home=()=>{
+  const e=emp(), u=usuarioActual(), apps=appsVisibles();
+  const h=new Date().getHours(), saludo=h<12?'Buenos días':h<19?'Buenas tardes':'Buenas noches';
+  const nombre=((u&&u.nombre)||'').trim().split(/\s+/)[0];
+  const lanzador=apps.length
+    ?`<div class="apps">${apps.map(a=>`<button type="button" class="app-tile" data-app="${a.id}">
+        <span class="app-ico" data-app="${a.id}">${iconoApp(a.id)}</span>
+        <span class="app-nombre">${esc(a.nombre)}</span><span class="app-desc">${esc(a.desc)}</span></button>`).join('')}</div>`
+    :'<div class="vacio">Tu cargo todavía no tiene aplicaciones asignadas. Consultá con el administrador.</div>';
+  return cab(`${saludo}${nombre?', '+esc(nombre):''}`,`${esc(e.nombre)} · ejercicio ${e.ejercicio} · ${esc(REGIMENES[e.regimen]||'—')}. Elegí con qué vas a trabajar.`)
+    + lanzador
+    + (puedeVer('tablero')?`<h2 class="tit-seccion">Resumen del ejercicio</h2>${resumenInicio(e)}`:'');
 };
 
 /* Detalle de inventario (Libro de Inventarios): junta las líneas de producto de

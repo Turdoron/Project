@@ -51,39 +51,50 @@ document.getElementById('menuBtn').onclick=()=>alternarPanel(true);
 document.getElementById('cerrarPanel').onclick=()=>alternarPanel(false);
 document.getElementById('velo').onclick=()=>alternarPanel(false);
 
-/* Grupos del menú plegables, para que la barra lateral no crezca sin fin.
-   Se recuerda qué grupos quedaron cerrados, por computadora. */
-function plegarGrupo(id,plegar){
-  const cab=document.querySelector(`.grupo-cab[data-grupo="${id}"]`);
-  const cuerpo=document.querySelector(`.grupo-cuerpo[data-cuerpo="${id}"]`);
-  if(!cab||!cuerpo) return;
-  cab.classList.toggle('plegado',plegar);
-  cab.setAttribute('aria-expanded',String(!plegar));
-  cuerpo.classList.toggle('plegado',plegar);
+/* ============ APLICACIONES ============ */
+/* El sistema se ordena en "aplicaciones", como el menú de un teléfono: en Inicio se elige con qué se va a
+   trabajar y el menú lateral muestra solo las pantallas de esa aplicación. Cada persona ve las aplicaciones
+   que su cargo permite (las mismas reglas de vistasPermitidas); el Administrador las ve todas. Las pantallas
+   de cada aplicación están en el marcado (src/marcado.html, bloques .app-menu). */
+const APPS=[
+  {id:'contabilidad',nombre:'Contabilidad',desc:'Facturas, partidas, catálogo y libros legales'},
+  {id:'impuestos',nombre:'Impuestos',desc:'Tablero fiscal, IVA, ISR, ISO y retenciones'},
+  {id:'estados',nombre:'Estados financieros',desc:'Balanza, resultados, balance y flujo de efectivo'},
+  {id:'rrhh',nombre:'Recursos Humanos',desc:'Empleados, planillas y prestaciones'},
+  {id:'compras',nombre:'Compras',desc:'Cotizaciones, órdenes de compra y proveedores'},
+  {id:'ventas',nombre:'Ventas',desc:'Ventas, consignaciones y clientes'},
+  {id:'inventario',nombre:'Inventario y activos',desc:'Existencias y activos fijos'},
+  {id:'produccion',nombre:'Producción',desc:'Órdenes, recetas y costos de producción'},
+  {id:'empresa',nombre:'Empresa',desc:'Datos de las empresas y aumentos de capital'},
+];
+/* Íconos de línea (24×24, trazo con el color del texto). */
+const ICONOS_APP={
+  contabilidad:'<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5v-15Z"/><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20v3H6.5A2.5 2.5 0 0 1 4 20.5Z"/><path d="M9 7.5h7M9 11h5"/>',
+  impuestos:'<path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="m9 14 6-6"/><circle cx="9.5" cy="8.5" r="1"/><circle cx="14.5" cy="13.5" r="1"/>',
+  estados:'<path d="M4 20h16"/><path d="M7 16v-5M12 16V6M17 16v-8"/>',
+  rrhh:'<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19.5c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="17" cy="9" r="2.4"/><path d="M16 14.6c2.3.2 3.9 1.8 4.5 4.4"/>',
+  compras:'<path d="M3 4h2.2l2.3 11h10.8l2-8H6.3"/><circle cx="9.5" cy="19" r="1.4"/><circle cx="17" cy="19" r="1.4"/>',
+  ventas:'<path d="M3.5 12.6V4.5a1 1 0 0 1 1-1h8.1l8 8a1 1 0 0 1 0 1.4l-7.1 7.1a1 1 0 0 1-1.4 0l-8-8Z"/><circle cx="8.5" cy="8.5" r="1.6"/>',
+  inventario:'<path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9"/>',
+  produccion:'<path d="M3 21V10l5 3V10l5 3V10l5 3V4h3v17H3Z"/><path d="M7 17h2M12 17h2"/>',
+  empresa:'<path d="M4 21V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v16"/><path d="M15 9h4a1 1 0 0 1 1 1v11"/><path d="M3 21h18M8 8h3M8 12h3M8 16h3"/>',
+  todas:'<rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6"/>',
+};
+const iconoApp=(id,clase='')=>`<svg class="ico-app ${clase}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONOS_APP[id]||''}</svg>`;
+let APP_ACTUAL=null;
+/* Botones de pantalla de una aplicación que la persona puede ver ahora (los esconde pintar()). */
+const pantallasDeApp=id=>[...document.querySelectorAll(`nav .app-menu[data-app="${id}"] [data-v]`)];
+const pantallasVisiblesDeApp=id=>pantallasDeApp(id).filter(b=>b.style.display!=='none');
+const appDeVista=v=>{ const b=document.querySelector(`nav .app-menu [data-v="${v}"]`); return b?b.closest('.app-menu').dataset.app:null; };
+const appsVisibles=()=>APPS.filter(a=>pantallasVisiblesDeApp(a.id).length);
+function abrirApp(id){
+  const b=pantallasVisiblesDeApp(id)[0]; if(!b) return;
+  APP_ACTUAL=id; VISTA=b.dataset.v; filtros={};
+  if(innerWidth<=820) alternarPanel(false);
+  pintar();
+  document.getElementById('vista').focus({preventScroll:true});
 }
-document.querySelectorAll('.grupo-cab:not(.admin-cab)').forEach(cab=>{
-  /* Acordeón: abrir un grupo cierra los demás, así el menú no crece sin fin. */
-  cab.onclick=()=>{
-    const id=cab.dataset.grupo, plegar=!cab.classList.contains('plegado');
-    if(!plegar) gruposMenu().forEach(otro=>{ if(otro!==id) plegarGrupo(otro,true); });
-    plegarGrupo(id,plegar);
-    guardarGruposMenu();
-  };
-});
-function gruposMenu(){ return [...document.querySelectorAll('.grupo-cab:not(.admin-cab)')].map(c=>c.dataset.grupo); }
-function guardarGruposMenu(){
-  const g={};
-  gruposMenu().forEach(id=>{ const c=document.querySelector(`.grupo-cab[data-grupo="${id}"]`); g[id]=c.classList.contains('plegado'); });
-  try{ localStorage.setItem('contagt_grupos',JSON.stringify(g)); }catch(err){}
-}
-/* Al arrancar queda abierto un solo grupo: el último que se dejó abierto (o ninguno). */
-(()=>{
-  let g={};
-  try{ g=JSON.parse(localStorage.getItem('contagt_grupos')||'{}'); }catch(err){}
-  /* Sin nada guardado todavía, arranca abierto "Operación diaria". */
-  const abierto=Object.keys(g).length?gruposMenu().find(id=>g[id]===false):'operacion';
-  gruposMenu().forEach(id=>plegarGrupo(id,id!==abierto));
-})();
+document.querySelector('nav [data-v="home"]').insertAdjacentHTML('afterbegin',iconoApp('todas','ico-chico'));
 document.addEventListener('keydown',ev=>{
   if(ev.key==='Escape'){ const abierto=document.querySelector('details.mas[open]'); if(abierto){ abierto.open=false; abierto.querySelector('summary').focus(); return; } }
   if(ev.key==='Escape' && !recuadroAdmin.hidden){ cerrarRecuadroAdmin(); adminCab.focus(); return; }

@@ -31,62 +31,57 @@
     </div>
     <div id="cajaUsuario"></div>
     <div class="emp-activa" id="empBox"></div>
-    <button type="button" data-v="home">Inicio</button>
-    <button type="button" data-v="tablero">Tablero fiscal</button>
+    <button type="button" data-v="home" class="nav-inicio">Aplicaciones</button>
+    <div id="listaApps" class="lista-apps"></div>
 
-    <button type="button" class="grupo-cab" data-grupo="operacion">Operación diaria<span class="flecha">▾</span></button>
-    <div class="grupo-cuerpo" data-cuerpo="operacion">
+    <div class="app-menu" data-app="contabilidad">
+      <p class="app-sec">Registro</p>
       <button type="button" data-v="facturas">Cargar facturas</button>
       <button type="button" data-v="partidas">Partidas contables</button>
-      <button type="button" data-v="ventas">Ventas</button>
-      <button type="button" data-v="compras">Compras</button>
-      <button type="button" data-v="produccion">Producción</button>
-    </div>
-
-    <button type="button" class="grupo-cab" data-grupo="inventario">Inventario y activos<span class="flecha">▾</span></button>
-    <div class="grupo-cuerpo" data-cuerpo="inventario">
-      <button type="button" data-v="inventario">Existencias</button>
-      <button type="button" data-v="libroInventarios">Libro de Inventarios</button>
-      <button type="button" data-v="activosFijos">Activos fijos</button>
-    </div>
-
-    <button type="button" class="grupo-cab" data-grupo="cartera">Cartera<span class="flecha">▾</span></button>
-    <div class="grupo-cuerpo" data-cuerpo="cartera">
-      <button type="button" data-v="proveedores">Proveedores</button>
-      <button type="button" data-v="clientes">Clientes</button>
-    </div>
-
-    <button type="button" class="grupo-cab" data-grupo="planillas">Planillas<span class="flecha">▾</span></button>
-    <div class="grupo-cuerpo" data-cuerpo="planillas">
-      <button type="button" data-v="empleados">Empleados</button>
-      <button type="button" data-v="planillas">Control de planillas</button>
-      <button type="button" data-v="pagoPrestaciones">Pago de prestaciones</button>
-    </div>
-
-    <button type="button" class="grupo-cab" data-grupo="libros">Libros legales<span class="flecha">▾</span></button>
-    <div class="grupo-cuerpo" data-cuerpo="libros">
+      <button type="button" data-v="catalogo">Catálogo de cuentas</button>
+      <p class="app-sec">Libros legales</p>
       <button type="button" data-v="diario">Libro Diario</button>
       <button type="button" data-v="mayor">Libro Mayor</button>
-      <button type="button" data-v="libroPequeno">Libro Pequeño Contribuyente</button>
       <button type="button" data-v="libroVentas">Libro de Ventas</button>
       <button type="button" data-v="libroCompras">Libro de Compras</button>
-      <button type="button" data-v="devolucionIVA">Devolución de IVA</button>
-      <button type="button" data-v="retenciones">Retenciones</button>
+      <button type="button" data-v="libroPequeno">Libro Pequeño Contribuyente</button>
+      <button type="button" data-v="libroInventarios">Libro de Inventarios</button>
+      <p class="app-sec">Revisión</p>
       <button type="button" data-v="conciliacion">Conciliación de libros</button>
     </div>
-
-    <button type="button" class="grupo-cab" data-grupo="estados">Estados financieros<span class="flecha">▾</span></button>
-    <div class="grupo-cuerpo" data-cuerpo="estados">
-      <button type="button" data-v="estadosFinancieros">Libro de Estados Financieros</button>
+    <div class="app-menu" data-app="impuestos">
+      <button type="button" data-v="tablero">Tablero fiscal</button>
+      <button type="button" data-v="retenciones">Retenciones</button>
+      <button type="button" data-v="devolucionIVA">Devolución de IVA</button>
+    </div>
+    <div class="app-menu" data-app="estados">
       <button type="button" data-v="balanza">Balance de comprobación</button>
       <button type="button" data-v="resultados">Estado de resultados</button>
       <button type="button" data-v="balance">Balance general</button>
       <button type="button" data-v="flujoEfectivo">Flujo de efectivo</button>
+      <button type="button" data-v="estadosFinancieros">Libro de Estados Financieros</button>
     </div>
-
-    <button type="button" class="grupo-cab" data-grupo="empresa" style="border-top:1px solid var(--linea);margin-top:6px;padding-top:14px">Empresa<span class="flecha">▾</span></button>
-    <div class="grupo-cuerpo" data-cuerpo="empresa">
-      <button type="button" data-v="catalogo">Catálogo de cuentas</button>
+    <div class="app-menu" data-app="rrhh">
+      <button type="button" data-v="empleados">Empleados</button>
+      <button type="button" data-v="planillas">Control de planillas</button>
+      <button type="button" data-v="pagoPrestaciones">Pago de prestaciones</button>
+    </div>
+    <div class="app-menu" data-app="compras">
+      <button type="button" data-v="compras">Cotizaciones y órdenes de compra</button>
+      <button type="button" data-v="proveedores">Proveedores</button>
+    </div>
+    <div class="app-menu" data-app="ventas">
+      <button type="button" data-v="ventas">Ventas y consignaciones</button>
+      <button type="button" data-v="clientes">Clientes</button>
+    </div>
+    <div class="app-menu" data-app="inventario">
+      <button type="button" data-v="inventario">Existencias</button>
+      <button type="button" data-v="activosFijos">Activos fijos</button>
+    </div>
+    <div class="app-menu" data-app="produccion">
+      <button type="button" data-v="produccion">Órdenes, recetas y costeo</button>
+    </div>
+    <div class="app-menu" data-app="empresa">
       <button type="button" data-v="empresas">Empresas</button>
       <button type="button" data-v="aumentosCapital">Aumento de capital</button>
     </div>

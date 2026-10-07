@@ -223,10 +223,55 @@ nav button .atajo{flex:none;white-space:nowrap;font-size:10.5px;font-weight:500;
 .grupo-cab:hover{background:var(--activo);color:var(--tinta)}
 .grupo-cab .flecha{font-size:9px;color:var(--tinta-suave);transition:transform .2s var(--suave)}
 .grupo-cab.plegado .flecha{transform:rotate(-90deg)}
-.grupo-cuerpo{overflow:hidden;max-height:600px;transition:max-height .24s var(--suave)}
-.grupo-cuerpo.plegado{max-height:0}
-.grupo-cuerpo button{font-size:13.5px;color:var(--tinta);padding:7px 12px;letter-spacing:0}
-.grupo-cuerpo button.on{color:var(--tinta);font-weight:600;background:var(--activo);border-left-color:var(--acento)}
+
+/* --- Aplicaciones (menú tipo teléfono) --- */
+/* Cada aplicación tiene un color propio, solo para su ícono: el resto de la interfaz sigue neutra. */
+[data-app="contabilidad"]{--c:#2B2E83} [data-app="impuestos"]{--c:#A9461E} [data-app="estados"]{--c:#17705F}
+[data-app="rrhh"]{--c:#7A3FA6} [data-app="compras"]{--c:#9A6512} [data-app="ventas"]{--c:#2A7130}
+[data-app="inventario"]{--c:#4E5D6C} [data-app="produccion"]{--c:#93344C} [data-app="empresa"]{--c:#57534E}
+:root[data-theme="dark"] [data-app="contabilidad"]{--c:#A3A7F4} :root[data-theme="dark"] [data-app="impuestos"]{--c:#F0A27F}
+:root[data-theme="dark"] [data-app="estados"]{--c:#6FD3BD} :root[data-theme="dark"] [data-app="rrhh"]{--c:#CDA2EE}
+:root[data-theme="dark"] [data-app="compras"]{--c:#E9BD6C} :root[data-theme="dark"] [data-app="ventas"]{--c:#8FD694}
+:root[data-theme="dark"] [data-app="inventario"]{--c:#AFBDCB} :root[data-theme="dark"] [data-app="produccion"]{--c:#EE9AB0}
+:root[data-theme="dark"] [data-app="empresa"]{--c:#CFCAC3}
+.ico-app{width:24px;height:24px;flex:none}
+.ico-app.ico-chico{width:18px;height:18px}
+nav .nav-inicio{display:flex;align-items:center;justify-content:flex-start;gap:10px;font-weight:500;margin-top:2px}
+nav .nav-inicio .atajo{margin-left:auto}
+nav .nav-inicio .ico-app{color:var(--tinta-suave)}
+nav .nav-inicio.volver{color:var(--tinta-suave)}
+nav .nav-inicio.volver:hover{color:var(--tinta)}
+.lista-apps{margin-top:6px}
+.lista-apps button{display:flex;align-items:center;gap:11px}
+.lista-apps .ico-app{color:var(--c)}
+.app-menu{margin-top:6px}
+.app-cab{display:flex;align-items:center;gap:11px;margin:14px 20px 10px;font:400 19px/1.2 var(--tipo-titulo);color:var(--tinta);letter-spacing:-.01em}
+.app-cab .ico-app{width:34px;height:34px;padding:7px;box-sizing:border-box;border-radius:10px;color:var(--c);background:color-mix(in srgb,var(--c) 13%,var(--panel))}
+.app-sec{margin:16px 22px 4px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--tinta-suave);font-weight:600}
+.app-menu .app-cab+.app-sec{margin-top:6px}
+.apps{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin:0 0 44px}
+.app-tile{display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left;padding:18px 18px 17px;
+  background:var(--panel);border:1px solid var(--linea);border-radius:var(--radio-grande);color:var(--tinta);cursor:pointer;
+  transition:border-color var(--rapido) var(--suave),box-shadow var(--rapido) var(--suave),transform var(--rapido) var(--suave)}
+.app-tile:hover{border-color:var(--linea-fuerte);box-shadow:var(--sombra);transform:translateY(-1px)}
+.app-tile:active{transform:translateY(0)}
+.app-tile:focus-visible{outline:2px solid var(--acento);outline-offset:2px}
+.app-ico{display:grid;place-items:center;width:48px;height:48px;border-radius:14px;margin-bottom:12px;
+  color:var(--c);background:color-mix(in srgb,var(--c) 13%,var(--panel))}
+.app-ico .ico-app{width:26px;height:26px}
+.app-nombre{font-weight:600;font-size:15.5px;letter-spacing:-.005em}
+.app-desc{font-size:13px;line-height:1.45;color:var(--tinta-suave)}
+.tit-seccion{font:400 22px/1.3 var(--tipo-titulo);letter-spacing:-.01em;margin:0 0 18px;padding-top:26px;border-top:1px solid var(--linea)}
+/* En el teléfono, cuadrícula de íconos con su nombre debajo, como la pantalla de inicio. */
+@media(max-width:820px){
+  .apps{grid-template-columns:repeat(3,minmax(0,1fr));gap:20px 8px;margin-bottom:34px}
+  .app-tile{align-items:center;text-align:center;padding:6px 2px;background:none;border:none;box-shadow:none!important;transform:none!important}
+  .app-ico{width:62px;height:62px;border-radius:18px;margin-bottom:7px}
+  .app-ico .ico-app{width:30px;height:30px}
+  .app-nombre{font-size:12.5px;font-weight:500;line-height:1.25}
+  .app-desc{display:none}
+}
+@media(prefers-reduced-motion:reduce){.app-tile{transition:none}.app-tile:hover{transform:none}}
 
 /* Encabezado de cada pantalla: título grande y ligero en serif, filete de un pelo, mucho aire debajo. */
 .tit{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap;
@@ -374,6 +419,7 @@ dialog::backdrop{background:var(--backdrop);backdrop-filter:blur(3px)}
 .recuadro-admin .seg-tema button.on{background:var(--boton);color:var(--boton-texto);font-weight:600;box-shadow:var(--sombra)}
 .recuadro-admin .salir{display:flex;width:calc(100% - 36px);margin:6px 18px 0;text-align:center;
   border-left:1px solid var(--linea-fuerte)!important}
+.grupo-cab.admin-cab{margin-top:22px}
 .grupo-cab.admin-cab.abierto{background:var(--activo);color:var(--tinta);border-left-color:var(--acento)}
 .recuadro-admin .cerrar-recuadro{display:none;position:absolute;top:8px;right:10px;width:32px;height:32px;
   align-items:center;justify-content:center;background:none;border:none;color:var(--tinta-suave);font-size:16px;border-radius:var(--radio-chico)}

@@ -125,6 +125,8 @@ function mejorarAccesibilidad(raiz){
     raiz.querySelectorAll('h4').forEach(h=>h.setAttribute('aria-level','3'));
   }
 }
+/* Texto visible de un botón del menú, sin el ícono ni la etiqueta del atajo. */
+const textoBoton=b=>[...b.childNodes].filter(n=>n.nodeType===3).map(n=>n.textContent).join('').trim();
 /* Pantalla actual: título de la pestaña y "página actual" para lectores de pantalla. */
 function marcarNavegacion(){
   const sel='nav [data-v], #recuadroAdmin [data-v]';
@@ -132,8 +134,9 @@ function marcarNavegacion(){
   document.querySelectorAll(sel).forEach(x=>{
     if(x.dataset.v===VISTA){ x.setAttribute('aria-current','page'); actual=actual||x; } else x.removeAttribute('aria-current');
   });
-  const nombre=actual?actual.childNodes[0].textContent.trim():'';
-  document.title=(nombre?nombre+' — ':'')+'Módulo Contable ADCONTIS';
+  const nombre=actual?textoBoton(actual):'';
+  const app=APP_ACTUAL&&VISTA!=='home'?APPS.find(a=>a.id===APP_ACTUAL):null;
+  document.title=(nombre?nombre+' — ':'')+(app?app.nombre+' — ':'')+'Módulo Contable ADCONTIS';
 }
 /* Cada ventana (formulario o aviso) se nombra con su título, y sus campos se etiquetan al abrirse. */
 ['modalForm','avisoCuerpo'].forEach(id=>{
@@ -159,7 +162,7 @@ const ATAJOS_VISTA={'1':'facturas','2':'partidas','3':'diario','4':'mayor','5':'
   });
 })();
 function ayudaAtajos(){
-  const nombre=v=>{ const b=document.querySelector(`nav [data-v="${v}"]`); return b?b.childNodes[0].textContent.trim():v; };
+  const nombre=v=>{ const b=document.querySelector(`nav [data-v="${v}"]`); return b?textoBoton(b):v; };
   avisar(Object.entries(ATAJOS_VISTA).map(([t,v])=>`Alt+${t}  —  ${nombre(v)}`).join('\n')+'\nAlt+H  —  Esta ayuda','Atajos de teclado');
 }
 document.addEventListener('keydown',ev=>{
@@ -173,8 +176,6 @@ document.addEventListener('keydown',ev=>{
   const b=document.querySelector(`nav [data-v="${v}"]`);
   if(!b||b.style.display==='none') return;   // pantalla no disponible para este cargo o esta empresa
   ev.preventDefault();
-  const grupo=b.closest('.grupo-cuerpo');
-  if(grupo) gruposMenu().forEach(id=>plegarGrupo(id,id!==grupo.dataset.cuerpo));
   b.click();
   document.getElementById('vista').focus({preventScroll:true});
 });
@@ -257,6 +258,39 @@ function envolverTablas(raiz){
     padre.insertBefore(caja,t); caja.appendChild(t);
   });
 }
+/* Menú por aplicaciones: en Inicio, la lista de aplicaciones; dentro de una, solo sus pantallas. */
+function pintarMenuApps(){
+  const enInicio=VISTA==='home';
+  if(!enInicio){
+    const deVista=appDeVista(VISTA);
+    /* Si la pantalla está en la aplicación abierta se queda ahí; si no, se abre la suya. */
+    if(deVista&&deVista!==APP_ACTUAL) APP_ACTUAL=deVista;
+    if(!deVista) APP_ACTUAL=null;   // pantallas de Administración: no cambian la aplicación
+  }
+  const visibles=appsVisibles();
+  document.querySelectorAll('nav .app-menu').forEach(m=>{
+    const activa=!enInicio&&m.dataset.app===APP_ACTUAL;
+    m.hidden=!activa;
+    if(!activa) return;
+    const app=APPS.find(a=>a.id===m.dataset.app);
+    let cab=m.querySelector('.app-cab');
+    if(!cab){ m.insertAdjacentHTML('afterbegin',`<p class="app-cab" data-app="${app.id}">${iconoApp(app.id)}<span>${esc(app.nombre)}</span></p>`); }
+    /* Rótulos de sección sin ninguna pantalla visible debajo: se esconden. */
+    m.querySelectorAll('.app-sec').forEach(sec=>{
+      let n=sec.nextElementSibling, alguno=false;
+      while(n&&!n.classList.contains('app-sec')){ if(n.matches('[data-v]')&&n.style.display!=='none') alguno=true; n=n.nextElementSibling; }
+      sec.hidden=!alguno;
+    });
+  });
+  const lista=document.getElementById('listaApps');
+  lista.hidden=!enInicio;
+  if(enInicio){
+    lista.innerHTML=visibles.map(a=>`<button type="button" data-app="${a.id}">${iconoApp(a.id,'ico-chico')}<span>${esc(a.nombre)}</span></button>`).join('');
+    lista.querySelectorAll('[data-app]').forEach(b=>b.onclick=()=>abrirApp(b.dataset.app));
+  }
+  const ini=document.querySelector('nav [data-v="home"]');
+  ini.classList.toggle('volver',!enInicio);
+}
 function pintar(){
   const u=usuarioActual();
   if(!u){ pantallaLogin(); return; }
@@ -269,11 +303,6 @@ function pintar(){
     if(!oculto && (a.dataset.v==='libroVentas'||a.dataset.v==='libroCompras')) oculto = !e0 || !tuvoRegimen(e0,['general','simplificado']);
     a.style.display = oculto ? 'none' : '';
     a.classList.toggle('on',a.dataset.v===VISTA);
-  });
-  document.querySelectorAll('nav .grupo-cab:not(.admin-cab)').forEach(cab=>{
-    const cuerpo=document.querySelector(`.grupo-cuerpo[data-cuerpo="${cab.dataset.grupo}"]`);
-    const algunoVisible = cuerpo && [...cuerpo.querySelectorAll('[data-v]')].some(b=>b.style.display!=='none');
-    cab.style.display = algunoVisible ? '' : 'none';
   });
   if(!puedeVer(VISTA)){ VISTA = permitidas ? (permitidas[0]||'home') : 'home'; }
   const cajaUsuario=document.getElementById('cajaUsuario');
@@ -312,6 +341,7 @@ function pintar(){
   const btnDeshacer=caja.querySelector('[data-accion="deshacer"]');
   if(btnDeshacer) btnDeshacer.onclick=()=>ACCIONES.deshacer();
   if(!e && VISTA!=='empresas' && VISTA!=='config' && VISTA!=='usuarios' && VISTA!=='capitalSocial' && VISTA!=='bitacora'){ VISTA='empresas'; }
+  pintarMenuApps();
   document.getElementById('vista').innerHTML = VISTAS[VISTA]();
   envolverTablas(document.getElementById('vista'));
   mejorarAccesibilidad(document.getElementById('vista'));
@@ -322,6 +352,7 @@ function pintar(){
     if(b.dataset.accion==='deshacer'){ acc(b.dataset); return; }
     conSnapshot(b.textContent.trim()||b.dataset.accion,()=>acc(b.dataset));
   });
+  nodo.querySelectorAll('[data-app]').forEach(b=>b.onclick=()=>abrirApp(b.dataset.app));
   nodo.querySelectorAll('[data-filtro]').forEach(i=>{
     i.oninput=i.onchange=()=>{filtros[i.dataset.filtro]=i.value;pintar()};
   });
