@@ -176,7 +176,9 @@ nav button{display:block;width:100%;text-align:left;background:none;border:none;
 nav button:hover{background:var(--papel)}
 nav button.on{border-left-color:var(--dorado);background:var(--activo);
   color:var(--verde);font-weight:600}
-nav button .atajo{float:right;font-size:11px;font-weight:400;color:var(--tinta-suave);letter-spacing:.02em}
+/* Con atajo: el nombre ocupa su espacio (y baja de línea si es largo) y "Alt+n" queda siempre a la derecha de la primera línea */
+nav button:has(.atajo){display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+nav button .atajo{flex:none;white-space:nowrap;font-size:11px;font-weight:400;color:var(--tinta-suave);letter-spacing:.02em}
 
 .grupo-cab{display:flex;justify-content:space-between;align-items:center;width:100%;
   padding:9px 18px;font-size:14px;color:var(--tinta);font-weight:500;
