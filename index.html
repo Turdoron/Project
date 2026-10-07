@@ -111,6 +111,7 @@ nav button{display:block;width:100%;text-align:left;background:none;border:none;
 nav button:hover{background:var(--papel)}
 nav button.on{border-left-color:var(--dorado);background:var(--activo);
   color:var(--verde);font-weight:600}
+nav button .atajo{float:right;font-size:11px;font-weight:400;opacity:.55;letter-spacing:.02em}
 
 .grupo-cab{display:flex;justify-content:space-between;align-items:center;width:100%;
   padding:9px 18px;font-size:14px;color:var(--tinta);font-weight:500;
@@ -1184,6 +1185,38 @@ document.addEventListener('keydown',ev=>{
   if(ev.key==='Escape' && !recuadroAdmin.hidden){ cerrarRecuadroAdmin(); adminCab.focus(); return; }
   if(ev.key==='Escape' && innerWidth<=820 && document.body.classList.contains('panel-abierto'))
     alternarPanel(false);
+});
+/* ============ ATAJOS DE TECLADO (Alt + número) ============ */
+/* Usan los mismos botones del menú: si el cargo de la persona no ve una pantalla, el atajo tampoco la abre.
+   Se usa Alt (y no Ctrl) para no pisar atajos del navegador como Ctrl+P (imprimir) o Ctrl+S. */
+const ATAJOS_VISTA={'1':'facturas','2':'partidas','3':'diario','4':'mayor','5':'libroVentas','6':'libroCompras',
+  '7':'balanza','8':'resultados','9':'balance','0':'home'};
+(()=>{
+  Object.entries(ATAJOS_VISTA).forEach(([tecla,v])=>{
+    const b=document.querySelector(`nav [data-v="${v}"]`);
+    if(!b) return;
+    b.insertAdjacentHTML('beforeend',`<span class="atajo">Alt+${tecla}</span>`);
+    b.title=`Atajo: Alt+${tecla}`;
+  });
+})();
+function ayudaAtajos(){
+  const nombre=v=>{ const b=document.querySelector(`nav [data-v="${v}"]`); return b?b.childNodes[0].textContent.trim():v; };
+  avisar(Object.entries(ATAJOS_VISTA).map(([t,v])=>`Alt+${t}  —  ${nombre(v)}`).join('\n')+'\nAlt+H  —  Esta ayuda','Atajos de teclado');
+}
+document.addEventListener('keydown',ev=>{
+  if(!ev.altKey||ev.ctrlKey||ev.metaKey||ev.shiftKey) return;
+  if(!BD.sesion || document.getElementById('app').style.display==='none') return;
+  if(modal.open || document.getElementById('aviso').open) return;   // con una ventana abierta no se navega
+  const tecla=(ev.code||'').replace(/^(Digit|Numpad)/,'');
+  if(tecla==='KeyH'){ ev.preventDefault(); ayudaAtajos(); return; }
+  const v=ATAJOS_VISTA[tecla];
+  if(!v) return;
+  const b=document.querySelector(`nav [data-v="${v}"]`);
+  if(!b||b.style.display==='none') return;   // pantalla no disponible para este cargo o esta empresa
+  ev.preventDefault();
+  const grupo=b.closest('.grupo-cuerpo');
+  if(grupo) gruposMenu().forEach(id=>plegarGrupo(id,id!==grupo.dataset.cuerpo));
+  b.click();
 });
 /* ============ TEMA CLARO / OSCURO ============ */
 function temaGuardado(){
