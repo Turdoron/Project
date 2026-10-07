@@ -332,6 +332,7 @@ function vistaOrdenProduccion(e,o){
   return cab(`${etiqueta} ${o.numero} — ${esc(o.producto)}`,
       `${METODOS_PRODUCCION[m].nombre} · del ${fFecha(o.fechaInicio)} al ${o.fechaFin?fFecha(o.fechaFin):'(sin fecha de fin)'}${o.cantidadPlan?` · a producir: ${fmtCant(o.cantidadPlan)}`:''}${r?` · receta: ${esc(r.producto)}`:''}${o.nota?' · '+esc(o.nota):''}`,
     `<button class="btn sec" data-accion="volverProduccion">Volver</button>
+     ${recetasDeOrden(e,o).length||(e.recetas||[]).some(x=>x.producto===o.producto)?`<button class="btn sec" data-accion="hojaProduccion" data-orden="${o.id}">Hoja para producción</button>`:''}
      <button class="btn sec" data-accion="pdfOrdenProduccion" data-id="${o.id}">Hoja de costos PDF</button>
      ${abierta?`<button class="btn sec" data-accion="fechasOrdenProduccion" data-id="${o.id}">Cambiar fechas</button>
        <button class="btn peligro" data-accion="anularOrdenProduccion" data-id="${o.id}">Anular</button>
@@ -407,7 +408,7 @@ function vistaRecetas(e){
   + (lista.length?`<table><thead><tr><th>Producto</th><th>Proceso</th><th>Base</th><th class="num">Materiales</th><th class="num">Horas MOD por base</th>${m==='estandar'?'<th class="num">Costo estándar por unidad</th>':''}<th></th></tr></thead><tbody>
     ${lista.map(r=>`<tr><td>${esc(r.producto)}</td><td>${r.centroId?esc(nombreCentro(e,r.centroId)):'Todos'}</td><td>Por ${esc(r.baseTipo==='materia'?`${r.baseUnidad} de ${r.materiaBase||'materia prima'}`:(r.baseUnidad||'unidad'))}</td>
       <td class="num">${(r.lineas||[]).length}</td><td class="num">${fmtCant(+r.horasStd||0)}</td>${m==='estandar'?`<td class="num">${Q(hojaEstandar(e,r).total)}</td>`:''}
-      <td class="num"><button class="btn mini sec" data-accion="editarReceta" data-id="${r.id}">Editar</button> <button class="btn mini peligro" data-accion="borrarReceta" data-id="${r.id}">Eliminar</button></td></tr>`).join('')}</tbody></table>`
+      <td class="num" style="white-space:nowrap"><button class="btn mini sec" data-accion="hojaProduccion" data-id="${r.id}">Hoja para producción</button> <button class="btn mini sec" data-accion="editarReceta" data-id="${r.id}">Editar</button> <button class="btn mini peligro" data-accion="borrarReceta" data-id="${r.id}">Eliminar</button></td></tr>`).join('')}</tbody></table>`
     :`<div class="vacio">Todavía no hay recetas. Ejemplos: un zapato (piezas de cuero, suela, hilo y pegamento por par) o una fórmula de tenería (cada químico como % del peso del cuero; el acabado en litros por hoja).</div>`)
   + `<div class="aviso">Con una receta, cada orden o corrida puede "Consumir según receta" (calcula y descarga del inventario lo que corresponde) y muestra el control de lo que debía usarse frente a lo que se usó: si se usó más, menos o según la receta. Las cantidades tienen que estar en la misma unidad en que se lleva el material en el inventario (kg, lb, litros, unidades).</div>`;
 }
@@ -438,6 +439,7 @@ ACCIONES.editarReceta=d=>{
     <div class="tabla-scroll" style="margin-top:12px"><table style="font-size:13px"><thead><tr><th>Material</th><th>Forma</th><th>Cantidad</th><th>Unidad</th>${m==='estandar'?'<th>Precio estándar</th>':''}</tr></thead>
       <tbody id="filasReceta">${lineas.map(fila).join('')}</tbody></table></div>
     <button class="btn mini sec" type="button" id="agregarMaterial" style="margin-top:10px">+ Agregar material</button>
+    <div class="campo" style="margin-top:14px"><label>Pasos o indicaciones de preparación (opcional, salen en la hoja de producción)</label><textarea name="instrucciones" rows="3" style="width:100%" placeholder="Ej.: 1. Lavar y pelar la fruta. 2. Disolver el azúcar en el agua tibia. 3. Mezclar y pasteurizar a 85 °C.">${esc(x?x.instrucciones||'':'')}</textarea></div>
     <p style="margin:10px 0 0;font-size:12.5px;color:var(--tinta-suave)">Tenería: base "kg de cuero" y cada químico como "% de la base" (por ejemplo, sal 8 %, cromo 6 %). Acabado: base "hoja" y cada producto en "cantidad por base" (litros por hoja). Calzado: base "par" y las piezas por par.</p>`,
     d=>{
       const producto=(d.producto||'').trim(); if(!producto){avisar('Escribí el producto.');return false}
@@ -452,7 +454,7 @@ ACCIONES.editarReceta=d=>{
       const dup=e.recetas.find(r=>r.producto===producto&&(r.centroId||'')===(d.centroId||'')&&(!x||r.id!==x.id));
       if(dup){avisar('Ese producto ya tiene una receta para ese proceso: editala.');return false}
       const datos={producto,centroId:d.centroId||'',baseTipo:d.baseTipo==='materia'?'materia':'producto',baseUnidad:(d.baseUnidad||'').trim()||(d.baseTipo==='materia'?'':'unidad'),
-        materiaBase:(d.materiaBase||'').trim(),horasStd:+d.horasStd||0,horasMaqStd:+d.horasMaqStd||0,lineas:ls};
+        materiaBase:(d.materiaBase||'').trim(),horasStd:+d.horasStd||0,horasMaqStd:+d.horasMaqStd||0,instrucciones:(d.instrucciones||'').trim(),lineas:ls};
       if(x) Object.assign(x,datos); else e.recetas.push({id:uid(),...datos});
       registrarLog(x?'Editó una receta de producción':'Creó una receta de producción',`${producto} — ${ls.length} materiales`);
       guardar();

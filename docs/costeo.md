@@ -68,6 +68,14 @@ La receta (lista de materiales o fórmula) dice qué **debía** usarse. Las cant
 
 «Consumir según receta» calcula lo que corresponde, deja corregir lo realmente usado y lo descarga del inventario. Cada orden o corrida muestra el **control de consumo**: lo que debía usarse frente a lo que se usó, con el resultado («según receta», «usó 4.8 % más», «usó 5 % menos»). También compara las horas estándar con las reales. Una orden puede usar varias recetas, una por proceso.
 
+**Hoja de producción (PDF para imprimir):** desde «Recetas» o desde una orden o corrida, se indica cuánto se va a producir (o cuánta materia prima base entra). El sistema calcula la cantidad exacta de cada material y genera una hoja para producción y bodega con:
+- los pasos de preparación de la receta y las indicaciones del lote;
+- columnas en blanco para anotar lo entregado y lo usado realmente;
+- el aviso de lo que no alcanza en bodega;
+- espacio para observaciones y firmas (elaboró, entregó y recibió).
+
+La hoja no lleva costos. Ejemplo: 200 litros de jugo, con 6 naranjas, 0.3 lb de azúcar y 0.4 L de agua por litro, dan 1,200 naranjas, 60 lb de azúcar y 80 L de agua.
+
 Las cantidades de la receta tienen que estar en la misma unidad en que se lleva el material en el inventario (kg, lb, litros o unidades).
 
 ## 5. Proceso continuo: informe de costo de producción
