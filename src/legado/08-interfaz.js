@@ -270,7 +270,7 @@ function pintarChipEmpresa(e,visibles){
   empChip.innerHTML=e
     ?`<span class="emp-chip-nombre">${esc(e.nombre)}</span><span class="emp-chip-sub">Ejercicio ${e.ejercicio} · NIT ${esc(e.nit||'—')}</span><span class="emp-chip-flecha" aria-hidden="true"></span>`
     :`<span class="emp-chip-nombre">${visibles.length?'Elegí una empresa':'Sin empresas todavía'}</span><span class="emp-chip-flecha" aria-hidden="true"></span>`;
-  empChip.setAttribute('aria-label',e?`Empresa en uso: ${e.nombre}, ejercicio ${e.ejercicio}. Cambiar empresa o ejercicio`:'Empresa y ejercicio');
+  empChip.title='Cambiar de empresa o de ejercicio';
 }
 function abrirRecuadroEmpresa(){
   cerrarRecuadroAdmin();
