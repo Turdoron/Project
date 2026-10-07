@@ -399,15 +399,16 @@ VISTAS.planillas=()=>{
 function formularioPlanilla(){
   const e=emp(), b=borradorPlanilla;
   const cajaBanco=cuentasCajaBanco(e);
-  const filas=b.detalle.map((f,i)=>`<tr${f.excluido?' style="opacity:.4"':''}>
+  const [cDF,cHE,cHD,cHM,cBA]=CAMPOS_NOVEDAD;
+  const filas=b.detalle.map((f,i)=>(b.soloNovedades&&!filaTieneNovedad(f))?'':`<tr${f.excluido?' style="opacity:.4"':''}>
     <td style="text-align:center"><input type="checkbox" data-incluir="${i}"${f.excluido?'':' checked'}></td>
     <td>${esc(f.nombre)}</td>
-    <td><input type="number" min="0" step="1" value="${f.diasFalta||0}" data-campo-emp="diasFalta" data-fila="${i}" style="width:64px"></td>
-    <td><input type="number" min="0" step="0.5" value="${f.horasExtra||0}" data-campo-emp="horasExtra" data-fila="${i}" style="width:64px"></td>
-    <td><input type="number" min="0" step="0.5" value="${f.horasExtraDomingo||0}" data-campo-emp="horasExtraDomingo" data-fila="${i}" style="width:64px"></td>
-    <td><input type="number" min="0" step="0.5" value="${f.horasMenos||0}" data-campo-emp="horasMenos" data-fila="${i}" style="width:64px"></td>
+    <td>${inputNovedad(f,i,cDF)}</td>
+    <td>${inputNovedad(f,i,cHE)}</td>
+    <td>${inputNovedad(f,i,cHD)}</td>
+    <td>${inputNovedad(f,i,cHM)}</td>
     <td class="num" title="Horas extra ${Q(f.montoHorasExtra||0)} + domingo ${Q(f.montoHorasExtraDomingo||0)} − horas de menos ${Q(f.descuentoHorasMenos||0)}">${(()=>{const a=r2((f.montoHorasExtra||0)+(f.montoHorasExtraDomingo||0)-(f.descuentoHorasMenos||0));return a>0?'+'+Q(a):a<0?'−'+Q(-a):'—'})()}</td>
-    <td><input type="number" min="0" step="0.01" value="${f.bonoAdicional||0}" data-campo-emp="bonoAdicional" data-fila="${i}" style="width:84px"></td>
+    <td>${inputNovedad(f,i,cBA)}</td>
     <td class="num">${Q(f.salarioPeriodo)}</td>
     <td class="num">${Q(f.bonifPeriodo)}</td>
     <td class="num">${Q(f.igssLaboral)}</td>
@@ -438,12 +439,13 @@ function formularioPlanilla(){
         ${cajaBanco.map(c=>`<option value="${c.c}"${c.c===b.cuentaPago?' selected':''}>${c.c} — ${esc(c.n)}</option>`).join('')}
       </select></div>
     </div></div>
+    ${barraPlanillaRapida(b)}
     <table class="densa"><thead><tr><th></th><th>Empleado</th>
       <th>Días falta</th><th>Horas extra</th><th>Horas domingo</th><th>Horas de menos</th>
       <th class="num" title="Valor de horas extra + horas de domingo − descuento por horas de menos">Ajuste por horas</th><th>Bono adic.</th>
       <th class="num">Salario</th><th class="num">Bonif. Q250</th><th class="num">IGSS laboral</th><th class="num">ISR</th>
       <th class="num">Líquido a pagar</th><th class="num">Cuota patronal</th><th class="num">Prestaciones</th></tr></thead>
-      <tbody>${filas}</tbody>
+      <tbody>${filas||`<tr><td colspan="15" style="text-align:center;color:var(--tinta-suave);padding:24px">Ningún empleado tiene novedades todavía.</td></tr>`}</tbody>
       <tfoot><tr class="total"><td colspan="2">Totales (${incluidos.length} empleado${incluidos.length===1?'':'s'})</td>
         <td colspan="6"></td>
         <td class="num">${Q(sum('salarioPeriodo'))}</td><td class="num">${Q(sum('bonifPeriodo'))}</td>
@@ -470,34 +472,18 @@ function formularioPlanilla(){
       para nada, ni suman ni restan.</div>`;
 }
 function enlazarFormularioPlanilla(){
-  const b=borradorPlanilla, e=emp();
-  const recalcular=(i)=>{
-    const filasARecalcular = i===undefined ? b.detalle.map((_,idx)=>idx) : [i];
-    filasARecalcular.forEach(idx=>{
-      const f=b.detalle[idx];
-      const empleado=e.empleados.find(x=>x.id===f.empleadoId);
-      if(empleado) b.detalle[idx]=Object.assign(
-        calcularPlanillaEmpleado(empleado,b.periodo,{diasFalta:f.diasFalta,horasExtra:f.horasExtra,horasExtraDomingo:f.horasExtraDomingo,horasMenos:f.horasMenos,bonoAdicional:f.bonoAdicional},{desde:b.desde,hasta:b.hasta}),
-        {excluido:f.excluido});
-    });
-    pintar();
-  };
+  const b=borradorPlanilla;
+  const recalcular=(i)=>{ recalcularFilasPlanilla(i===undefined?undefined:[i]); pintar(); };
   const pPeriodo=document.getElementById('pPeriodo');
-  if(pPeriodo) pPeriodo.onchange=()=>{ b.periodo=pPeriodo.value; recalcular(); };
+  if(pPeriodo) pPeriodo.onchange=()=>{ b.periodo=pPeriodo.value; reprorratearBonosFijos(); recalcular(); };
   const pDesde=document.getElementById('pDesde'); if(pDesde) pDesde.onchange=()=>b.desde=pDesde.value;
   const pHasta=document.getElementById('pHasta'); if(pHasta) pHasta.onchange=()=>b.hasta=pHasta.value;
   const pFechaPago=document.getElementById('pFechaPago'); if(pFechaPago) pFechaPago.onchange=()=>b.fechaPago=pFechaPago.value;
   const pCuenta=document.getElementById('pCuenta'); if(pCuenta) pCuenta.onchange=()=>b.cuentaPago=pCuenta.value;
-  document.querySelectorAll('[data-campo-emp]').forEach(inp=>{
-    inp.onchange=()=>{
-      const i=+inp.dataset.fila;
-      b.detalle[i][inp.dataset.campoEmp]=+inp.value||0;
-      recalcular(i);
-    };
-  });
   document.querySelectorAll('[data-incluir]').forEach(ch=>{
     ch.onchange=()=>{ b.detalle[+ch.dataset.incluir].excluido=!ch.checked; pintar(); };
   });
+  enlazarPlanillaRapida();   // casillas de novedades: Enter, pegar desde Excel, foco, plantilla
 }
 
 ACCIONES.nuevaPlanilla=()=>{
@@ -511,7 +497,7 @@ ACCIONES.nuevaPlanilla=()=>{
   const desdeInicial=h.slice(0,8)+'01', hastaInicial=h;
   borradorPlanilla={periodo:'mensual',desde:desdeInicial,hasta:hastaInicial,fechaPago:h,
     cuentaPago:cajaBanco[0].c,
-    detalle:activos.map(x=>({...calcularPlanillaEmpleado(x,'mensual',{},{desde:desdeInicial,hasta:hastaInicial}),excluido:false}))};
+    detalle:activos.map(x=>filaInicialPlanilla(x,'mensual',{desde:desdeInicial,hasta:hastaInicial},false))};
   pintar();
 };
 ACCIONES.cancelarPlanilla=()=>{
@@ -616,7 +602,7 @@ ACCIONES.editarPlanilla=d=>{
   if(pl.partidaNumero){avisar('Esa planilla ya tiene partida en libros: ya no se puede editar.');return}
   const enPlanilla=new Set(pl.detalle.map(f=>f.empleadoId));
   const otros=(e.empleados||[]).filter(x=>x.activo!==false&&!enPlanilla.has(x.id))
-    .map(x=>({...calcularPlanillaEmpleado(x,pl.periodo,{},{desde:pl.desde,hasta:pl.hasta}),excluido:true}));
+    .map(x=>filaInicialPlanilla(x,pl.periodo,{desde:pl.desde,hasta:pl.hasta},true));
   borradorPlanilla={editandoId:pl.id,periodo:pl.periodo,desde:pl.desde,hasta:pl.hasta,fechaPago:pl.fechaPago,cuentaPago:pl.cuentaPago,
     detalle:[...pl.detalle.map(f=>({...f,excluido:false})),...otros]};
   VISTA='planillas'; pintar();

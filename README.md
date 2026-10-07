@@ -21,7 +21,7 @@ Superadministrador → Administrador (cliente con licencia) → empresas → per
 | 01–05 | Almacenamiento en Supabase, deshacer, utilidades, catálogo base, cálculo contable |
 | 06–08 | Usuarios y permisos, navegación, interfaz (esqueleto, accesibilidad, atajos, tema, avisos, modal) |
 | 09–10 | Vistas generales, estados financieros y tablero fiscal |
-| 11–15 | Planillas, cartera y empleados, compras, ventas, prestaciones y finiquito |
+| 11–15 | Planillas, cartera y empleados, compras, ventas, planilla rápida (Excel, pegar, aplicar a varios, bono fijo), prestaciones y finiquito |
 | 16–18 | Impuestos (conciliación, retenciones, devolución de IVA), activos fijos, ISO |
 | 19–23 | Empresas y capital, carga de facturas, producción, libros en PDF, partidas |
 | 24 | Arranque: decide entre el login y la app |
