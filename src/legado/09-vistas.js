@@ -341,8 +341,10 @@ function calcularISO(e){
   if(ingresosAnt && margenBruto<4) return {aplica:false,motivo:`Exenta: el margen bruto del ejercicio ${ejercicioAnterior} fue de ${margenBruto}%, inferior al 4% (Art. 4, Dto. 73-2008).`};
   /* Activo neto: activo total menos depreciaciones, reserva de incobrables (ya
      vienen restando como cuentas de activo) y menos los créditos fiscales
-     pendientes de reintegro por la SAT (Art. 7, Dto. 73-2008). */
-  const activoNetoAnt=r2(saldoTipoAntesDe(e,['activo'],`${e.ejercicio}-01-01`)-saldoCuentaAntesDe(e,'1.1.15',`${e.ejercicio}-01-01`));
+     pendientes de reintegro por la SAT (Art. 7, Dto. 73-2008): el IVA en devolución (1.1.15) y el ISR
+     pagado en exceso que se reclama con el SAT-2350 (1.1.13). */
+  const iniAnio=`${e.ejercicio}-01-01`;
+  const activoNetoAnt=r2(saldoTipoAntesDe(e,['activo'],iniAnio)-saldoCuentaAntesDe(e,'1.1.15',iniAnio)-saldoCuentaAntesDe(e,'1.1.13',iniAnio));
   const baseActivo=activoNetoAnt/4, baseIngresos=ingresosAnt/4;
   let base, criterio;
   if(activoNetoAnt>ingresosAnt*4){ base=baseIngresos; criterio='ingresos brutos (el activo supera 4 veces los ingresos)'; }
