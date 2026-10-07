@@ -266,7 +266,7 @@ function mesesDelEjercicio(){
   return out;
 }
 
-/* Resumen del ejercicio (debajo de las aplicaciones en Inicio, para quien ve la parte contable). */
+/* Contenido del Resumen del ejercicio (pantalla de Contabilidad). */
 function resumenInicio(e){
   const meses=mesesDelEjercicio();
   const conMov=meses.filter(x=>x.ingresos||x.cg);
@@ -341,8 +341,13 @@ VISTAS.home=()=>{
         <span class="app-nombre">${esc(a.nombre)}</span><span class="app-desc">${esc(a.desc)}</span></button>`).join('')}</div>`
     :'<div class="vacio">Tu cargo todavía no tiene aplicaciones asignadas. Consultá con el administrador.</div>';
   return cab(`${saludo}${nombre?', '+esc(nombre):''}`,`${esc(e.nombre)} · ejercicio ${e.ejercicio} · ${esc(REGIMENES[e.regimen]||'—')}. Elegí con qué vas a trabajar.`)
-    + lanzador
-    + (puedeVer('tablero')?`<h2 class="tit-seccion">Resumen del ejercicio</h2>${resumenInicio(e)}`:'');
+    + lanzador;
+};
+/* Resumen del ejercicio: pantalla propia dentro de Contabilidad. */
+VISTAS.resumen=()=>{
+  const e=emp();
+  return cab('Resumen del ejercicio',`${esc(e.nombre)} · ejercicio ${e.ejercicio} · ${esc(REGIMENES[e.regimen]||'—')}`,
+    `<button class="btn" data-accion="irFacturas">Cargar facturas</button>`)+resumenInicio(e);
 };
 
 /* Detalle de inventario (Libro de Inventarios): junta las líneas de producto de

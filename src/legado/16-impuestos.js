@@ -28,16 +28,17 @@ function conciliacionLibros(e,desde,hasta){
     'Si no cuadra: una compra se editó a mano en Partidas, o hay crédito fiscal en una partida manual sin factura cargada.');
   /* 3. Cartera contra cuentas (todo el historial) */
   const movTodo=movimientos(null,hasta||null);
-  add('Clientes — estado de cuenta vs. cuenta 1.1.04',carteraClientes(e).reduce((s,x)=>s+x.saldo,0),saldoNatural('1.1.04',movTodo),
+  add('Clientes — estado de cuenta vs. cuenta 1.1.04',carteraClientes(e,hasta).reduce((s,x)=>s+x.saldo,0),saldoNatural('1.1.04',movTodo),
     'Si no cuadra: hay ventas al crédito o cobros registrados en partidas manuales, fuera de "Cargar facturas" y "Registrar cobro".');
-  add('Proveedores — estado de cuenta vs. cuenta 2.1.01',carteraProveedores(e).reduce((s,x)=>s+x.saldo,0),saldoNatural('2.1.01',movTodo),
+  add('Proveedores — estado de cuenta vs. cuenta 2.1.01',carteraProveedores(e,hasta).reduce((s,x)=>s+x.saldo,0),saldoNatural('2.1.01',movTodo),
     'Si no cuadra: hay compras al crédito o pagos registrados en partidas manuales, fuera de "Cargar facturas" y "Registrar pago".');
-  /* 4. Activos fijos contra el mayor */
-  const cats=Object.values(CATEGORIAS_DEPRECIACION), af=(e.activosFijos||[]).filter(a=>!a.baja);
-  if(af.length||cats.some(c=>saldoNatural(c.act,movTodo))){
-    add('Activos fijos — costo registrado vs. cuentas de activo',af.reduce((s,a)=>s+a.costo,0),cats.reduce((s,c)=>s+saldoNatural(c.act,movTodo),0),
+  /* 4. Activos fijos contra el mayor. El registro de activos guarda el estado de hoy (depreciación y
+     bajas), así que se compara con las cuentas de hoy, no a la fecha de corte. */
+  const cats=Object.values(CATEGORIAS_DEPRECIACION), af=(e.activosFijos||[]).filter(a=>!a.baja), movAF=movimientos(null,null);
+  if(af.length||cats.some(c=>saldoNatural(c.act,movAF))){
+    add('Activos fijos — costo registrado vs. cuentas de activo',af.reduce((s,a)=>s+a.costo,0),cats.reduce((s,c)=>s+saldoNatural(c.act,movAF),0),
       'El costo de cada activo tiene que estar cargado en su cuenta (con la factura de compra) y registrado en "Activos fijos".');
-    add('Activos fijos — depreciación registrada vs. cuentas de depreciación',af.reduce((s,a)=>s+(a.acumulada||0),0),-cats.reduce((s,c)=>s+saldoNatural(c.dep,movTodo),0),
+    add('Activos fijos — depreciación registrada vs. cuentas de depreciación',af.reduce((s,a)=>s+(a.acumulada||0),0),-cats.reduce((s,c)=>s+saldoNatural(c.dep,movAF),0),
       'Si no cuadra: se registró depreciación en una partida manual en vez de "Generar depreciación".');
   }
   /* 5. Inventario: informativo (el sistema es periódico — la cuenta solo baja al cerrar el costo de ventas) */
@@ -314,11 +315,11 @@ ACCIONES.registrarDevolucionRecibida=d0=>{
     },'Registrar');
 };
 
-ACCIONES.pagarIVA=()=>{
+ACCIONES.pagarIVA=(d0={})=>{
   const e=emp();
   const cajaBanco=cuentasCajaBanco(e);
   if(!cajaBanco.length){avisar('El catálogo no tiene ninguna cuenta de Caja o Bancos.');return}
-  const {desde:desdeDefault,hasta:hastaDefault}=mesAnteriorRango();
+  const rangoAnt=mesAnteriorRango(), desdeDefault=d0.desde||rangoAnt.desde, hastaDefault=d0.hasta||rangoAnt.hasta;
   const ivaIni=ivaDelPeriodo(e,desdeDefault,hastaDefault);
 
   abrirModal('Pagar IVA',
@@ -725,7 +726,7 @@ function postearCierreFiscalParcial(e,t,x,d){
   avisar(`Cierre parcial del trimestre ${t} registrado${partidasNuevas.length>1?` en las partidas No. ${partidasNuevas.map(p=>p.numero).join(' y ')}`:` en la partida No. ${partidasNuevas[0].numero}`}.`,'Listo');
 }
 
-ACCIONES.cierreFiscalParcial=()=>{
+ACCIONES.cierreFiscalParcial=(d0={})=>{
   const e=emp();
   if(e.regimen!=='general'){avisar('El cierre fiscal parcial es solo para el régimen General.');return}
   const cajaBanco=cuentasCajaBanco(e);
@@ -735,7 +736,7 @@ ACCIONES.cierreFiscalParcial=()=>{
   let trim=trimestresGeneral(e);
   const yaPagados=e.cierresParciales.filter(c=>c.ejercicio===e.ejercicio).map(c=>c.trimestre);
   const metodoFijo=(e.cierresParciales.find(c=>c.ejercicio===e.ejercicio)||{}).metodo||'';
-  const opsTrim=trim.map(x=>`<option value="${x.t}"${yaPagados.includes(x.t)?' disabled':''}>
+  const opsTrim=trim.map(x=>`<option value="${x.t}"${yaPagados.includes(x.t)?' disabled':(+d0.trimestre===x.t?' selected':'')}>
     ${['Ene–Mar','Abr–Jun','Jul–Sep','Oct–Dic'][x.t-1]}${yaPagados.includes(x.t)?' (ya pagado)':''}</option>`).join('');
 
   abrirModal('Cierre fiscal parcial (trimestral)',
@@ -751,7 +752,7 @@ ACCIONES.cierreFiscalParcial=()=>{
         <option value="estimada"${metodoFijo==='cierre'?' disabled':metodoFijo==='estimada'?' selected':''}>Renta imponible estimada (8% de la renta bruta × 25%)</option>
       </select>${metodoFijo?`<span style="font-size:12.5px;color:var(--tinta-suave)">Fijado para ${e.ejercicio}: la opción no se cambia durante el año (Art. 38, Dto. 10-2012).</span>`:''}</div>
       <div class="campo full"><label id="lblInvFinal">Inventario final al corte del trimestre</label>
-        <input name="invFinal" type="number" step="0.01" min="0" placeholder="Del conteo físico"></div>
+        <input name="invFinal" type="number" step="0.01" min="0" placeholder="Del conteo físico" value="${d0.inv!==undefined&&d0.inv!==''?esc(String(d0.inv)):''}"></div>
       <div class="campo"><label>Se paga desde</label><select name="cuenta">
         ${cajaBanco.map(c=>`<option value="${c.c}">${c.c} — ${esc(c.n)}</option>`).join('')}
       </select></div>

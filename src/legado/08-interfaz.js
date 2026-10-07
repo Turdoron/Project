@@ -136,7 +136,9 @@ function marcarNavegacion(){
   });
   const nombre=actual?textoBoton(actual):'';
   const app=APP_ACTUAL&&VISTA!=='home'?APPS.find(a=>a.id===APP_ACTUAL):null;
-  document.title=(nombre?nombre+' — ':'')+(app?app.nombre+' — ':'')+'Módulo Contable ADCONTIS';
+  const sub=actual&&actual.closest('.sub-menu');
+  const nombreSub=sub?textoBoton(sub.querySelector('.sub-cab')):'';
+  document.title=(nombre?nombre+' — ':'')+(nombreSub&&nombreSub!==app?.nombre?nombreSub+' — ':'')+(app?app.nombre+' — ':'')+'Módulo Contable ADCONTIS';
 }
 /* Cada ventana (formulario o aviso) se nombra con su título, y sus campos se etiquetan al abrirse. */
 ['modalForm','avisoCuerpo'].forEach(id=>{
@@ -275,6 +277,16 @@ function pintarMenuApps(){
     const app=APPS.find(a=>a.id===m.dataset.app);
     let cab=m.querySelector('.app-cab');
     if(!cab){ m.insertAdjacentHTML('afterbegin',`<p class="app-cab" data-app="${app.id}">${iconoApp(app.id)}<span>${esc(app.nombre)}</span></p>`); }
+    /* Submenús: se esconde el que no tiene pantallas visibles; se despliega el de la pantalla abierta. */
+    m.querySelectorAll('.sub-menu').forEach(sm=>{
+      const id=sm.dataset.sub, tiene=[...sm.querySelectorAll('[data-v]')].some(b=>b.style.display!=='none');
+      sm.hidden=!tiene;
+      if(sm.querySelector(`[data-v="${VISTA}"]`)) SUBS_ABIERTOS.add(id);
+      const abierto=SUBS_ABIERTOS.has(id);
+      sm.classList.toggle('abierto',abierto);
+      sm.querySelector('.sub-cab').setAttribute('aria-expanded',String(abierto));
+      sm.querySelector('.sub-cuerpo').hidden=!abierto;
+    });
     /* Rótulos de sección sin ninguna pantalla visible debajo: se esconden. */
     m.querySelectorAll('.app-sec').forEach(sec=>{
       let n=sec.nextElementSibling, alguno=false;
@@ -300,6 +312,7 @@ function pintar(){
     let oculto = permitidas!==null && !permitidas.includes(a.dataset.v);
     if(!oculto && a.dataset.v==='libroPequeno') oculto = !e0 || !tuvoRegimen(e0,['pequeno']);
     if(!oculto && a.dataset.v==='produccion') oculto = !esProductora(e0);
+    if(!oculto && a.dataset.v==='cierreFiscal') oculto = !e0 || !tuvoRegimen(e0,['general']);
     if(!oculto && (a.dataset.v==='libroVentas'||a.dataset.v==='libroCompras')) oculto = !e0 || !tuvoRegimen(e0,['general','simplificado']);
     a.style.display = oculto ? 'none' : '';
     a.classList.toggle('on',a.dataset.v===VISTA);

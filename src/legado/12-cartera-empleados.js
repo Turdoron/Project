@@ -2,16 +2,17 @@
 /* Se arma a partir del detalle de documentos, no de las partidas: en el modo
    agrupado por día las partidas ya no distinguen proveedor por línea, pero el
    detalle documento por documento siempre conserva el NIT y el nombre. */
-function carteraProveedores(e){
-  const map={};
+/* Con "hasta", solo lo registrado hasta esa fecha (para conciliar contra la cuenta a esa fecha). */
+function carteraProveedores(e,hasta){
+  const map={}, enFecha=x=>!hasta||(x.fecha||'')<=hasta;
   (e.documentos||[]).forEach(d=>{
-    if(d.tipo!=='compra'||!d.alCredito) return;
+    if(d.tipo!=='compra'||!d.alCredito||!enFecha(d)) return;
     const k=d.nit||'—';
     map[k]=map[k]||{nit:k,nombre:d.nombre,comprado:0,pagado:0};
     map[k].comprado=r2(map[k].comprado+(d.signo||1)*d.total);
     if(d.nombre) map[k].nombre=d.nombre;
   });
-  (e.pagos||[]).forEach(pg=>{
+  (e.pagos||[]).filter(enFecha).forEach(pg=>{
     const k=pg.nit||'—';
     map[k]=map[k]||{nit:k,nombre:pg.nombre,comprado:0,pagado:0};
     map[k].pagado=r2(map[k].pagado+pg.monto);
@@ -19,17 +20,17 @@ function carteraProveedores(e){
   return Object.values(map).map(x=>({...x,saldo:r2(x.comprado-x.pagado)}))
     .sort((a,b)=>b.saldo-a.saldo);
 }
-function carteraClientes(e){
-  const map={};
+function carteraClientes(e,hasta){
+  const map={}, enFecha=x=>!hasta||(x.fecha||'')<=hasta;
   (e.documentos||[]).forEach(d=>{
-    if(d.tipo!=='venta'||!d.alCredito) return;
+    if(d.tipo!=='venta'||!d.alCredito||!enFecha(d)) return;
     const k=d.nit||'—';
     map[k]=map[k]||{nit:k,nombre:d.nombre,vendido:0,cobrado:0};
     /* Lo que el cliente retuvo (ISR, IVA o 5%) no lo va a pagar: se descuenta del saldo. */
     map[k].vendido=r2(map[k].vendido+(d.signo||1)*r2(d.total-(d.retencionISR||0)-(d.retencionIVA||0)));
     if(d.nombre) map[k].nombre=d.nombre;
   });
-  (e.cobros||[]).forEach(cb=>{
+  (e.cobros||[]).filter(enFecha).forEach(cb=>{
     const k=cb.nit||'—';
     map[k]=map[k]||{nit:k,nombre:cb.nombre,vendido:0,cobrado:0};
     map[k].cobrado=r2(map[k].cobrado+cb.monto);

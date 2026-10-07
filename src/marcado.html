@@ -35,31 +35,51 @@
     <div id="listaApps" class="lista-apps"></div>
 
     <div class="app-menu" data-app="contabilidad">
-      <p class="app-sec">Registro</p>
-      <button type="button" data-v="facturas">Cargar facturas</button>
-      <button type="button" data-v="partidas">Partidas contables</button>
-      <button type="button" data-v="catalogo">Catálogo de cuentas</button>
-      <p class="app-sec">Libros legales</p>
-      <button type="button" data-v="diario">Libro Diario</button>
-      <button type="button" data-v="mayor">Libro Mayor</button>
-      <button type="button" data-v="libroVentas">Libro de Ventas</button>
-      <button type="button" data-v="libroCompras">Libro de Compras</button>
-      <button type="button" data-v="libroPequeno">Libro Pequeño Contribuyente</button>
-      <button type="button" data-v="libroInventarios">Libro de Inventarios</button>
-      <p class="app-sec">Revisión</p>
-      <button type="button" data-v="conciliacion">Conciliación de libros</button>
-    </div>
-    <div class="app-menu" data-app="impuestos">
-      <button type="button" data-v="tablero">Tablero fiscal</button>
-      <button type="button" data-v="retenciones">Retenciones</button>
-      <button type="button" data-v="devolucionIVA">Devolución de IVA</button>
-    </div>
-    <div class="app-menu" data-app="estados">
-      <button type="button" data-v="balanza">Balance de comprobación</button>
-      <button type="button" data-v="resultados">Estado de resultados</button>
-      <button type="button" data-v="balance">Balance general</button>
-      <button type="button" data-v="flujoEfectivo">Flujo de efectivo</button>
-      <button type="button" data-v="estadosFinancieros">Libro de Estados Financieros</button>
+      <button type="button" data-v="resumen">Resumen del ejercicio</button>
+      <div class="sub-menu" data-sub="general">
+        <button type="button" class="sub-cab" data-sub="general" aria-expanded="false">Contabilidad general</button>
+        <div class="sub-cuerpo">
+          <p class="app-sec">Registro</p>
+          <button type="button" data-v="facturas">Cargar facturas</button>
+          <button type="button" data-v="partidas">Partidas contables</button>
+          <button type="button" data-v="catalogo">Catálogo de cuentas</button>
+          <p class="app-sec">Libros legales</p>
+          <button type="button" data-v="diario">Libro Diario</button>
+          <button type="button" data-v="mayor">Libro Mayor</button>
+          <button type="button" data-v="libroVentas">Libro de Ventas</button>
+          <button type="button" data-v="libroCompras">Libro de Compras</button>
+          <button type="button" data-v="libroPequeno">Libro Pequeño Contribuyente</button>
+          <button type="button" data-v="libroInventarios">Libro de Inventarios</button>
+          <p class="app-sec">Revisión</p>
+          <button type="button" data-v="conciliacion">Conciliación de libros</button>
+        </div>
+      </div>
+      <div class="sub-menu" data-sub="impuestos">
+        <button type="button" class="sub-cab" data-sub="impuestos" aria-expanded="false">Impuestos</button>
+        <div class="sub-cuerpo">
+          <button type="button" data-v="cierreFiscal">Cierre fiscal (ISR 25 %)</button>
+          <button type="button" data-v="tablero">Tablero fiscal</button>
+          <button type="button" data-v="retenciones">Retenciones</button>
+          <button type="button" data-v="devolucionIVA">Devolución de IVA</button>
+        </div>
+      </div>
+      <div class="sub-menu" data-sub="estados">
+        <button type="button" class="sub-cab" data-sub="estados" aria-expanded="false">Estados financieros</button>
+        <div class="sub-cuerpo">
+          <button type="button" data-v="balanza">Balance de comprobación</button>
+          <button type="button" data-v="resultados">Estado de resultados</button>
+          <button type="button" data-v="balance">Balance general</button>
+          <button type="button" data-v="flujoEfectivo">Flujo de efectivo</button>
+          <button type="button" data-v="estadosFinancieros">Libro de Estados Financieros</button>
+        </div>
+      </div>
+      <div class="sub-menu" data-sub="inventario">
+        <button type="button" class="sub-cab" data-sub="inventario" aria-expanded="false">Inventario y activos</button>
+        <div class="sub-cuerpo">
+          <button type="button" data-v="inventario">Existencias</button>
+          <button type="button" data-v="activosFijos">Activos fijos</button>
+        </div>
+      </div>
     </div>
     <div class="app-menu" data-app="rrhh">
       <button type="button" data-v="empleados">Empleados</button>
@@ -73,10 +93,6 @@
     <div class="app-menu" data-app="ventas">
       <button type="button" data-v="ventas">Ventas y consignaciones</button>
       <button type="button" data-v="clientes">Clientes</button>
-    </div>
-    <div class="app-menu" data-app="inventario">
-      <button type="button" data-v="inventario">Existencias</button>
-      <button type="button" data-v="activosFijos">Activos fijos</button>
     </div>
     <div class="app-menu" data-app="produccion">
       <button type="button" data-v="produccion">Órdenes, recetas y costeo</button>

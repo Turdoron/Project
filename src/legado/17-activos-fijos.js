@@ -319,11 +319,11 @@ ACCIONES.pdfActivosFijos=async()=>{
     avisar('No se pudo generar el PDF: '+err.message+'\n\nEl generador se descarga de internet la primera vez, así que necesitás conexión.');
   }
 };
-ACCIONES.generarDepreciacion=()=>{
+ACCIONES.generarDepreciacion=(d0={})=>{
   const e=emp();
   if(!(e.activosFijos||[]).some(a=>!a.baja)){avisar('No hay activos fijos registrados todavía.');return}
   const hoyMes=hoy().slice(0,7);
-  const porDefecto=hoyMes.slice(0,4)===String(e.ejercicio)
+  const porDefecto=d0.hastames&&d0.hastames<=hoyMes?d0.hastames:hoyMes.slice(0,4)===String(e.ejercicio)
     ? (hoyMes.slice(5)==='01'?hoyMes:`${hoyMes.slice(0,5)}${String(+hoyMes.slice(5)-1).padStart(2,'0')}`)
     : `${e.ejercicio}-12`;
   abrirModal('Generar depreciación',

@@ -71,7 +71,7 @@ function vistasPermitidas(){
   if(u.rol==='administrador') return null;
   const r=ROLES[u.rol];
   if(!r) return ['home'];
-  if(r.depto==='contabilidad') return ['home','catalogo','partidas','facturas','proveedores','clientes',
+  if(r.depto==='contabilidad') return ['home','resumen','cierreFiscal','catalogo','partidas','facturas','proveedores','clientes',
     'diario','mayor','inventario','libroInventarios','activosFijos','libroPequeno','libroVentas','libroCompras','devolucionIVA','retenciones','conciliacion','balanza','resultados','balance','flujoEfectivo','estadosFinancieros','tablero','aumentosCapital'];
   if(r.depto==='rrhh') return ['home','empleados','planillas','pagoPrestaciones'];
   if(r.depto==='produccion') return ['home','produccion'];

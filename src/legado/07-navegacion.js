@@ -57,16 +57,15 @@ document.getElementById('velo').onclick=()=>alternarPanel(false);
    que su cargo permite (las mismas reglas de vistasPermitidas); el Administrador las ve todas. Las pantallas
    de cada aplicación están en el marcado (src/marcado.html, bloques .app-menu). */
 const APPS=[
-  {id:'contabilidad',nombre:'Contabilidad',desc:'Facturas, partidas, catálogo y libros legales'},
-  {id:'impuestos',nombre:'Impuestos',desc:'Tablero fiscal, IVA, ISR, ISO y retenciones'},
-  {id:'estados',nombre:'Estados financieros',desc:'Balanza, resultados, balance y flujo de efectivo'},
+  {id:'contabilidad',nombre:'Contabilidad',desc:'Libros, impuestos, estados financieros, inventario y activos fijos'},
   {id:'rrhh',nombre:'Recursos Humanos',desc:'Empleados, planillas y prestaciones'},
   {id:'compras',nombre:'Compras',desc:'Cotizaciones, órdenes de compra y proveedores'},
   {id:'ventas',nombre:'Ventas',desc:'Ventas, consignaciones y clientes'},
-  {id:'inventario',nombre:'Inventario y activos',desc:'Existencias y activos fijos'},
   {id:'produccion',nombre:'Producción',desc:'Órdenes, recetas y costos de producción'},
   {id:'empresa',nombre:'Empresa',desc:'Datos de las empresas y aumentos de capital'},
 ];
+/* Submenús de Contabilidad: se despliega solo el de la pantalla abierta (y los que la persona abra). */
+const SUBS_ABIERTOS=new Set();
 /* Íconos de línea (24×24, trazo con el color del texto). */
 const ICONOS_APP={
   contabilidad:'<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5v-15Z"/><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20v3H6.5A2.5 2.5 0 0 1 4 20.5Z"/><path d="M9 7.5h7M9 11h5"/>',
@@ -89,11 +88,14 @@ const appDeVista=v=>{ const b=document.querySelector(`nav .app-menu [data-v="${v
 const appsVisibles=()=>APPS.filter(a=>pantallasVisiblesDeApp(a.id).length);
 function abrirApp(id){
   const b=pantallasVisiblesDeApp(id)[0]; if(!b) return;
-  APP_ACTUAL=id; VISTA=b.dataset.v; filtros={};
+  APP_ACTUAL=id; VISTA=b.dataset.v; filtros={}; SUBS_ABIERTOS.clear();
   if(innerWidth<=820) alternarPanel(false);
   pintar();
   document.getElementById('vista').focus({preventScroll:true});
 }
+document.querySelectorAll('nav .sub-cab').forEach(c=>c.onclick=()=>{
+  const id=c.dataset.sub; SUBS_ABIERTOS.has(id)?SUBS_ABIERTOS.delete(id):SUBS_ABIERTOS.add(id); pintarMenuApps();
+});
 document.querySelector('nav [data-v="home"]').insertAdjacentHTML('afterbegin',iconoApp('todas','ico-chico'));
 document.addEventListener('keydown',ev=>{
   if(ev.key==='Escape'){ const abierto=document.querySelector('details.mas[open]'); if(abierto){ abierto.open=false; abierto.querySelector('summary').focus(); return; } }

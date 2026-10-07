@@ -272,6 +272,38 @@ nav .nav-inicio.volver:hover{color:var(--tinta)}
   .app-desc{display:none}
 }
 @media(prefers-reduced-motion:reduce){.app-tile{transition:none}.app-tile:hover{transform:none}}
+/* Submenús de Contabilidad */
+nav .sub-cab{display:flex;justify-content:space-between;align-items:center;font-weight:600;margin-top:4px}
+nav .sub-cab::after{content:'';flex:none;width:6px;height:6px;margin-right:4px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;
+  opacity:.55;transform:rotate(-45deg);transition:transform var(--rapido) var(--suave)}
+nav .sub-menu.abierto>.sub-cab::after{transform:rotate(45deg)}
+nav .sub-cuerpo{margin:2px 0 8px 22px;border-left:1px solid var(--linea)}
+nav .sub-cuerpo button{width:calc(100% - 10px);margin:1px 0 1px 8px;font-size:13.5px}
+nav .sub-cuerpo .app-sec{margin:12px 0 4px 20px}
+nav .sub-cuerpo .app-sec:first-child{margin-top:6px}
+@media(prefers-reduced-motion:reduce){nav .sub-cab::after{transition:none}}
+/* Cierre fiscal paso a paso */
+.progreso-cf{display:flex;flex-direction:column;gap:6px;justify-content:flex-end;font-size:13.5px;color:var(--tinta-suave);min-width:220px}
+.progreso-cf strong{color:var(--tinta)}
+.barra-cf{display:block;height:6px;border-radius:99px;background:var(--activo);overflow:hidden}
+.barra-cf span{display:block;height:100%;background:var(--acento);border-radius:99px}
+.pasos-cf{list-style:none;margin:8px 0 0;padding:0}
+.paso-cf{display:flex;gap:16px;padding:18px 0;border-bottom:1px solid var(--linea)}
+.paso-cf:last-child{border-bottom:none}
+.num-cf{flex:none;display:grid;place-items:center;width:30px;height:30px;border-radius:50%;font-size:13.5px;font-weight:600;
+  border:1.5px solid var(--linea-fuerte);color:var(--tinta-suave);font-variant-numeric:tabular-nums}
+.paso-cf.cf-ok .num-cf{background:var(--ok);border-color:var(--ok);color:#fff}
+.paso-cf.cf-pend .num-cf{border-color:var(--acento);color:var(--acento-texto)}
+.paso-cf.cf-aviso .num-cf{border-color:var(--alerta);color:var(--alerta)}
+.cuerpo-cf{flex:1;min-width:0}
+.cuerpo-cf h3{margin:4px 0 6px;font-size:15.5px;font-weight:600;display:flex;flex-wrap:wrap;align-items:baseline;gap:10px}
+.estado-cf{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--tinta-suave)}
+.paso-cf.cf-ok .estado-cf{color:var(--ok)} .paso-cf.cf-pend .estado-cf{color:var(--acento-texto)} .paso-cf.cf-aviso .estado-cf{color:var(--alerta)}
+.det-cf{font-size:14px;line-height:1.55;color:var(--tinta-suave);max-width:80ch}
+.det-cf strong{color:var(--tinta)}
+.acc-cf{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.paso-cf.cf-ok .det-cf{color:var(--tinta-suave)}
+
 
 /* Encabezado de cada pantalla: título grande y ligero en serif, filete de un pelo, mucho aire debajo. */
 .tit{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap;
