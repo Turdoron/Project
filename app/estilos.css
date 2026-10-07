@@ -346,6 +346,8 @@ dialog{border:1px solid var(--linea);border-radius:var(--radio-grande);padding:0
 dialog[open]{animation:aparecer .22s var(--suave)}
 /* Cierre con productos conjuntos: la tabla de productos necesita más ancho */
 dialog:has(#cjBloque:not([hidden])){max-width:820px}
+/* Cierre de una corrida por procesos: el informe de cantidades y costos necesita más ancho */
+dialog:has([name^="p_T_"]){max-width:min(1040px,94vw)}
 dialog::backdrop{background:var(--backdrop);backdrop-filter:blur(3px)}
 
 /* --- Recuadro de Administración (se abre flotando al lado del menú) --- */

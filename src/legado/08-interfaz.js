@@ -507,7 +507,7 @@ function abrirModal(titulo,cuerpo,alGuardar,textoBtn='Guardar'){
   mForm.onkeydown=ev=>{
     if(ev.key==='Enter' && ev.target.tagName==='INPUT' && ev.target.type!=='file'){ ev.preventDefault(); aceptar(); }
   };
-  modal.showModal();
+  if(!modal.open) modal.showModal();   // si ya estaba abierta (se cambia de opción dentro del mismo formulario), solo se reemplaza el contenido
   const primero=mForm.querySelector('input,select');
   if(primero) primero.focus();
 }

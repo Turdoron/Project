@@ -317,6 +317,7 @@ function limpiarDependenciasPartida(e,p){
   if((e.aumentosCapital||[]).some(mismaPartida)){ e.aumentosCapital=e.aumentosCapital.filter(a=>!mismaPartida(a)); notas.push('el registro del aumento de capital'); }
 
   /* Producción */
+  if((e.cierresCIF||[]).some(c=>c.partidaId===id)){ e.cierresCIF=e.cierresCIF.filter(c=>c.partidaId!==id); notas.push('el cierre de CIF del período'); }
   (e.ordenesProduccion||[]).forEach(o=>{
     ['materiales','manoObra','cif'].forEach(k=>{
       const quitar=(o[k]||[]).filter(mismaPartida);
@@ -328,7 +329,11 @@ function limpiarDependenciasPartida(e,p){
     });
     if(o.partidaCierreId===id){
       o.estado='abierta';
-      ['fechaCierre','cantidadTerminada','costoTerminado','costoUnitario','partidaCierreId','partidaCierreNumero','wipFinal','variaciones','productosConjuntos','metodoConjunto'].forEach(k=>delete o[k]);
+      /* Los CIF que se aplicaron por unidad terminada al cerrar se reversan: al volver a cerrar se aplican de nuevo. */
+      const cifU=(o.cif||[]).filter(x=>x.aplicado&&x.base==='unidades'&&x.fecha===o.fechaCierre);
+      if(cifU.length){ const ids=new Set(cifU.map(x=>x.partidaId)); e.partidas=e.partidas.filter(q=>!ids.has(q.id)); o.cif=o.cif.filter(x=>!cifU.includes(x)); }
+      ['fechaCierre','cantidadTerminada','costoTerminado','costoUnitario','partidaCierreId','partidaCierreNumero','wipFinal','variaciones','productosConjuntos','metodoConjunto',
+        'wipPorCentro','perdidaAnormal','informe','variacionesDetalle','estandarUnitario','controlCierre'].forEach(k=>delete o[k]);
       notas.push(`la orden de producción ${o.numero} vuelve a quedar abierta`);
     }
   });
@@ -413,7 +418,7 @@ ACCIONES.borrarTodo=()=>{
         e.inventarioFinal={};
         e.activosFijos=[]; e.creditosISO=[]; e.pagosISO=[]; e.liquidaciones=[];
         e.cotizaciones=[]; e.ordenesCompra=[]; e.correlativoCot=0; e.correlativoOC=0;
-        e.ordenesProduccion=[]; e.correlativoProd=0;
+        e.ordenesProduccion=[]; e.correlativoProd=0; e.cierresCIF=[];
         e.correlativo=partidasCapital.length+1;
       });
       guardar(); lote=[]; borrador=null; VISTA='empresas'; pintar();

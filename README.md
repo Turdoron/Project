@@ -23,7 +23,7 @@ Superadministrador → Administrador (cliente con licencia) → empresas → per
 | 09–10 | Vistas generales, estados financieros y tablero fiscal |
 | 11–15 | Planillas, cartera y empleados, compras, ventas, planilla rápida (Excel, pegar, aplicar a varios), prestaciones y finiquito |
 | 16–18 | Impuestos (conciliación, retenciones, devolución de IVA), activos fijos, ISO |
-| 19–23 | Empresas y capital, carga de facturas, producción (con reparto de costos comunes y productos conjuntos), libros en PDF, partidas |
+| 19–23 | Empresas y capital, carga de facturas, producción (órdenes, procesos y estándar; recetas, boletas de tiempo, CIF con tasa predeterminada, informe de costo, variaciones, reparto de costos comunes y productos conjuntos — ver `docs/costeo.md`), libros en PDF, partidas |
 | 24 | Arranque: decide entre el login y la app |
 
 Un módulo nuevo se agrega con su número para indicar el orden. Las pantallas nuevas pueden hacerse como componentes de React en `app/`.
