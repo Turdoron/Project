@@ -93,6 +93,14 @@
   background:var(--panel);border:1px solid var(--borde-campo);border-radius:8px;padding:22px;box-shadow:var(--sombra-flot)}
 #esqError[hidden]{display:none}
 @media(max-width:820px){#esqueleto{grid-template-columns:1fr}.esq-menu{display:none}.esq-cont{padding:70px 16px 20px}.esq-cifras{grid-template-columns:1fr}}
+/* ---- Acciones plegadas ("Más") ---- */
+details.mas{display:inline-block;vertical-align:top;text-align:left}
+details.mas>summary{list-style:none;cursor:pointer;display:inline-block}
+details.mas>summary::-webkit-details-marker{display:none}
+details.mas>summary::after{content:' ▾'}
+details.mas[open]>summary::after{content:' ▴'}
+.mas-lista{display:flex;flex-direction:column;gap:4px;margin-top:6px;white-space:normal;min-width:130px}
+.mas-lista .btn{text-align:left;width:100%}
 /* ---- Accesibilidad ---- */
 .saltar{position:absolute;left:8px;top:-80px;z-index:100;background:var(--panel);color:var(--verde);font-weight:600;
   padding:10px 16px;border:2px solid var(--verde);border-radius:4px;text-decoration:none}
@@ -1279,6 +1287,7 @@ function guardarGruposMenu(){
   gruposMenu().forEach(id=>plegarGrupo(id,id!==abierto));
 })();
 document.addEventListener('keydown',ev=>{
+  if(ev.key==='Escape'){ const abierto=document.querySelector('details.mas[open]'); if(abierto){ abierto.open=false; abierto.querySelector('summary').focus(); return; } }
   if(ev.key==='Escape' && !recuadroAdmin.hidden){ cerrarRecuadroAdmin(); adminCab.focus(); return; }
   if(ev.key==='Escape' && innerWidth<=820 && document.body.classList.contains('panel-abierto'))
     alternarPanel(false);
@@ -1473,6 +1482,11 @@ document.querySelectorAll('nav [data-v], #recuadroAdmin [data-v]').forEach(a=>{
     pintar();
   };
 });
+/* Acciones secundarias de una fila, plegadas. Se despliegan en el mismo lugar (no flotan), así que
+   funcionan dentro de tablas con desplazamiento y con el teclado sin código adicional. */
+function masAcciones(nombre,botonesHtml){
+  return `<details class="mas"><summary class="btn mini sec" aria-label="${esc(nombre)}">Más</summary><div class="mas-lista">${botonesHtml}</div></details>`;
+}
 function envolverTablas(raiz){
   raiz.querySelectorAll('table').forEach(t=>{
     const padre=t.parentElement;
@@ -4928,11 +4942,18 @@ VISTAS.planillas=()=>{
     <td>${fFecha(p.desde)} — ${fFecha(p.hasta)}</td>
     <td class="num">${p.detalle.length}<br><span style="font-size:12px;color:${p.detalle.every(f=>f.pago&&f.pago.estado==='pagado')?'var(--verde)':'var(--alerta)'}">${p.detalle.filter(f=>f.pago&&f.pago.estado==='pagado').length} pagado(s)</span></td>
     <td class="num">${Q(p.totales.liquido)}</td>
-    <td class="num">${p.partidaNumero?'':`<button class="btn mini" data-accion="generarPartidaPlanilla" data-id="${p.id}">Generar partida</button>
-      <button class="btn mini sec" data-accion="editarPlanilla" data-id="${p.id}">Editar</button>
-      <button class="btn mini peligro" data-accion="eliminarPlanilla" data-id="${p.id}">Eliminar</button><br>`}<button class="btn mini" data-accion="confirmarPagosPlanilla" data-id="${p.id}">Confirmar pagos</button>
-      <button class="btn mini" data-accion="verPlanilla" data-id="${p.id}">Ver</button>
-      <button class="btn mini sec" data-accion="pdfPlanilla" data-id="${p.id}">PDF</button></td>
+    <td class="num">${(()=>{
+      /* Un solo paso principal por fila (el que toca hacer ahora), "Ver", y el resto dentro de "Más". */
+      const sinPartida=!p.partidaNumero;
+      const pagosPendientes=!p.detalle.every(f=>f.pago&&f.pago.estado==='pagado');
+      const btn=(accion,texto,clase)=>`<button class="btn mini${clase?' '+clase:''}" data-accion="${accion}" data-id="${p.id}">${texto}</button>`;
+      const principal=sinPartida?btn('generarPartidaPlanilla','Generar partida'):pagosPendientes?btn('confirmarPagosPlanilla','Confirmar pagos'):'';
+      const confirmarEsPrincipal=!sinPartida&&pagosPendientes;
+      const resto=[ confirmarEsPrincipal?'':btn('confirmarPagosPlanilla','Confirmar pagos','sec'),
+        sinPartida?btn('editarPlanilla','Editar','sec'):'', btn('pdfPlanilla','PDF','sec'),
+        sinPartida?btn('eliminarPlanilla','Eliminar','peligro'):'' ].filter(Boolean);
+      return principal+' '+btn('verPlanilla','Ver','sec')+' '+masAcciones(`Más acciones de la planilla del ${fFecha(p.fechaPago)}`,resto.join(''));
+    })()}</td>
   </tr>`).join('');
   return cab('Planillas','Control de pago de salarios, con el IGSS laboral y patronal calculado cada vez.',
     `<button class="btn" data-accion="nuevaPlanilla">Nueva planilla</button>`)
