@@ -2,23 +2,40 @@
 
 Estas reglas se aplican a toda pantalla nueva. El programa está en `src/legado/` (un archivo por módulo) y la estructura de la pantalla en `src/marcado.html`; los estilos, en `app/estilos.css`.
 
-## 1. Color (roles, nunca un color suelto)
+## 1. Estilo: minimalismo editorial
+- **Neutros cálidos** (tiza y grises cálidos) para todo y **un solo acento** bermellón (`--acento`), usado de forma quirúrgica: elemento activo del menú, foco del teclado, selección y casillas. Nunca en fondos grandes ni en el botón principal.
+- **Botón principal en tinta** (casi negro), porque aparece muchas veces por pantalla. Secundario: blanco con filete; destructivo: `peligro`.
+- **Tipografía con jerarquía estricta**:
+  - Títulos de pantalla y cifras grandes en Fraunces **ligera** (300, 30–36 px, tracking negativo).
+  - Rótulos (encabezados de tabla, etiquetas de cifras, grupos del menú) en Lexend **semibold**, 11 px, MAYÚSCULAS, tracking +0.07–0.1em.
+  - Texto en Lexend 400, de 14 a 15.5 px.
+- **Aire**: márgenes de pantalla de 56/36/16 px según el ancho, 32 px bajo el título y 24 px entre bloques.
+- **Profundidad**:
+  - Bordes de un pelo (`--linea`) y radios de 8/12/18 px (`--radio-chico`, `--radio`, `--radio-grande`).
+  - Sombras difusas en dos capas (`--sombra`, `--sombra-hover`, `--sombra-flot`).
+  - Cada tabla de la pantalla es una hoja blanca con sombra.
+- **Microinteracciones** de 160 ms con `--suave`:
+  - Botones y cifras se elevan 1 px al pasar el mouse.
+  - Los campos muestran un halo de acento al enfocarlos.
+  - Menús, «Más» y ventanas aparecen con un leve desplazamiento.
+  - Todo se desactiva con «reducir movimiento».
+
+## 1b. Color (roles, nunca un color suelto)
 Los componentes usan solo variables de rol. Para cambiar la marca o un tema se edita el bloque `:root` del principio del CSS.
 
 | Rol | Variables |
 |---|---|
-| Superficies | `--papel` (fondo), `--panel` (tarjetas, tablas, campos), `--activo` (selección, hover) |
+| Superficies | `--papel` (fondo tiza), `--panel` (tarjetas, tablas, campos), `--activo` (selección, hover) |
 | Texto | `--tinta` (principal), `--tinta-suave` (secundario) |
-| Bordes | `--linea` (decorativo), `--linea-fuerte` (divisor), `--borde-campo` (contorno de controles) |
-| Marca | `--verde`, `--boton`, `--boton-hover`, `--boton-texto` |
-| Acento | `--dorado` (solo decorativo), `--acento-texto` (si va como texto) |
+| Bordes | `--linea` (filete), `--linea-fuerte` (divisor), `--borde-campo` (contorno de campos) |
+| Énfasis y acción | `--verde` (énfasis; hoy igual a la tinta), `--boton`, `--boton-hover`, `--boton-texto` |
+| Acento | `--acento` (indicadores y foco; nunca texto), `--acento-texto` (si va como texto), `--anillo` (halo de foco); `--dorado` es un alias |
 | Contabilidad | `--debe`, `--haber` |
 | Estados | `--exito`, `--advertencia`, `--peligro`, `--info`, cada uno con `-bg` y `-borde` |
 
 Contraste (WCAG 2.2 AA, verificado en claro y oscuro):
 - Texto normal ≥ 4.5:1 sobre `--papel`, `--panel` y `--activo`.
-- Bordes de campos y controles ≥ 3:1 → `--borde-campo`.
-- El dorado nunca es texto (2.4:1 en claro).
+- Contorno de campos ≥ 3:1 → `--borde-campo`. El acento puro ≥ 3:1 (indicadores), nunca texto.
 - Un estado nunca se comunica solo con color: va con texto o con signo (+/−).
 
 ## 2. Jerarquía y ley de Hick (menos opciones a la vez)
