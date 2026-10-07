@@ -23,7 +23,7 @@ export async function POST(req) {
     if (!yo || !yo.activo) throw new Err('Cuenta no autorizada.', 403)
     if (yo.rol !== 'superadmin' && yo.rol !== 'administrador') throw new Err('No tenés permiso para gestionar usuarios.', 403)
 
-    const b = await req.json().catch(() => ({}))
+    const b = (await req.json().catch(() => null)) || {}
     const esSuper = yo.rol === 'superadmin'
 
     // El usuario sobre el que se actúa debe estar dentro del alcance de quien llama.
@@ -146,4 +146,9 @@ export async function POST(req) {
   } catch (e) {
     return Response.json({ error: e.message || 'Error del servidor' }, { status: e.c || 500 })
   }
+}
+
+// Cualquier otro método responde como antes, con el mensaje en JSON.
+export function GET() {
+  return Response.json({ error: 'Método no permitido' }, { status: 405, headers: { Allow: 'POST' } })
 }

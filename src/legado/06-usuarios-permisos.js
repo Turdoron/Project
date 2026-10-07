@@ -1,6 +1,6 @@
 /* ============ USUARIOS, ROLES Y PERMISOS ============ */
 /* Cuentas y permisos. La identidad, las contraseñas, las licencias y el acceso a los datos de cada
-   empresa los controla el servidor (Supabase con reglas por fila + la función api/usuarios.js, que es la
+   empresa los controla el servidor (Supabase con reglas por fila + la función app/api/usuarios/route.js, que es la
    única que usa la llave secreta). Lo que se decide aquí es qué módulos ve cada cargo: eso se aplica en
    esta aplicación, por lo que ordena el trabajo del equipo pero no sustituye al servidor.
    Jerarquía: Superadministrador > Administrador (cliente con licencia) > empresas > personal. */

@@ -11,6 +11,10 @@ import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { build, transform } from 'esbuild'
+import nextEnv from '@next/env'
+
+// Lee .env y .env.local igual que Next.js (este paso corre antes que next build / next dev).
+nextEnv.loadEnvConfig(process.cwd(), process.argv.includes('--sin-minificar'))
 
 const minificar = !process.argv.includes('--sin-minificar')
 const dir = 'src/legado'
