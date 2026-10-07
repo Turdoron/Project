@@ -56,10 +56,19 @@ input:focus,select:focus,button:focus-visible{outline:2px solid var(--debe);outl
 
 /* --- Estructura general y menú lateral --- */
 /* estructura */
-#app{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
+#app{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:100vh}
 nav{background:var(--panel);border-right:1px solid var(--linea);padding:18px 0;
   position:sticky;top:0;height:100vh;overflow:auto}
-main{padding:26px 40px 70px;max-width:1680px}
+main{padding:26px 40px 70px;max-width:1680px;min-width:0}
+@media(max-width:1500px){main{padding:22px 24px 60px}}
+@media(min-width:821px) and (max-width:1300px){#app{grid-template-columns:212px minmax(0,1fr)}main{padding:20px 16px 56px}}
+/* Una tabla más ancha que la pantalla se desplaza dentro de su caja, nunca empuja toda la página. */
+.tabla-scroll{overflow-x:auto;max-width:100%}
+/* Tablas con muchas columnas: letra y márgenes más chicos, y encabezados que pueden partirse en dos líneas. */
+table.densa{font-size:12px}
+table.densa th{white-space:normal;line-height:1.2;padding:6px 4px;font-size:11.5px;vertical-align:bottom}
+table.densa td{padding:5px 4px}
+table.densa input{padding:4px;font-size:12px;width:52px!important}
 
 .menu-btn{position:fixed;top:10px;left:10px;z-index:55;
   background:var(--panel);border:1px solid var(--linea-fuerte);border-radius:4px;
@@ -1283,6 +1292,15 @@ document.querySelectorAll('nav [data-v], #recuadroAdmin [data-v]').forEach(a=>{
     pintar();
   };
 });
+function envolverTablas(raiz){
+  raiz.querySelectorAll('table').forEach(t=>{
+    const padre=t.parentElement;
+    if(!padre||padre.classList.contains('tabla-scroll')) return;
+    if(getComputedStyle(padre).overflowX!=='visible') return;   // ya está dentro de una caja con desplazamiento
+    const caja=document.createElement('div'); caja.className='tabla-scroll';
+    padre.insertBefore(caja,t); caja.appendChild(t);
+  });
+}
 function pintar(){
   const u=usuarioActual();
   if(!u){ pantallaLogin(); return; }
@@ -1339,6 +1357,7 @@ function pintar(){
   if(btnDeshacer) btnDeshacer.onclick=()=>ACCIONES.deshacer();
   if(!e && VISTA!=='empresas' && VISTA!=='config' && VISTA!=='usuarios' && VISTA!=='capitalSocial' && VISTA!=='bitacora'){ VISTA='empresas'; }
   document.getElementById('vista').innerHTML = VISTAS[VISTA]();
+  envolverTablas(document.getElementById('vista'));
   const nodo=document.getElementById('vista');
   nodo.querySelectorAll('[data-accion]').forEach(b=>b.onclick=()=>{
     const acc=ACCIONES[b.dataset.accion]; if(!acc) return;
@@ -3058,7 +3077,7 @@ function tablaLibroCV(docs,cols,etiquetaContraparte){
     +M.docs.map(({d,x})=>`<tr><td>${fFecha(d.fecha)}</td><td>${esc(d.tipoDte||'FACT')} ${esc(d.serie||'')}${d.dte?'-'+esc(d.dte):''}</td>
       <td>${esc(d.nit||'CF')}</td><td>${esc(d.nombre||'—')}</td>${cols.map(([k])=>`<td class="num">${x[k]?Q(x[k]):'—'}</td>`).join('')}</tr>`).join('')
     +`<tr><td colspan="4" style="padding-left:26px"><em>Total ${nombreMes(M.mes)}</em></td>${cols.map(([k])=>`<td class="num"><em>${Q(M.tot[k])}</em></td>`).join('')}</tr>`).join('');
-  return {L,html:`<table style="font-size:13px"><thead><tr>${cab4}${cols.map(([,t])=>`<th class="num">${t}</th>`).join('')}</tr></thead>
+  return {L,html:`<table class="densa"><thead><tr>${cab4}${cols.map(([,t])=>`<th class="num">${t}</th>`).join('')}</tr></thead>
     <tbody>${cuerpo}</tbody>
     <tfoot><tr class="total"><td colspan="4">Totales</td>${cols.map(([k])=>`<td class="num">${Q(L.gen[k])}</td>`).join('')}</tr></tfoot></table>`};
 }
@@ -4750,9 +4769,7 @@ function formularioPlanilla(){
     <td><input type="number" min="0" step="0.5" value="${f.horasExtra||0}" data-campo-emp="horasExtra" data-fila="${i}" style="width:64px"></td>
     <td><input type="number" min="0" step="0.5" value="${f.horasExtraDomingo||0}" data-campo-emp="horasExtraDomingo" data-fila="${i}" style="width:64px"></td>
     <td><input type="number" min="0" step="0.5" value="${f.horasMenos||0}" data-campo-emp="horasMenos" data-fila="${i}" style="width:64px"></td>
-    <td class="num h">${f.montoHorasExtra?'+'+Q(f.montoHorasExtra):'—'}</td>
-    <td class="num h">${f.montoHorasExtraDomingo?'+'+Q(f.montoHorasExtraDomingo):'—'}</td>
-    <td class="num h">${f.descuentoHorasMenos?'−'+Q(f.descuentoHorasMenos):'—'}</td>
+    <td class="num" title="Horas extra ${Q(f.montoHorasExtra||0)} + domingo ${Q(f.montoHorasExtraDomingo||0)} − horas de menos ${Q(f.descuentoHorasMenos||0)}">${(()=>{const a=r2((f.montoHorasExtra||0)+(f.montoHorasExtraDomingo||0)-(f.descuentoHorasMenos||0));return a>0?'+'+Q(a):a<0?'−'+Q(-a):'—'})()}</td>
     <td><input type="number" min="0" step="0.01" value="${f.bonoAdicional||0}" data-campo-emp="bonoAdicional" data-fila="${i}" style="width:84px"></td>
     <td class="num">${Q(f.salarioPeriodo)}</td>
     <td class="num">${Q(f.bonifPeriodo)}</td>
@@ -4784,9 +4801,9 @@ function formularioPlanilla(){
         ${cajaBanco.map(c=>`<option value="${c.c}"${c.c===b.cuentaPago?' selected':''}>${c.c} — ${esc(c.n)}</option>`).join('')}
       </select></div>
     </div></div>
-    <table style="font-size:13px"><thead><tr><th></th><th>Empleado</th>
+    <table class="densa"><thead><tr><th></th><th>Empleado</th>
       <th>Días falta</th><th>Horas extra</th><th>Horas domingo</th><th>Horas de menos</th>
-      <th class="num">Valor h. extra</th><th class="num">Valor h. domingo</th><th class="num">Desc. h. menos</th><th>Bono adic.</th>
+      <th class="num" title="Valor de horas extra + horas de domingo − descuento por horas de menos">Ajuste por horas</th><th>Bono adic.</th>
       <th class="num">Salario</th><th class="num">Bonif. Q250</th><th class="num">IGSS laboral</th><th class="num">ISR</th>
       <th class="num">Líquido a pagar</th><th class="num">Cuota patronal</th><th class="num">Prestaciones</th></tr></thead>
       <tbody>${filas}</tbody>
