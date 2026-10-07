@@ -343,7 +343,11 @@ tr.total:hover{background:var(--panel)}
   font-variant-numeric:tabular-nums lining-nums;color:var(--tinta)}
 dialog{border:1px solid var(--linea);border-radius:var(--radio-grande);padding:0;max-width:580px;width:92%;
   box-shadow:var(--sombra-flot);background:var(--panel);color:var(--tinta);overflow:hidden}
-dialog[open]{animation:aparecer .22s var(--suave)}
+dialog[open]{animation:aparecer .22s var(--suave);display:flex;flex-direction:column;max-height:calc(var(--alto,100vh) - 48px)}
+/* Ventanas altas: el contenido se desplaza y los botones de abajo quedan siempre a la vista */
+#modalForm,#avisoCuerpo{display:flex;flex-direction:column;min-height:0;flex:1 1 auto}
+#modalForm>.modal-cuerpo,#avisoCuerpo>.modal-cuerpo{overflow-y:auto;min-height:0;flex:1 1 auto;overscroll-behavior:contain}
+#modalForm>.pie-modal,#avisoCuerpo>.pie-modal{flex:none}
 /* Cierre con productos conjuntos: la tabla de productos necesita más ancho */
 dialog:has(#cjBloque:not([hidden])){max-width:820px}
 /* Formularios de costos con tablas (receta, configuración, consumo): ventana más ancha para que se lean completas */

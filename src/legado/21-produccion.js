@@ -407,7 +407,8 @@ ACCIONES.editarReceta=d=>{
   const e=emp(); e.recetas=e.recetas||[];
   const x=d&&d.id?e.recetas.find(r=>r.id===d.id):null, c=cfgCostos(e), m=metodoProduccion(e);
   const mats=inventarioDetalle(e).lista.map(p=>p.producto);
-  const lineas=[...(x?x.lineas:[]),...Array(Math.max(0,10-(x?x.lineas.length:0))).fill(null)];
+  /* Arranca con los materiales que ya tiene (o una fila vacía) y "Agregar material" suma filas. */
+  const lineas=x&&x.lineas.length?[...x.lineas]:[null];
   const fila=(l,i)=>`<tr>
     <td style="width:40%"><input name="l_mat_${i}" list="dlMatReceta" value="${esc(l?l.material:'')}" style="min-width:180px;width:100%" aria-label="Material ${i+1}"></td>
     <td><select name="l_modo_${i}" style="min-width:178px" aria-label="Forma de la cantidad ${i+1}"><option value="cantidad"${l&&l.modo!=='porcentaje'?' selected':''}>Cantidad por base</option><option value="porcentaje"${l&&l.modo==='porcentaje'?' selected':''}>% de la base</option></select></td>
@@ -426,11 +427,13 @@ ACCIONES.editarReceta=d=>{
     </div>
     <datalist id="dlMatReceta">${mats.map(p=>`<option value="${esc(p)}">`).join('')}</datalist>
     <div class="tabla-scroll" style="margin-top:12px"><table style="font-size:13px"><thead><tr><th>Material</th><th>Forma</th><th>Cantidad</th><th>Unidad</th>${m==='estandar'?'<th>Precio estándar</th>':''}</tr></thead>
-      <tbody>${lineas.map(fila).join('')}</tbody></table></div>
+      <tbody id="filasReceta">${lineas.map(fila).join('')}</tbody></table></div>
+    <button class="btn mini sec" type="button" id="agregarMaterial" style="margin-top:10px">+ Agregar material</button>
     <p style="margin:10px 0 0;font-size:12.5px;color:var(--tinta-suave)">Tenería: base "kg de cuero" y cada químico como "% de la base" (por ejemplo, sal 8 %, cromo 6 %). Acabado: base "hoja" y cada producto en "cantidad por base" (litros por hoja). Calzado: base "par" y las piezas por par.</p>`,
     d=>{
       const producto=(d.producto||'').trim(); if(!producto){avisar('Escribí el producto.');return false}
-      const ls=lineas.map((_,i)=>({material:(d['l_mat_'+i]||'').trim(),modo:d['l_modo_'+i]==='porcentaje'?'porcentaje':'cantidad',valor:+d['l_valor_'+i]||0,unidad:(d['l_unidad_'+i]||'').trim(),
+      const filasN=mForm.querySelectorAll('[name^="l_mat_"]').length;
+      const ls=Array.from({length:filasN},(_,i)=>({material:(d['l_mat_'+i]||'').trim(),modo:d['l_modo_'+i]==='porcentaje'?'porcentaje':'cantidad',valor:+d['l_valor_'+i]||0,unidad:(d['l_unidad_'+i]||'').trim(),
         ...(m==='estandar'?{precioStd:+d['l_precio_'+i]||0}:{})})).filter(l=>l.material||l.valor);
       if(!ls.length){avisar('Agregá al menos un material.');return false}
       if(ls.some(l=>!l.material||!(l.valor>0))){avisar('Cada material necesita su nombre y una cantidad mayor que cero.');return false}
@@ -445,6 +448,11 @@ ACCIONES.editarReceta=d=>{
       registrarLog(x?'Editó una receta de producción':'Creó una receta de producción',`${producto} — ${ls.length} materiales`);
       guardar();
     },x?'Guardar receta':'Crear receta');
+  document.getElementById('agregarMaterial').onclick=()=>{
+    const cuerpo=document.getElementById('filasReceta'), i=cuerpo.querySelectorAll('tr').length;
+    cuerpo.insertAdjacentHTML('beforeend',fila(null,i));
+    const nuevo=mForm.querySelector(`[name="l_mat_${i}"]`); nuevo.focus(); nuevo.scrollIntoView({block:'nearest'});
+  };
 };
 ACCIONES.borrarReceta=d=>{
   const e=emp(), r=(e.recetas||[]).find(x=>x.id===d.id); if(!r) return;
