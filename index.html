@@ -125,7 +125,7 @@ input:focus,select:focus,button:focus-visible{outline:2px solid var(--debe);outl
 #app{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:var(--alto,100vh)}
 nav{background:var(--panel);border-right:1px solid var(--linea);padding:18px 0;
   position:sticky;top:0;height:var(--alto,100vh);overflow:auto}
-main{padding:26px 40px 70px;max-width:1680px;min-width:0}
+main{padding:26px 40px 70px;min-width:0}
 @media(max-width:1500px){main{padding:22px 24px 60px}}
 @media(min-width:821px) and (max-width:1300px){#app{grid-template-columns:212px minmax(0,1fr)}main{padding:20px 16px 56px}}
 /* Una tabla más ancha que la pantalla se desplaza dentro de su caja, nunca empuja toda la página. */
@@ -1233,17 +1233,20 @@ function alternarPanel(abrir){
    tablas), no solo la letra. Usa "zoom" en vez de font-size a propósito: el sistema
    está pensado para Chrome, y zoom es la única forma de escalar TODO parejo sin
    tener que reescribir cada medida en px del sistema a una unidad relativa. */
+/* Tamaño predeterminado: 90 %. Solo se recuerda lo que la persona elige con los botones (clave nueva,
+   para que todos partan del predeterminado). El contenido llena siempre el ancho y el alto de la ventana. */
+const ESCALA_BASE=0.9;
 function escalaActual(){
-  let v=1;
-  try{ v=parseFloat(localStorage.getItem('contagt_escala'))||1; }catch(err){}
-  return (v>=0.8 && v<=1.6) ? v : 1;
+  let v=ESCALA_BASE;
+  try{ const g=parseFloat(localStorage.getItem('contagt_escala2')); if(g>=0.8&&g<=1.6) v=g; }catch(err){}
+  return v;
 }
-function aplicarEscala(v){
+function aplicarEscala(v,recordar=true){
   v=Math.max(0.8,Math.min(1.6,Math.round(v*10)/10));
   document.body.style.zoom=(v*100)+'%';
   /* Con zoom, "100vh" también se encoge: se compensa para que la barra lateral siempre llegue hasta abajo. */
   document.documentElement.style.setProperty('--alto',(100/v)+'vh');
-  try{ localStorage.setItem('contagt_escala',v); }catch(err){}
+  if(recordar){ try{ localStorage.setItem('contagt_escala2',v); }catch(err){} }
   const t=document.getElementById('escalaTexto');
   if(t) t.textContent=Math.round(v*100)+'%';
 }
@@ -3715,7 +3718,7 @@ VISTAS.config=()=>cab('Configuración','Ajustes del sistema, no de una empresa e
         que lo abrás en esta computadora.</p>
       <div style="display:flex;align-items:center;gap:10px;margin-top:10px">
         <button class="btn sec" data-accion="escalaMenos" style="font-size:15px;padding:9px 16px" aria-label="Reducir el tamaño">A−</button>
-        <button class="btn sec" data-accion="escalaNormal" style="padding:9px 16px" aria-label="Tamaño normal">A</button>
+        <button class="btn sec" data-accion="escalaNormal" style="padding:9px 16px" aria-label="Tamaño predeterminado (90 %)" title="Tamaño predeterminado (90 %)">A</button>
         <button class="btn sec" data-accion="escalaMas" style="font-size:19px;padding:9px 16px" aria-label="Agrandar el tamaño">A+</button>
         <span id="escalaTexto" style="color:var(--tinta-suave);font-size:14px">${Math.round(escalaActual()*100)}%</span>
       </div>
@@ -7382,7 +7385,7 @@ ACCIONES.cerrarCostoVentas=d=>{
 };
 ACCIONES.escalaMenos=()=>aplicarEscala(escalaActual()-0.1);
 ACCIONES.escalaMas=()=>aplicarEscala(escalaActual()+0.1);
-ACCIONES.escalaNormal=()=>aplicarEscala(1);
+ACCIONES.escalaNormal=()=>aplicarEscala(ESCALA_BASE);
 ACCIONES.guardarDeduccionPersonal=()=>{
   const e=emp(), anio=+document.getElementById('dedAnio').value, v=document.getElementById('dedMonto').value;
   if(!(anio>=2000&&anio<=2100)){avisar('Escribí un año válido.');return}
@@ -10722,7 +10725,7 @@ ACCIONES.borrarTodo=()=>{
   try{ guardado=localStorage.getItem('contagt_panel'); }catch(err){}
   /* En pantalla grande el panel arranca visible; en la chica, oculto. */
   alternarPanel(guardado!==null ? guardado==='1' : innerWidth>820);
-  aplicarEscala(escalaActual());
+  aplicarEscala(escalaActual(),false);
   window.sb.auth.onAuthStateChange(ev=>{
     if(ev==='SIGNED_OUT' && BD.sesion){ BD=VACIO(); pantallaLogin('Tu sesión terminó. Iniciá sesión de nuevo.'); }
   });
