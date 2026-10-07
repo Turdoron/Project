@@ -409,8 +409,8 @@ ACCIONES.editarReceta=d=>{
   const mats=inventarioDetalle(e).lista.map(p=>p.producto);
   const lineas=[...(x?x.lineas:[]),...Array(Math.max(0,10-(x?x.lineas.length:0))).fill(null)];
   const fila=(l,i)=>`<tr>
-    <td><input name="l_mat_${i}" list="dlMatReceta" value="${esc(l?l.material:'')}" style="min-width:150px" aria-label="Material ${i+1}"></td>
-    <td><select name="l_modo_${i}" style="min-width:150px" aria-label="Forma de la cantidad ${i+1}"><option value="cantidad"${l&&l.modo!=='porcentaje'?' selected':''}>Cantidad por base</option><option value="porcentaje"${l&&l.modo==='porcentaje'?' selected':''}>% de la base</option></select></td>
+    <td style="width:40%"><input name="l_mat_${i}" list="dlMatReceta" value="${esc(l?l.material:'')}" style="min-width:180px;width:100%" aria-label="Material ${i+1}"></td>
+    <td><select name="l_modo_${i}" style="min-width:178px" aria-label="Forma de la cantidad ${i+1}"><option value="cantidad"${l&&l.modo!=='porcentaje'?' selected':''}>Cantidad por base</option><option value="porcentaje"${l&&l.modo==='porcentaje'?' selected':''}>% de la base</option></select></td>
     <td><input name="l_valor_${i}" type="number" step="0.0001" min="0" value="${l?l.valor:''}" style="width:96px" aria-label="Cantidad ${i+1}"></td>
     <td><input name="l_unidad_${i}" value="${esc(l?l.unidad||'':'')}" style="width:70px" placeholder="kg" aria-label="Unidad ${i+1}"></td>
     ${m==='estandar'?`<td><input name="l_precio_${i}" type="number" step="0.0001" min="0" value="${l&&l.precioStd!==undefined?l.precioStd:''}" style="width:96px" aria-label="Precio estándar ${i+1}"></td>`:''}</tr>`;
