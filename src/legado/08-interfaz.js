@@ -218,6 +218,7 @@ function posicionarRecuadroAdmin(){
   recuadroAdmin.style.left=left+'px'; recuadroAdmin.style.top=top+'px';
 }
 function abrirRecuadroAdmin(){
+  cerrarRecuadroEmpresa();
   recuadroAdmin.hidden=false; document.getElementById('veloAdmin').hidden=false;
   adminCab.classList.add('abierto'); adminCab.setAttribute('aria-expanded','true');
   posicionarRecuadroAdmin();
@@ -260,6 +261,60 @@ function envolverTablas(raiz){
     padre.insertBefore(caja,t); caja.appendChild(t);
   });
 }
+/* ============ EMPRESA Y EJERCICIO (línea compacta + recuadro) ============ */
+/* La empresa en uso se ve siempre arriba del menú, en una sola línea; al tocarla se abre un recuadro para
+   cambiar de empresa o de ejercicio. Así no ocupa media barra lateral, pero nunca se pierde de vista en
+   qué empresa se está registrando. */
+const empChip=document.getElementById('empChip'), recuadroEmpresa=document.getElementById('recuadroEmpresa');
+function pintarChipEmpresa(e,visibles){
+  empChip.innerHTML=e
+    ?`<span class="emp-chip-nombre">${esc(e.nombre)}</span><span class="emp-chip-sub">Ejercicio ${e.ejercicio} · NIT ${esc(e.nit||'—')}</span><span class="emp-chip-flecha" aria-hidden="true"></span>`
+    :`<span class="emp-chip-nombre">${visibles.length?'Elegí una empresa':'Sin empresas todavía'}</span><span class="emp-chip-flecha" aria-hidden="true"></span>`;
+  empChip.setAttribute('aria-label',e?`Empresa en uso: ${e.nombre}, ejercicio ${e.ejercicio}. Cambiar empresa o ejercicio`:'Empresa y ejercicio');
+}
+function abrirRecuadroEmpresa(){
+  cerrarRecuadroAdmin();
+  recuadroEmpresa.hidden=false; document.getElementById('veloAdmin').hidden=false;
+  empChip.setAttribute('aria-expanded','true'); empChip.classList.add('abierto');
+  if(innerWidth>820){
+    const r=empChip.getBoundingClientRect(), w=recuadroEmpresa.offsetWidth, h=recuadroEmpresa.offsetHeight;
+    recuadroEmpresa.style.left=Math.max(12,Math.min(document.getElementById('panel').getBoundingClientRect().right+8,innerWidth-w-12))+'px';
+    recuadroEmpresa.style.top=Math.max(12,Math.min(r.top,innerHeight-h-12))+'px';
+  }else{ recuadroEmpresa.style.left=''; recuadroEmpresa.style.top=''; }
+  const s=recuadroEmpresa.querySelector('select,input'); if(s) s.focus();
+}
+function cerrarRecuadroEmpresa(){
+  if(recuadroEmpresa.hidden) return;
+  recuadroEmpresa.hidden=true; if(recuadroAdmin.hidden) document.getElementById('veloAdmin').hidden=true;
+  empChip.setAttribute('aria-expanded','false'); empChip.classList.remove('abierto');
+}
+empChip.onclick=ev=>{ ev.stopPropagation(); recuadroEmpresa.hidden?abrirRecuadroEmpresa():cerrarRecuadroEmpresa(); };
+document.getElementById('cerrarEmpresa').onclick=()=>{ cerrarRecuadroEmpresa(); empChip.focus(); };
+document.addEventListener('click',ev=>{ if(!recuadroEmpresa.hidden&&!recuadroEmpresa.contains(ev.target)&&!empChip.contains(ev.target)) cerrarRecuadroEmpresa(); });
+document.addEventListener('keydown',ev=>{ if(ev.key==='Escape'&&!recuadroEmpresa.hidden&&!modal.open&&!document.getElementById('aviso').open){ cerrarRecuadroEmpresa(); empChip.focus(); } });
+
+/* ============ DESHACER (aviso flotante) ============ */
+/* Justo después de una acción aparece abajo a la derecha, unos segundos. Mientras siga disponible, también
+   está en el recuadro de Administración. */
+const SEG_DESHACER=25;
+let deshacerOcultado=null, tDeshacer=null;
+function pintarDeshacer(e){
+  const caja=document.getElementById('deshacerFlotante'), adm=document.getElementById('adminDeshacer');
+  const disp=!!(snapshotDeshacer&&e&&snapshotDeshacer.empId===e.id);
+  adm.hidden=!disp;
+  if(disp){ adm.textContent=`↩ Deshacer «${etiquetaDeshacer}»`; adm.onclick=()=>{ cerrarRecuadroAdmin(); ACCIONES.deshacer(); }; }
+  const reciente=disp&&deshacerOcultado!==snapshotDeshacer&&Date.now()-(snapshotDeshacer.t||0)<SEG_DESHACER*1000;
+  caja.hidden=!reciente;
+  clearTimeout(tDeshacer);
+  if(!reciente){ caja.innerHTML=''; return; }
+  caja.innerHTML=`<span class="deshacer-txt">Listo: ${esc(etiquetaDeshacer)}</span>
+    <button type="button" class="btn mini" id="btnDeshacerFlot">↩ Deshacer</button>
+    <button type="button" class="deshacer-cerrar" id="btnDeshacerCerrar" aria-label="Cerrar el aviso de deshacer">✕</button>`;
+  document.getElementById('btnDeshacerFlot').onclick=()=>ACCIONES.deshacer();
+  document.getElementById('btnDeshacerCerrar').onclick=()=>{ deshacerOcultado=snapshotDeshacer; pintarDeshacer(emp()); };
+  tDeshacer=setTimeout(()=>pintarDeshacer(emp()),Math.max(500,SEG_DESHACER*1000-(Date.now()-snapshotDeshacer.t)));
+}
+
 /* Menú por aplicaciones: en Inicio, la lista de aplicaciones; dentro de una, solo sus pantallas. */
 function pintarMenuApps(){
   const enInicio=VISTA==='home';
@@ -318,16 +373,9 @@ function pintar(){
     a.classList.toggle('on',a.dataset.v===VISTA);
   });
   if(!puedeVer(VISTA)){ VISTA = permitidas ? (permitidas[0]||'home') : 'home'; }
-  const cajaUsuario=document.getElementById('cajaUsuario');
-  if(cajaUsuario){
-    const r=ROLES[u.rol];
-    cajaUsuario.innerHTML=`<div class="emp-datos" style="margin:0 12px 10px">
-      <strong style="display:block;color:var(--verde)">${esc(u.nombre||u.usuario)}</strong>
-      <span>${esc(r?r.nombre:u.rol)}</span>
-    </div>`;
-    /* Cerrar sesión ahora vive en el recuadro de Administración. */
-    document.getElementById('recuadroUsuario').textContent=`Sesión: ${u.nombre||u.usuario} · ${r?r.nombre:u.rol}`;
-  }
+  const r=ROLES[u.rol];
+  /* Nombre y cargo de la sesión: viven en el recuadro de Administración. */
+  document.getElementById('recuadroUsuario').textContent=`Sesión: ${u.nombre||u.usuario} · ${r?r.nombre:u.rol}`;
   const e=emp();
   const caja=document.getElementById('empBox');
   const visibles=empresasVisibles();
@@ -339,20 +387,17 @@ function pintar(){
        ${e?`<div class="emp-datos">NIT ${esc(e.nit||'—')}</div>
        <label for="selEjercicio" style="margin-top:8px" title="${AYUDA_EJERCICIO}">Ejercicio de trabajo
          <span class="ayuda" tabindex="0" aria-label="${AYUDA_EJERCICIO}" title="${AYUDA_EJERCICIO}">ⓘ</span></label>
-       <input id="selEjercicio" type="number" value="${e.ejercicio}" style="width:100%" title="${AYUDA_EJERCICIO}">
-       ${snapshotDeshacer&&snapshotDeshacer.empId===e.id?`<button class="btn sec" style="width:100%;margin-top:10px"
-         data-accion="deshacer" title="Deshacer: ${esc(etiquetaDeshacer)}">↩ Deshacer «${esc(etiquetaDeshacer)}»</button>`:''}`:''}`
+       <input id="selEjercicio" type="number" value="${e.ejercicio}" style="width:100%" title="${AYUDA_EJERCICIO}">`:''}`
     : `<span class="emp-datos">Todavía no hay empresas registradas</span>`;
   const sel=document.getElementById('selEmpresa');
-  if(sel) sel.onchange=()=>cambiarEmpresa(sel.value);
+  if(sel) sel.onchange=()=>{ cerrarRecuadroEmpresa(); cambiarEmpresa(sel.value); };
+  pintarChipEmpresa(e,visibles); pintarDeshacer(e);
   const selEj=document.getElementById('selEjercicio');
   if(selEj) selEj.onchange=()=>{
     const nuevo=+selEj.value;
     if(!nuevo||nuevo<2000||nuevo>2100){avisar('Escribí un año válido.');selEj.value=e.ejercicio;return}
     e.ejercicio=nuevo; guardar(); pintar();
   };
-  const btnDeshacer=caja.querySelector('[data-accion="deshacer"]');
-  if(btnDeshacer) btnDeshacer.onclick=()=>ACCIONES.deshacer();
   if(!e && VISTA!=='empresas' && VISTA!=='config' && VISTA!=='usuarios' && VISTA!=='capitalSocial' && VISTA!=='bitacora'){ VISTA='empresas'; }
   pintarMenuApps();
   document.getElementById('vista').innerHTML = VISTAS[VISTA]();

@@ -11,7 +11,7 @@ let snapshotDeshacer=null, etiquetaDeshacer='';
 function tomarSnapshotDeshacer(etiqueta){
   const e=emp();
   if(!e) return;
-  try{ snapshotDeshacer={empId:e.id,datos:JSON.parse(JSON.stringify(e))}; etiquetaDeshacer=etiqueta||'la última acción'; }
+  try{ snapshotDeshacer={empId:e.id,datos:JSON.parse(JSON.stringify(e)),t:Date.now()}; etiquetaDeshacer=etiqueta||'la última acción'; }
   catch(err){ snapshotDeshacer=null; }
 }
 /* Corrección: antes CUALQUIER clic (incluso "Ver" o "PDF") pisaba la copia
@@ -30,7 +30,7 @@ async function conSnapshot(etiqueta,fn){
     let cambio=false;
     try{ cambio=JSON.stringify(despues)!==antes; }catch(err){}
     if(cambio){
-      snapshotDeshacer={empId:id,datos:JSON.parse(antes)}; etiquetaDeshacer=etiqueta||'la última acción';
+      snapshotDeshacer={empId:id,datos:JSON.parse(antes),t:Date.now()}; etiquetaDeshacer=etiqueta||'la última acción';
       if(!document.getElementById('modal').open) pintar();
     }
   }

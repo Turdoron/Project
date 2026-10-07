@@ -29,8 +29,7 @@
       <img class="logo logo-claro" alt="ADCONTIS" src="/logo-azul.png" width="378" height="363"><img class="logo logo-oscuro" alt="ADCONTIS" src="/logo-blanco.png" width="378" height="363">
       <p class="lema">Módulo Contable</p>
     </div>
-    <div id="cajaUsuario"></div>
-    <div class="emp-activa" id="empBox"></div>
+    <button type="button" id="empChip" class="emp-chip" aria-haspopup="dialog" aria-expanded="false" aria-controls="recuadroEmpresa"></button>
     <button type="button" data-v="home" class="nav-inicio">Aplicaciones</button>
     <div id="listaApps" class="lista-apps"></div>
 
@@ -111,6 +110,7 @@
     <button type="button" class="cerrar-recuadro" id="cerrarRecuadro" aria-label="Cerrar">✕</button>
     <h4>Administración</h4>
     <p id="recuadroUsuario" style="margin:0 16px 8px;font-size:13px;color:var(--tinta-suave)"></p>
+    <button type="button" class="item-admin" id="adminDeshacer" hidden></button>
     <button type="button" data-v="usuarios">Usuarios</button>
     <button type="button" data-v="bitacora">Bitácora</button>
     <button type="button" data-v="config">Configuración</button>
@@ -124,6 +124,14 @@
     <hr>
     <button type="button" class="btn sec salir" id="btnCerrarSesion">Cerrar sesión</button>
   </div>
+  <!-- Recuadro de empresa y ejercicio: se abre desde la línea compacta de arriba del menú. -->
+  <div id="recuadroEmpresa" class="recuadro-admin recuadro-emp" role="dialog" aria-label="Empresa y ejercicio" hidden>
+    <button type="button" class="cerrar-recuadro" id="cerrarEmpresa" aria-label="Cerrar">✕</button>
+    <h4>Empresa y ejercicio</h4>
+    <div class="emp-activa" id="empBox"></div>
+  </div>
+  <!-- Deshacer: aparece abajo a la derecha justo después de cada acción. -->
+  <div id="deshacerFlotante" class="deshacer-flotante" role="status" hidden></div>
   <main id="vista" tabindex="-1"></main>
 </div>
 
