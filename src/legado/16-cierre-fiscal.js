@@ -154,7 +154,7 @@ VISTAS.cierreFiscal=()=>{
   const c=CORTES_CF.find(x=>x.id===id), {R,pasos}=pasosCierreFiscal(e,c);
   const listos=pasos.filter(p=>p.estado==='ok').length;
   const icono={ok:'✓',pend:'',aviso:'!'};
-  return cab('Cierre fiscal (ISR 25 %)',`${esc(e.nombre)} · ejercicio ${e.ejercicio} · del ${fFecha(R.desde)} al ${fFecha(R.hasta)}. Todo lo del cierre en un solo lugar, en orden: cada paso tiene su botón.`)
+  return cab('Cierre fiscal (ISR 25 %)',`${esc(e.nombre)} · ejercicio ${e.ejercicio} · del ${fFecha(R.desde)} al ${fFecha(R.hasta)}. Todo lo del cierre en un solo lugar, en orden: cada paso tiene su botón.`,`<button class="btn sec" data-accion="irTablero">Tablero fiscal</button>`)
     +`<div class="barra"><div class="campo ancho"><label for="selCorteCF">Cierre de</label>
         <select id="selCorteCF" data-filtro="corteCF">${CORTES_CF.map(x=>`<option value="${x.id}"${x.id===id?' selected':''}>${x.nombre}</option>`).join('')}</select></div>
       <div class="progreso-cf" aria-live="polite"><strong>${listos} de ${pasos.length}</strong> pasos listos
@@ -165,6 +165,8 @@ VISTAS.cierreFiscal=()=>{
           <div class="det-cf">${p.detalle}</div>${p.botones?`<div class="acc-cf">${p.botones}</div>`:''}</div></li>`).join('')}</ol>`;
 };
 ACCIONES.irProduccion=()=>{VISTA='produccion';filtros={};pintar()};
+ACCIONES.irResumen=()=>{VISTA='resumen';filtros={};pintar()};
+ACCIONES.irCierreFiscal=()=>{VISTA='cierreFiscal';filtros={};pintar()};
 ACCIONES.cfParcial=d=>{ const v=document.getElementById('cfInv'); ACCIONES.cierreFiscalParcial({trimestre:d.t,inv:v?v.value:''}); };
 ACCIONES.cfCerrarCosto=d=>{
   const e=emp(), v=document.getElementById('cfInv'), monto=+(v&&v.value);

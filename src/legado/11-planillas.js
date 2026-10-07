@@ -343,10 +343,15 @@ VISTAS.home=()=>{
   return cab(`${saludo}${nombre?', '+esc(nombre):''}`,`${esc(e.nombre)} · ejercicio ${e.ejercicio} · ${esc(REGIMENES[e.regimen]||'—')}. Elegí con qué vas a trabajar.`)
     + lanzador;
 };
+/* Resumen del ejercicio y Tablero fiscal van juntos, en dos pestañas. */
+function pestanasResumen(activa){
+  const p=(id,txt,acc)=>puedeVer(id)?`<button type="button" class="pestana${activa===id?' on':''}" data-accion="${acc}"${activa===id?' aria-current="page"':''}>${txt}</button>`:'';
+  return `<div class="pestanas" role="navigation" aria-label="Resumen y tablero fiscal">${p('resumen','Resumen del ejercicio','irResumen')}${p('tablero','Tablero fiscal','irTablero')}</div>`;
+}
 /* Resumen del ejercicio: pantalla propia dentro de Contabilidad. */
 VISTAS.resumen=()=>{
   const e=emp();
-  return cab('Resumen del ejercicio',`${esc(e.nombre)} · ejercicio ${e.ejercicio} · ${esc(REGIMENES[e.regimen]||'—')}`,
+  return pestanasResumen('resumen')+cab('Resumen del ejercicio',`${esc(e.nombre)} · ejercicio ${e.ejercicio} · ${esc(REGIMENES[e.regimen]||'—')}`,
     `<button class="btn" data-accion="irFacturas">Cargar facturas</button>`)+resumenInicio(e);
 };
 
@@ -757,12 +762,11 @@ VISTAS.tablero=()=>{
         Al superarlo hay que pasar al régimen general.</div>`;
   }
 
-  return cab('Tablero fiscal',`${esc(e.nombre)} · ejercicio ${e.ejercicio} · régimen actual: ${esc(REGIMENES[e.regimen]||e.regimen)}`,
+  return pestanasResumen('tablero')+cab('Tablero fiscal',`${esc(e.nombre)} · ejercicio ${e.ejercicio} · régimen actual: ${esc(REGIMENES[e.regimen]||e.regimen)}`,
     `${e.regimen==='general'||e.regimen==='simplificado'?'<button class="btn sec" data-accion="pagarIVA">Pagar IVA</button>':''}
      ${e.regimen!=='general'&&e.regimen!=='simplificado'?`<button class="btn sec" data-accion="pagarISR">Pagar impuesto (${e.regimen==='pequeno'?'5%':'1.5%'})</button>`:''}
      ${e.regimen==='simplificado'?'<button class="btn sec" data-accion="pagarISR">Pagar ISR</button>':''}
-     ${e.regimen==='general'?'<button class="btn sec" data-accion="cierreFiscalParcial">Cierre parcial</button>':''}
-     ${e.regimen==='general'?'<button class="btn sec" data-accion="cierreFiscalTotal">Cierre total</button>':''}
+     ${e.regimen==='general'?'<button class="btn" data-accion="irCierreFiscal">Cierre fiscal paso a paso</button>':''}
      ${e.regimen==='general'?'<button class="btn sec" data-accion="pagarISO">Pagar ISO</button>':''}
      <button class="btn sec" data-accion="cambiarRegimen">Cambiar régimen</button>`)
   + `<div class="barra"><div class="campo ancho"><label>Período</label>
