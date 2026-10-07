@@ -1,9 +1,11 @@
-import { Lexend, Fraunces } from 'next/font/google'
+import { Inter, Fraunces } from 'next/font/google'
 import './estilos.css'
 
 // Las fuentes se descargan al construir y se sirven desde el mismo sitio (sin pedirlas a Google en cada visita).
-const lexend = Lexend({ subsets: ['latin'], display: 'swap', variable: '--fuente-lexend' })
-// Fraunces (cifras de los reportes) no se precarga: así no le quita velocidad al programa en la primera visita.
+// Inter: letra de todo el sistema. Sus números tienen ancho fijo (las columnas de montos alinean dígito con dígito)
+// y distingue bien 1/7, 3/8, 0/O en tamaños chicos.
+const inter = Inter({ subsets: ['latin'], axes: ['opsz'], display: 'swap', variable: '--fuente-inter' })
+// Fraunces: solo los títulos de pantalla (sin cifras). No se precarga: así no le quita velocidad al programa en la primera visita.
 const fraunces = Fraunces({ subsets: ['latin'], axes: ['opsz'], display: 'swap', variable: '--fuente-fraunces', preload: false })
 
 export const metadata = { title: 'Módulo Contable TINBREW' }
@@ -23,7 +25,7 @@ window.__recuperando=/[#&]type=recovery(&|$)/.test(location.hash);`
 export default function RaizLayout({ children }) {
   // suppressHydrationWarning: el tema y la visibilidad (zoom) los ajusta el programa en <html> y <body>.
   return (
-    <html lang="es" className={`${lexend.variable} ${fraunces.variable}`} suppressHydrationWarning>
+    <html lang="es" className={`${inter.variable} ${fraunces.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: TEMA }} />
         <script dangerouslySetInnerHTML={{ __html: PREVIO }} />

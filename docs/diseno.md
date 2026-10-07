@@ -6,9 +6,9 @@ Estas reglas se aplican a toda pantalla nueva. El programa está en `src/legado/
 - **Neutros cálidos** (tiza y grises cálidos) para todo y **un solo acento** bermellón (`--acento`), usado de forma quirúrgica: elemento activo del menú, foco del teclado, selección y casillas. Nunca en fondos grandes ni en el botón principal.
 - **Botón principal en tinta** (casi negro), porque aparece muchas veces por pantalla. Secundario: blanco con filete; destructivo: `peligro`.
 - **Tipografía con jerarquía estricta**:
-  - Títulos de pantalla y cifras grandes en Fraunces **ligera** (300, 30–36 px, tracking negativo).
-  - Rótulos (encabezados de tabla, etiquetas de cifras, grupos del menú) en Lexend **semibold**, 11 px, MAYÚSCULAS, tracking +0.07–0.1em.
-  - Texto en Lexend 400, de 14 a 15.5 px.
+  - Títulos de pantalla en Fraunces **ligera** (300, 36 px, tracking negativo); cifras grandes en Inter ligera (300, 30 px).
+  - Rótulos (encabezados de tabla, etiquetas de cifras, grupos del menú) en Inter **semibold**, 11 px, MAYÚSCULAS, tracking +0.07–0.1em.
+  - Texto, tablas y cifras en **Inter** (números de ancho fijo: las columnas de montos alinean dígito con dígito), de 14 a 15 px. Fraunces solo en títulos, nunca en montos.
 - **Aire**: márgenes de pantalla de 56/36/16 px según el ancho, 32 px bajo el título y 24 px entre bloques.
 - **Profundidad**:
   - Bordes de un pelo (`--linea`) y radios de 8/12/18 px (`--radio-chico`, `--radio`, `--radio-grande`).
@@ -61,7 +61,7 @@ Antes de publicar cambios visuales: revisar claro y oscuro, anchos de 1280 y 144
 - `npm run build` hace dos pasos: `scripts/armar-app.mjs` une los módulos de `src/legado/` con la conexión de Supabase en un solo archivo minificado, `public/app/app.<hash>.js`, y después `next build` arma el sitio.
 - La página carga ese archivo con `defer` y prioridad alta, porque sin él no aparece ni el inicio de sesión. El código de Next.js/React llega en paralelo.
 - Todo lo de `/app/` y `/_next/static/` se guarda en caché por un año, porque el nombre cambia solo cuando cambia el contenido.
-- Las fuentes (Lexend y Fraunces) se sirven desde el propio sitio con `next/font`. Solo se precarga Lexend.
+- Las fuentes (Inter y Fraunces) se sirven desde el propio sitio con `next/font`. Solo se precarga Inter (~73 KB).
 - La conexión con Supabase (`src/supabase.js`) usa solo autenticación y base de datos, sin tiempo real ni archivos.
 - Las librerías pesadas (Excel, PDF, ZIP) se cargan solo al usarlas, no al abrir el sistema.
 - Costo de Next.js (React, ~124 KB): medido con 3G rápido y procesador 4× más lento, la primera visita tarda ~0.9 s más que con Vite (2.7 s contra 1.8 s). En laptop con 4G, y en las visitas siguientes desde el celular, el tiempo es el mismo.
