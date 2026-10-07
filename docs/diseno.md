@@ -1,6 +1,6 @@
 # Reglas de diseño — TINBREW Contable
 
-Estas reglas se aplican a toda pantalla nueva. Todo está en `index.html`.
+Estas reglas se aplican a toda pantalla nueva. El programa está en `src/legado/` (un archivo por módulo) y la estructura de la pantalla en `src/marcado.html`; los estilos, en `app/estilos.css`.
 
 ## 1. Color (roles, nunca un color suelto)
 Los componentes usan solo variables de rol. Para cambiar la marca o un tema se edita el bloque `:root` del principio del CSS.
@@ -41,9 +41,10 @@ Los esqueletos (`#esqueleto`) se ven desde el primer pintado y al iniciar sesió
 Antes de publicar cambios visuales: revisar claro y oscuro, anchos de 1280 y 1440 px, y correr una auditoría con axe (extensión *axe DevTools* o `axe-core`). El resultado esperado es 0 problemas.
 
 ## 6. Rendimiento (carga)
-- `npm run build` hace dos pasos: `vite build` y `scripts/optimizar.mjs`, que minifica el JavaScript y el CSS propios (el comportamiento no cambia) y saca el programa grande a `assets/app.<hash>.js` con `defer`. El HTML queda en ~47 KB y el navegador pinta el esqueleto mientras descarga el programa.
-- `vercel.json` guarda en caché por un año todo lo de `/assets/` (el nombre cambia solo cuando cambia el contenido).
+- `npm run build` hace dos pasos: `scripts/armar-app.mjs` une los módulos de `src/legado/` con la conexión de Supabase en un solo archivo minificado, `public/app/app.<hash>.js`, y después `next build` arma el sitio.
+- La página carga ese archivo con `defer` y prioridad alta, porque sin él no aparece ni el inicio de sesión. El código de Next.js/React llega en paralelo.
+- Todo lo de `/app/` y `/_next/static/` se guarda en caché por un año, porque el nombre cambia solo cuando cambia el contenido.
+- Las fuentes (Lexend y Fraunces) se sirven desde el propio sitio con `next/font`. Solo se precarga Lexend.
 - La conexión con Supabase (`src/supabase.js`) usa solo autenticación y base de datos, sin tiempo real ni archivos.
 - Las librerías pesadas (Excel, PDF, ZIP) se cargan solo al usarlas, no al abrir el sistema.
-- Medido con 3G rápido y procesador 4× más lento: el login pasó de 2.1 s a 1.4 s, y la descarga de 232 KB a 166 KB.
-- Pendiente a futuro: dividir el programa por módulos (planillas, libros, estados) para que cada pantalla cargue solo lo suyo.
+- Costo de Next.js (React, ~124 KB): medido con 3G rápido y procesador 4× más lento, la primera visita tarda ~0.9 s más que con Vite (2.7 s contra 1.8 s). En laptop con 4G, y en las visitas siguientes desde el celular, el tiempo es el mismo.

@@ -1,0 +1,121 @@
+<a class="saltar" href="#vista">Saltar al contenido</a>
+<div id="esqueleto" role="status" aria-live="polite">
+  <span class="solo-lector">Cargando el sistema…</span>
+  <div class="esq-menu" aria-hidden="true">
+    <div class="esq-b" style="width:150px;height:64px;margin:6px auto 18px"></div>
+    <div class="esq-b" style="width:100%;height:86px;margin-bottom:22px"></div>
+    <div class="esq-b" style="width:70%;height:14px;margin-bottom:20px"></div><div class="esq-b" style="width:84%;height:14px;margin-bottom:20px"></div><div class="esq-b" style="width:64%;height:14px;margin-bottom:20px"></div><div class="esq-b" style="width:78%;height:14px;margin-bottom:20px"></div>
+    <div class="esq-b" style="width:58%;height:14px;margin-bottom:20px"></div><div class="esq-b" style="width:82%;height:14px;margin-bottom:20px"></div><div class="esq-b" style="width:66%;height:14px;margin-bottom:20px"></div><div class="esq-b" style="width:74%;height:14px;"></div>
+  </div>
+  <div class="esq-cont" aria-hidden="true">
+    <div class="esq-tit"><div style="flex:1"><div class="esq-b" style="width:min(320px,60%);height:30px;margin-bottom:12px"></div><div class="esq-b" style="width:min(520px,85%);height:14px;"></div></div><div class="esq-b" style="width:150px;height:42px;border-radius:5px"></div></div>
+    <div class="esq-cifras"><div class="esq-b" style="width:100%;height:92px;"></div><div class="esq-b" style="width:100%;height:92px;"></div><div class="esq-b" style="width:100%;height:92px;"></div></div>
+    <div class="esq-tabla"><div class="esq-b" style="width:100%;height:34px;border-radius:0"></div><div class="esq-fila"><div class="esq-b" style="width:7%;height:14px;"></div><div class="esq-b" style="width:14%;height:14px;"></div><div class="esq-b" style="width:38%;height:14px;"></div><div class="esq-b" style="width:11%;height:14px;margin-left:auto"></div></div><div class="esq-fila"><div class="esq-b" style="width:7%;height:14px;"></div><div class="esq-b" style="width:14%;height:14px;"></div><div class="esq-b" style="width:46%;height:14px;"></div><div class="esq-b" style="width:11%;height:14px;margin-left:auto"></div></div><div class="esq-fila"><div class="esq-b" style="width:7%;height:14px;"></div><div class="esq-b" style="width:14%;height:14px;"></div><div class="esq-b" style="width:33%;height:14px;"></div><div class="esq-b" style="width:11%;height:14px;margin-left:auto"></div></div><div class="esq-fila"><div class="esq-b" style="width:7%;height:14px;"></div><div class="esq-b" style="width:14%;height:14px;"></div><div class="esq-b" style="width:42%;height:14px;"></div><div class="esq-b" style="width:11%;height:14px;margin-left:auto"></div></div><div class="esq-fila"><div class="esq-b" style="width:7%;height:14px;"></div><div class="esq-b" style="width:14%;height:14px;"></div><div class="esq-b" style="width:36%;height:14px;"></div><div class="esq-b" style="width:11%;height:14px;margin-left:auto"></div></div><div class="esq-fila"><div class="esq-b" style="width:7%;height:14px;"></div><div class="esq-b" style="width:14%;height:14px;"></div><div class="esq-b" style="width:44%;height:14px;"></div><div class="esq-b" style="width:11%;height:14px;margin-left:auto"></div></div></div>
+  </div>
+  <div id="esqError" hidden>
+    <p><strong>El sistema está tardando más de lo normal en cargar.</strong><br>Revisá tu conexión a internet e intentá de nuevo.</p>
+    <button type="button" class="btn" onclick="location.reload()">Reintentar</button>
+  </div>
+</div>
+<script>setTimeout(function(){var e=document.getElementById('esqueleto');if(e&&!e.hidden)document.getElementById('esqError').hidden=false},15000)</script>
+<!-- ============ HTML — Menú lateral, estructura de la app y modales ============ -->
+<button id="menuBtn" class="menu-btn" type="button" aria-label="Mostrar el menú">☰ Menú</button>
+<div id="loginScreen" style="display:none" role="region" aria-label="Inicio de sesión"></div>
+<div id="velo"></div>
+<div id="app">
+  <nav id="panel" aria-label="Menú principal">
+    <button id="cerrarPanel" class="cerrar-panel" type="button" aria-label="Ocultar el menú">✕</button>
+    <div class="marca">
+      <img class="logo" alt="Tinbrew" src="/logo.png">
+      <p class="lema">Módulo Contable</p>
+    </div>
+    <div id="cajaUsuario"></div>
+    <div class="emp-activa" id="empBox"></div>
+    <button type="button" data-v="home">Inicio</button>
+    <button type="button" data-v="tablero">Tablero fiscal</button>
+
+    <button type="button" class="grupo-cab" data-grupo="operacion">Operación diaria<span class="flecha">▾</span></button>
+    <div class="grupo-cuerpo" data-cuerpo="operacion">
+      <button type="button" data-v="facturas">Cargar facturas</button>
+      <button type="button" data-v="partidas">Partidas contables</button>
+      <button type="button" data-v="ventas">Ventas</button>
+      <button type="button" data-v="compras">Compras</button>
+      <button type="button" data-v="produccion">Producción</button>
+    </div>
+
+    <button type="button" class="grupo-cab" data-grupo="inventario">Inventario y activos<span class="flecha">▾</span></button>
+    <div class="grupo-cuerpo" data-cuerpo="inventario">
+      <button type="button" data-v="inventario">Existencias</button>
+      <button type="button" data-v="libroInventarios">Libro de Inventarios</button>
+      <button type="button" data-v="activosFijos">Activos fijos</button>
+    </div>
+
+    <button type="button" class="grupo-cab" data-grupo="cartera">Cartera<span class="flecha">▾</span></button>
+    <div class="grupo-cuerpo" data-cuerpo="cartera">
+      <button type="button" data-v="proveedores">Proveedores</button>
+      <button type="button" data-v="clientes">Clientes</button>
+    </div>
+
+    <button type="button" class="grupo-cab" data-grupo="planillas">Planillas<span class="flecha">▾</span></button>
+    <div class="grupo-cuerpo" data-cuerpo="planillas">
+      <button type="button" data-v="empleados">Empleados</button>
+      <button type="button" data-v="planillas">Control de planillas</button>
+      <button type="button" data-v="pagoPrestaciones">Pago de prestaciones</button>
+    </div>
+
+    <button type="button" class="grupo-cab" data-grupo="libros">Libros legales<span class="flecha">▾</span></button>
+    <div class="grupo-cuerpo" data-cuerpo="libros">
+      <button type="button" data-v="diario">Libro Diario</button>
+      <button type="button" data-v="mayor">Libro Mayor</button>
+      <button type="button" data-v="libroPequeno">Libro Pequeño Contribuyente</button>
+      <button type="button" data-v="libroVentas">Libro de Ventas</button>
+      <button type="button" data-v="libroCompras">Libro de Compras</button>
+      <button type="button" data-v="devolucionIVA">Devolución de IVA</button>
+      <button type="button" data-v="retenciones">Retenciones</button>
+      <button type="button" data-v="conciliacion">Conciliación de libros</button>
+    </div>
+
+    <button type="button" class="grupo-cab" data-grupo="estados">Estados financieros<span class="flecha">▾</span></button>
+    <div class="grupo-cuerpo" data-cuerpo="estados">
+      <button type="button" data-v="estadosFinancieros">Libro de Estados Financieros</button>
+      <button type="button" data-v="balanza">Balance de comprobación</button>
+      <button type="button" data-v="resultados">Estado de resultados</button>
+      <button type="button" data-v="balance">Balance general</button>
+      <button type="button" data-v="flujoEfectivo">Flujo de efectivo</button>
+    </div>
+
+    <button type="button" class="grupo-cab" data-grupo="empresa" style="border-top:1px solid var(--linea);margin-top:6px;padding-top:14px">Empresa<span class="flecha">▾</span></button>
+    <div class="grupo-cuerpo" data-cuerpo="empresa">
+      <button type="button" data-v="catalogo">Catálogo de cuentas</button>
+      <button type="button" data-v="empresas">Empresas</button>
+      <button type="button" data-v="aumentosCapital">Aumento de capital</button>
+    </div>
+
+    <button type="button" class="grupo-cab admin-cab" id="adminCab" aria-haspopup="true" aria-expanded="false" aria-controls="recuadroAdmin">Administración<span class="flecha">▸</span></button>
+  </nav>
+  <!-- Recuadro flotante de Administración: se abre al tocar "Administración" en el menú.
+       Va fuera del <nav> porque en pantalla chica el menú usa transform y descolocaría un position:fixed. -->
+  <div id="veloAdmin" hidden></div>
+  <div id="recuadroAdmin" class="recuadro-admin" role="menu" aria-label="Administración" hidden>
+    <button type="button" class="cerrar-recuadro" id="cerrarRecuadro" aria-label="Cerrar">✕</button>
+    <h4>Administración</h4>
+    <p id="recuadroUsuario" style="margin:0 16px 8px;font-size:13px;color:var(--tinta-suave)"></p>
+    <button type="button" data-v="usuarios">Usuarios</button>
+    <button type="button" data-v="bitacora">Bitácora</button>
+    <button type="button" data-v="config">Configuración</button>
+    <hr>
+    <h4>Tema</h4>
+    <div class="seg-tema" id="segTema" role="group" aria-label="Tema de colores">
+      <button type="button" data-tema="claro">☀ Claro</button>
+      <button type="button" data-tema="oscuro">☾ Oscuro</button>
+      <button type="button" data-tema="sistema">Sistema</button>
+    </div>
+    <hr>
+    <button type="button" class="btn sec salir" id="btnCerrarSesion">Cerrar sesión</button>
+  </div>
+  <main id="vista" tabindex="-1"></main>
+</div>
+
+<dialog id="modal" aria-modal="true"><div id="modalForm"></div></dialog>
+<dialog id="aviso" role="alertdialog" aria-modal="true"><div id="avisoCuerpo"></div></dialog>
+

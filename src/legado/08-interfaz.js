@@ -1,0 +1,458 @@
+/* ============ ESQUELETO DE CARGA ============ */
+/* Está en el HTML desde el primer pintado. Se oculta cuando aparece el login o la aplicación,
+   y reaparece mientras se cargan los datos justo después de iniciar sesión. */
+let _tEsq=null;
+function mostrarEsqueleto(){
+  const e=document.getElementById('esqueleto'); if(!e) return;
+  document.getElementById('esqError').hidden=true;
+  document.getElementById('loginScreen').style.display='none';   // el esqueleto reemplaza al login mientras cargan los datos
+  e.hidden=false; document.body.setAttribute('aria-busy','true');
+  clearTimeout(_tEsq); _tEsq=setTimeout(()=>{ if(!e.hidden) document.getElementById('esqError').hidden=false; },15000);
+}
+function ocultarEsqueleto(){
+  clearTimeout(_tEsq);
+  const e=document.getElementById('esqueleto'); if(e) e.hidden=true;
+  document.body.removeAttribute('aria-busy');
+}
+
+/* ============ ACCESIBILIDAD ============ */
+/* El contenido de las pantallas se arma con plantillas; en vez de corregir cada formulario, esta pasada
+   les da nombre a los controles, encabezados a las tablas y estado al menú, cada vez que se dibuja algo. */
+let _nAcc=0;
+const textoLimpio=el=>(el.textContent||'').replace(/\s+/g,' ').trim();
+const SIN_NOMBRE=['hidden','button','submit','reset','image'];
+function etiquetarControles(raiz){
+  raiz.querySelectorAll('input,select,textarea').forEach(c=>{
+    if(SIN_NOMBRE.includes(c.type)) return;
+    if(c.getAttribute('aria-label')||c.getAttribute('aria-labelledby')||c.title) return;
+    if(c.labels&&c.labels.length) return;
+    /* 1) una <label> suelta dentro de la misma caja de campo */
+    const caja=c.closest('.campo,.campo-login');
+    if(caja){
+      const controles=[...caja.querySelectorAll('input,select,textarea')].filter(x=>!SIN_NOMBRE.includes(x.type));
+      const lab=[...caja.querySelectorAll('label')].find(l=>!l.htmlFor&&!l.querySelector('input,select,textarea'));
+      if(lab&&controles[0]===c){ if(!c.id) c.id='acc'+(++_nAcc); lab.htmlFor=c.id; return; }
+      if(lab){ c.setAttribute('aria-label',textoLimpio(lab)+' '+(controles.indexOf(c)+1)); return; }
+    }
+    /* 2) un control dentro de una celda: columna + persona de la fila */
+    const td=c.closest('td');
+    if(td){
+      const tr=td.parentElement, tabla=td.closest('table');
+      const th=tabla&&tabla.tHead&&tabla.tHead.rows[0]&&tabla.tHead.rows[0].cells[[...tr.children].indexOf(td)];
+      const enc=th?textoLimpio(th):'';
+      const quien=[...tr.children].filter(x=>x!==td&&!x.querySelector('input,select,textarea')).map(textoLimpio).find(t=>/[A-Za-zÁ-ú]{3}/.test(t))||'';
+      const base=c.dataset.incluir!==undefined?'Incluir en la planilla':(enc||'Valor');
+      c.setAttribute('aria-label',quien?`${base}: ${quien}`:base); return;
+    }
+    /* 3) texto inmediatamente anterior, o el nombre técnico como último recurso */
+    const prev=c.previousElementSibling;
+    if(prev&&!prev.matches('input,select,textarea,button')){ const t=textoLimpio(prev); if(t&&t.length<50){ c.setAttribute('aria-label',t); return; } }
+    const alt=c.getAttribute('placeholder')||c.dataset.filtro||c.name;
+    if(alt) c.setAttribute('aria-label',alt.replace(/([a-z])([A-Z])/g,'$1 $2'));
+  });
+}
+function etiquetarEncabezados(raiz){
+  raiz.querySelectorAll('thead th').forEach(th=>{
+    th.scope='col';
+    if(textoLimpio(th)) return;
+    const tabla=th.closest('table'), col=th.cellIndex;
+    const filas=[...tabla.tBodies].flatMap(b=>[...b.rows]);
+    const en=sel=>filas.some(r=>r.cells[col]&&r.cells[col].querySelector(sel));
+    th.insertAdjacentHTML('beforeend',`<span class="solo-lector">${en('button,a')?'Acciones':en('input[type=checkbox]')?'Incluir':'Detalle'}</span>`);
+  });
+}
+function mejorarAccesibilidad(raiz){
+  etiquetarControles(raiz); etiquetarEncabezados(raiz);
+  /* Jerarquía de títulos: cada pantalla tiene un h1; sus secciones son nivel 2 (y sus partes, nivel 3) sin cambiar el aspecto. */
+  if(raiz.id==='vista'){
+    raiz.querySelectorAll('h3').forEach(h=>h.setAttribute('aria-level','2'));
+    raiz.querySelectorAll('h4').forEach(h=>h.setAttribute('aria-level','3'));
+  }
+}
+/* Pantalla actual: título de la pestaña y "página actual" para lectores de pantalla. */
+function marcarNavegacion(){
+  const sel='nav [data-v], #recuadroAdmin [data-v]';
+  let actual=null;
+  document.querySelectorAll(sel).forEach(x=>{
+    if(x.dataset.v===VISTA){ x.setAttribute('aria-current','page'); actual=actual||x; } else x.removeAttribute('aria-current');
+  });
+  const nombre=actual?actual.childNodes[0].textContent.trim():'';
+  document.title=(nombre?nombre+' — ':'')+'Módulo Contable TINBREW';
+}
+/* Cada ventana (formulario o aviso) se nombra con su título, y sus campos se etiquetan al abrirse. */
+['modalForm','avisoCuerpo'].forEach(id=>{
+  const el=document.getElementById(id), dlg=el.closest('dialog');
+  new MutationObserver(()=>{
+    const h=el.querySelector('h3');
+    if(h){ if(!h.id) h.id=id+'Titulo'; dlg.setAttribute('aria-labelledby',h.id); }
+    mejorarAccesibilidad(el);
+  }).observe(el,{childList:true});
+});
+
+/* ============ ATAJOS DE TECLADO (Alt + número) ============ */
+/* Usan los mismos botones del menú: si el cargo de la persona no ve una pantalla, el atajo tampoco la abre.
+   Se usa Alt (y no Ctrl) para no pisar atajos del navegador como Ctrl+P (imprimir) o Ctrl+S. */
+const ATAJOS_VISTA={'1':'facturas','2':'partidas','3':'diario','4':'mayor','5':'libroVentas','6':'libroCompras',
+  '7':'balanza','8':'resultados','9':'balance','0':'home'};
+(()=>{
+  Object.entries(ATAJOS_VISTA).forEach(([tecla,v])=>{
+    const b=document.querySelector(`nav [data-v="${v}"]`);
+    if(!b) return;
+    b.insertAdjacentHTML('beforeend',`<span class="atajo">Alt+${tecla}</span>`);
+    b.title=`Atajo: Alt+${tecla}`;
+  });
+})();
+function ayudaAtajos(){
+  const nombre=v=>{ const b=document.querySelector(`nav [data-v="${v}"]`); return b?b.childNodes[0].textContent.trim():v; };
+  avisar(Object.entries(ATAJOS_VISTA).map(([t,v])=>`Alt+${t}  —  ${nombre(v)}`).join('\n')+'\nAlt+H  —  Esta ayuda','Atajos de teclado');
+}
+document.addEventListener('keydown',ev=>{
+  if(!ev.altKey||ev.ctrlKey||ev.metaKey||ev.shiftKey) return;
+  if(!BD.sesion || document.getElementById('app').style.display==='none') return;
+  if(modal.open || document.getElementById('aviso').open) return;   // con una ventana abierta no se navega
+  const tecla=(ev.code||'').replace(/^(Digit|Numpad)/,'');
+  if(tecla==='KeyH'){ ev.preventDefault(); ayudaAtajos(); return; }
+  const v=ATAJOS_VISTA[tecla];
+  if(!v) return;
+  const b=document.querySelector(`nav [data-v="${v}"]`);
+  if(!b||b.style.display==='none') return;   // pantalla no disponible para este cargo o esta empresa
+  ev.preventDefault();
+  const grupo=b.closest('.grupo-cuerpo');
+  if(grupo) gruposMenu().forEach(id=>plegarGrupo(id,id!==grupo.dataset.cuerpo));
+  b.click();
+  document.getElementById('vista').focus({preventScroll:true});
+});
+/* ============ TEMA CLARO / OSCURO ============ */
+function temaGuardado(){
+  let t='sistema'; try{ t=localStorage.getItem('contagt_tema')||'sistema'; }catch(err){}
+  return ['claro','oscuro','sistema'].includes(t)?t:'sistema';
+}
+function aplicarTema(t){
+  const osc = t==='oscuro' || (t==='sistema' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.setAttribute('data-theme', osc?'dark':'light');
+  document.querySelectorAll('#segTema [data-tema]').forEach(b=>{
+    b.classList.toggle('on',b.dataset.tema===t); b.setAttribute('aria-pressed',b.dataset.tema===t?'true':'false');
+  });
+}
+function elegirTema(t){ try{ localStorage.setItem('contagt_tema',t); }catch(err){} aplicarTema(t); }
+if(window.matchMedia){
+  const mq=matchMedia('(prefers-color-scheme: dark)');
+  const alCambiar=()=>{ if(temaGuardado()==='sistema') aplicarTema('sistema'); };
+  if(mq.addEventListener) mq.addEventListener('change',alCambiar); else if(mq.addListener) mq.addListener(alCambiar);
+}
+document.querySelectorAll('#segTema [data-tema]').forEach(b=>b.onclick=()=>elegirTema(b.dataset.tema));
+aplicarTema(temaGuardado());
+
+/* ============ RECUADRO DE ADMINISTRACIÓN ============ */
+/* Al tocar "Administración" se abre un recuadro flotante con Usuarios,
+   Bitácora, Configuración, el tema y Cerrar sesión. Se cierra al elegir algo,
+   al tocar fuera o con Escape. */
+const adminCab=document.getElementById('adminCab'), recuadroAdmin=document.getElementById('recuadroAdmin');
+function posicionarRecuadroAdmin(){
+  if(innerWidth<=820){ recuadroAdmin.style.left=''; recuadroAdmin.style.top=''; return; }   // hoja inferior: lo acomoda el CSS
+  const r=adminCab.getBoundingClientRect(), w=recuadroAdmin.offsetWidth, h=recuadroAdmin.offsetHeight;
+  let left, top;
+  if(innerWidth<=820){ left=12; top=r.bottom+6; }
+  else{ left=document.getElementById('panel').getBoundingClientRect().right+8; top=r.top; }
+  left=Math.max(12,Math.min(left,innerWidth-w-12));
+  top=Math.max(12,Math.min(top,innerHeight-h-12));
+  recuadroAdmin.style.left=left+'px'; recuadroAdmin.style.top=top+'px';
+}
+function abrirRecuadroAdmin(){
+  recuadroAdmin.hidden=false; document.getElementById('veloAdmin').hidden=false;
+  adminCab.classList.add('abierto'); adminCab.setAttribute('aria-expanded','true');
+  posicionarRecuadroAdmin();
+  const primero=[...recuadroAdmin.querySelectorAll('button:not(.cerrar-recuadro)')].find(b=>b.style.display!=='none');
+  if(primero) primero.focus();
+}
+function cerrarRecuadroAdmin(){
+  if(recuadroAdmin.hidden) return;
+  recuadroAdmin.hidden=true; document.getElementById('veloAdmin').hidden=true;
+  adminCab.classList.remove('abierto'); adminCab.setAttribute('aria-expanded','false');
+}
+adminCab.onclick=ev=>{ ev.stopPropagation(); recuadroAdmin.hidden?abrirRecuadroAdmin():cerrarRecuadroAdmin(); };
+document.addEventListener('click',ev=>{
+  if(!recuadroAdmin.hidden && !recuadroAdmin.contains(ev.target) && !adminCab.contains(ev.target)) cerrarRecuadroAdmin();
+});
+addEventListener('resize',()=>{ if(!recuadroAdmin.hidden) posicionarRecuadroAdmin(); });
+document.getElementById('panel').addEventListener('scroll',()=>{ if(!recuadroAdmin.hidden) posicionarRecuadroAdmin(); });
+document.getElementById('btnCerrarSesion').onclick=()=>{ cerrarRecuadroAdmin(); cerrarSesion(); };
+document.getElementById('cerrarRecuadro').onclick=()=>{ cerrarRecuadroAdmin(); adminCab.focus(); };
+
+document.querySelectorAll('nav [data-v], #recuadroAdmin [data-v]').forEach(a=>{
+  a.onclick=ev=>{
+    cerrarRecuadroAdmin();
+    ev.preventDefault(); VISTA=a.dataset.v; filtros={};
+    if(innerWidth<=820) alternarPanel(false);   // en pantalla chica el panel tapa el contenido
+    pintar();
+  };
+});
+/* Acciones secundarias de una fila, plegadas. Se despliegan en el mismo lugar (no flotan), así que
+   funcionan dentro de tablas con desplazamiento y con el teclado sin código adicional. */
+function masAcciones(nombre,botonesHtml){
+  return `<details class="mas"><summary class="btn mini sec" aria-label="${esc(nombre)}">Más</summary><div class="mas-lista">${botonesHtml}</div></details>`;
+}
+function envolverTablas(raiz){
+  raiz.querySelectorAll('table').forEach(t=>{
+    const padre=t.parentElement;
+    if(!padre||padre.classList.contains('tabla-scroll')) return;
+    if(getComputedStyle(padre).overflowX!=='visible') return;   // ya está dentro de una caja con desplazamiento
+    const caja=document.createElement('div'); caja.className='tabla-scroll';
+    padre.insertBefore(caja,t); caja.appendChild(t);
+  });
+}
+function pintar(){
+  const u=usuarioActual();
+  if(!u){ pantallaLogin(); return; }
+  const permitidas=vistasPermitidas();
+  const e0=emp();
+  document.querySelectorAll('nav [data-v], #recuadroAdmin [data-v]').forEach(a=>{
+    let oculto = permitidas!==null && !permitidas.includes(a.dataset.v);
+    if(!oculto && a.dataset.v==='libroPequeno') oculto = !e0 || !tuvoRegimen(e0,['pequeno']);
+    if(!oculto && a.dataset.v==='produccion') oculto = !esProductora(e0);
+    if(!oculto && (a.dataset.v==='libroVentas'||a.dataset.v==='libroCompras')) oculto = !e0 || !tuvoRegimen(e0,['general','simplificado']);
+    a.style.display = oculto ? 'none' : '';
+    a.classList.toggle('on',a.dataset.v===VISTA);
+  });
+  document.querySelectorAll('nav .grupo-cab:not(.admin-cab)').forEach(cab=>{
+    const cuerpo=document.querySelector(`.grupo-cuerpo[data-cuerpo="${cab.dataset.grupo}"]`);
+    const algunoVisible = cuerpo && [...cuerpo.querySelectorAll('[data-v]')].some(b=>b.style.display!=='none');
+    cab.style.display = algunoVisible ? '' : 'none';
+  });
+  if(!puedeVer(VISTA)){ VISTA = permitidas ? (permitidas[0]||'home') : 'home'; }
+  const cajaUsuario=document.getElementById('cajaUsuario');
+  if(cajaUsuario){
+    const r=ROLES[u.rol];
+    cajaUsuario.innerHTML=`<div class="emp-datos" style="margin:0 12px 10px">
+      <strong style="display:block;color:var(--verde)">${esc(u.nombre||u.usuario)}</strong>
+      <span>${esc(r?r.nombre:u.rol)}</span>
+    </div>`;
+    /* Cerrar sesión ahora vive en el recuadro de Administración. */
+    document.getElementById('recuadroUsuario').textContent=`Sesión: ${u.nombre||u.usuario} · ${r?r.nombre:u.rol}`;
+  }
+  const e=emp();
+  const caja=document.getElementById('empBox');
+  const visibles=empresasVisibles();
+  caja.innerHTML = visibles.length
+    ? `<label for="selEmpresa">Empresa en uso</label>
+       <select id="selEmpresa">${visibles
+         .map(x=>`<option value="${x.id}"${x.id===BD.activa?' selected':''}>${esc(x.nombre)}</option>`)
+         .join('')}</select>
+       ${e?`<div class="emp-datos">NIT ${esc(e.nit||'—')}</div>
+       <label for="selEjercicio" style="margin-top:8px" title="${AYUDA_EJERCICIO}">Ejercicio de trabajo
+         <span class="ayuda" tabindex="0" aria-label="${AYUDA_EJERCICIO}" title="${AYUDA_EJERCICIO}">ⓘ</span></label>
+       <input id="selEjercicio" type="number" value="${e.ejercicio}" style="width:100%" title="${AYUDA_EJERCICIO}">
+       ${snapshotDeshacer&&snapshotDeshacer.empId===e.id?`<button class="btn sec" style="width:100%;margin-top:10px"
+         data-accion="deshacer" title="Deshacer: ${esc(etiquetaDeshacer)}">↩ Deshacer «${esc(etiquetaDeshacer)}»</button>`:''}`:''}`
+    : `<span class="emp-datos">Todavía no hay empresas registradas</span>`;
+  const sel=document.getElementById('selEmpresa');
+  if(sel) sel.onchange=()=>cambiarEmpresa(sel.value);
+  const selEj=document.getElementById('selEjercicio');
+  if(selEj) selEj.onchange=()=>{
+    const nuevo=+selEj.value;
+    if(!nuevo||nuevo<2000||nuevo>2100){avisar('Escribí un año válido.');selEj.value=e.ejercicio;return}
+    e.ejercicio=nuevo; guardar(); pintar();
+  };
+  const btnDeshacer=caja.querySelector('[data-accion="deshacer"]');
+  if(btnDeshacer) btnDeshacer.onclick=()=>ACCIONES.deshacer();
+  if(!e && VISTA!=='empresas' && VISTA!=='config' && VISTA!=='usuarios' && VISTA!=='capitalSocial' && VISTA!=='bitacora'){ VISTA='empresas'; }
+  document.getElementById('vista').innerHTML = VISTAS[VISTA]();
+  envolverTablas(document.getElementById('vista'));
+  mejorarAccesibilidad(document.getElementById('vista'));
+  marcarNavegacion();
+  const nodo=document.getElementById('vista');
+  nodo.querySelectorAll('[data-accion]').forEach(b=>b.onclick=()=>{
+    const acc=ACCIONES[b.dataset.accion]; if(!acc) return;
+    if(b.dataset.accion==='deshacer'){ acc(b.dataset); return; }
+    conSnapshot(b.textContent.trim()||b.dataset.accion,()=>acc(b.dataset));
+  });
+  nodo.querySelectorAll('[data-filtro]').forEach(i=>{
+    i.oninput=i.onchange=()=>{filtros[i.dataset.filtro]=i.value;pintar()};
+  });
+  if(VISTA==='partidas' && borrador) enlazarFormulario();
+  if(VISTA==='planillas' && borradorPlanilla) enlazarFormularioPlanilla();
+  if(VISTA==='pagoPrestaciones' && borradorPago) enlazarFormularioPago();
+  if(VISTA==='capitalSocial' && borradorCapital) enlazarCapitalSocial();
+  if(VISTA==='facturas'){
+    const inputArch=document.getElementById('reporte');
+    if(inputArch) inputArch.onchange=function(){
+      const archivos=[...this.files];
+      const nombre=archivos.map(f=>f.name).join(' + ');
+      const zona=document.getElementById('dropzoneLabel'), texto=document.getElementById('dropzoneTexto');
+      if(zona&&texto){
+        texto.textContent = nombre || 'Excel (.xls, .xlsx) o XML/ZIP de la SAT (.xml, .zip) — podés elegir los dos juntos';
+        zona.classList.toggle('elegido',!!nombre);
+      }
+    };
+  }
+  if(VISTA==='facturas' && lote.length){
+    nodo.querySelectorAll('[data-sel]').forEach(ch=>{
+      ch.onchange=()=>{
+        const d=lote[+ch.dataset.sel];
+        d.sel=ch.checked;
+        ch.closest('tr').style.background = d.sel ? 'var(--activo)' : '';
+        const n=lote.filter(x=>x.sel).length;
+        document.getElementById('contadorSel').textContent =
+          n ? `${n} de ${lote.length} seleccionados` : 'Ninguno seleccionado';
+      };
+    });
+    nodo.querySelectorAll('[data-anular]').forEach(ch=>{
+      ch.onchange=()=>{
+        lote[+ch.dataset.anular].anuladaManual=ch.checked;
+        pintar();   // cambia totales, avisos y el tachado de la fila
+      };
+    });
+    nodo.querySelectorAll('[data-retencion]').forEach(inp=>{
+      inp.onchange=()=>{
+        const d=lote[+inp.dataset.retencion];
+        const monto=+inp.value||0;
+        if(monto+(d.retencionIVA||0)>d.total){avisar('Las retenciones no pueden sumar más que el total del documento.');inp.value=d.retencionISR||'';return}
+        d.retencionISR=monto;
+      };
+    });
+    nodo.querySelectorAll('[data-retencioniva]').forEach(inp=>{
+      inp.onchange=()=>{
+        const d=lote[+inp.dataset.retencioniva];
+        const monto=+inp.value||0;
+        if(monto>(d.iva||0)+0.005){avisar('La retención de IVA no puede ser mayor que el IVA del documento.');inp.value=d.retencionIVA||'';return}
+        d.retencionIVA=monto;
+      };
+    });
+    nodo.querySelectorAll('[data-oc]').forEach(s=>{
+      s.onchange=()=>{ lote[+s.dataset.oc].ocId=s.value; pintar(); };
+    });
+    nodo.querySelectorAll('[data-f]').forEach(s=>{
+      s.onchange=()=>{
+        const d=lote[+s.dataset.f];
+        d[s.dataset.campo]=s.value;
+        if(s.dataset.campo==='bs'){
+          const e2=emp(); e2.mapeoBS=e2.mapeoBS||{};
+          const n=d.tipo==='compra'?d.nitEmisor:d.nitReceptor;
+          if(n) e2.mapeoBS[n]=d.bs;
+          guardar();
+        }
+        if(s.dataset.campo==='cta'){
+          const e2=emp();
+          if(d.cta==='6.2.14'){
+            /* Gastos no deducibles: el IVA de esta compra tampoco es
+               acreditable —no tendría sentido que el gasto no genere
+               derecho a deducir en ISR pero su IVA sí generara crédito
+               fiscal—, así que se separa igual que cualquier otra factura
+               y en generarPartidas() va a su propia cuenta (6.2.27, "IVA no
+               deducible"), no a la de crédito fiscal ni fundido con el
+               gasto. Antes esto ponía la factura completa como si fuera
+               puro gasto, sin distinguir cuánto era producto y cuánto IVA. */
+            if(!d.ivaReportado) d.iva=r2(d.total-d.total/1.12);
+            d.base=r2(d.total-d.iva-(d.noAcred||0));
+          }else{
+            const regimenDoc=regimenEn(e2,d.fecha);
+            const generaCredito = (regimenDoc==='general'||regimenDoc==='simplificado')
+              && !d.pequeno && !(d.categoria&&/no genera cr[ée]dito/i.test(d.categoria));
+            if(generaCredito){
+              if(!d.ivaReportado) d.iva=r2(d.total-d.total/1.12);
+              d.base=r2(d.total-d.iva-(d.noAcred||0));
+            }else{
+              d.iva=0; d.base=d.total;
+            }
+          }
+          recordarCuenta(d);
+          /* "Gastos no deducibles" es una decisión que se toma factura por
+             factura, no por proveedor — el mismo Claro puede mandar una
+             factura de servicio normal (deducible) y otra que no lo es. Para
+             cualquier OTRA cuenta sí tiene sentido copiarla a las demás
+             facturas del mismo proveedor en esta carga (ahorra reclasificar
+             una por una cuando de verdad es la misma situación), pero no
+             para esta cuenta específica. */
+          if(d.cta!=='6.2.14'){
+            const iguales=lote.filter(o=>o!==d && o.tipo===d.tipo && o.cta!=='6.2.14' &&
+              (o.tipo==='compra'?o.nitEmisor:o.nitReceptor)===(d.tipo==='compra'?d.nitEmisor:d.nitReceptor));
+            if(iguales.length) iguales.forEach(o=>o.cta=d.cta);
+          }
+          /* Sin esto, elegir "Gastos no deducibles" cambiaba la cuenta y
+             separaba base/IVA por dentro, pero la fila seguía mostrando los
+             montos viejos en pantalla hasta que algo más disparara un
+             repintado — como si no hubiera pasado nada. */
+          pintar();
+        }
+      };
+    });
+  }
+  if(modo==='vista'){
+    nodo.insertAdjacentHTML('afterbegin',
+      `<div class="aviso"><strong>Estás en la vista previa.</strong> Lo que registrés aquí se guarda y sigue estando si volvés a esta conversación, así que podés probar con confianza. Para el trabajo de verdad descargá el archivo y abrilo en Chrome.</div>`);
+  } else if(modo==='memoria'){
+    nodo.insertAdjacentHTML('afterbegin',
+      `<div class="aviso malo"><strong>Sin guardado.</strong> Esta ventana no puede conservar datos. Descargá el archivo y abrilo directamente en Chrome.</div>`);
+  }
+}
+/* Antes era un párrafo fijo debajo del campo; ahora es una ayuda al pasar el ratón por encima. */
+const AYUDA_EJERCICIO='Para ponerte al día con un año anterior, cambiá este año: el Tablero fiscal y los cierres usan el ejercicio que esté acá, no el de hoy.';
+function cab(t,sub,extra=''){
+  return `<div class="tit"><div><h1>${t}</h1>${sub?`<p>${sub}</p>`:''}</div><div>${extra}</div></div>`;
+}
+
+/* ============ AVISOS Y CONFIRMACIONES ============ */
+/* Reemplazan las ventanas nativas del navegador, que no funcionan en vistas restringidas. */
+const dlgAviso=document.getElementById('aviso'), avisoCuerpo=document.getElementById('avisoCuerpo');
+function avisar(mensaje,titulo='Revisá esto'){
+  avisoCuerpo.innerHTML=`<div class="modal-cuerpo"><h3>${esc(titulo)}</h3>
+    <p style="margin:0;white-space:pre-line">${esc(mensaje)}</p></div>
+    <div class="pie-modal"><button class="btn" type="button" id="aOk">Entendido</button></div>`;
+  avisoCuerpo.querySelector('#aOk').onclick=()=>dlgAviso.close();
+  dlgAviso.showModal();
+  avisoCuerpo.querySelector('#aOk').focus();
+}
+function confirmar(mensaje,alConfirmar,textoBoton='Eliminar'){
+  avisoCuerpo.innerHTML=`<div class="modal-cuerpo"><h3>Confirmá la acción</h3>
+    <p style="margin:0;white-space:pre-line">${esc(mensaje)}</p></div>
+    <div class="pie-modal"><button class="btn sec" type="button" id="aNo">Cancelar</button>
+    <button class="btn peligro" type="button" id="aSi">${esc(textoBoton)}</button></div>`;
+  avisoCuerpo.querySelector('#aNo').onclick=()=>dlgAviso.close();
+  avisoCuerpo.querySelector('#aSi').onclick=()=>{dlgAviso.close();conSnapshot(textoBoton,alConfirmar)};
+  dlgAviso.showModal();
+}
+
+/* Pregunta Sí/No que devuelve una promesa — reemplaza a window.confirm, que
+   no funciona en vistas restringidas. Se puede usar con un modal abierto. */
+function preguntar(mensaje,textoSi='Continuar'){
+  return new Promise(ok=>{
+    avisoCuerpo.innerHTML=`<div class="modal-cuerpo"><h3>Confirmá la acción</h3>
+      <p style="margin:0;white-space:pre-line">${esc(mensaje)}</p></div>
+      <div class="pie-modal"><button class="btn sec" type="button" id="aNo">Cancelar</button>
+      <button class="btn" type="button" id="aSi">${esc(textoSi)}</button></div>`;
+    let listo=false; const fin=v=>{ if(listo) return; listo=true; try{dlgAviso.close()}catch(err){} ok(v); };
+    avisoCuerpo.querySelector('#aNo').onclick=()=>fin(false);
+    avisoCuerpo.querySelector('#aSi').onclick=()=>fin(true);
+    dlgAviso.addEventListener('close',()=>fin(false),{once:true});
+    dlgAviso.showModal();
+  });
+}
+
+/* ============ MODAL ============ */
+const modal=document.getElementById('modal'), mForm=document.getElementById('modalForm');
+function cerrarModal(){ try{modal.close()}catch(e){} mForm.innerHTML=''; pintar(); }
+modal.addEventListener('cancel',ev=>{ev.preventDefault();cerrarModal()});
+
+function abrirModal(titulo,cuerpo,alGuardar,textoBtn='Guardar'){
+  mForm.innerHTML=`<div class="modal-cuerpo"><h3>${titulo}</h3>${cuerpo}</div>
+    <div class="pie-modal"><button class="btn sec" type="button" id="mCancelar">Cancelar</button>
+    <button class="btn" type="button" id="mAceptar">${textoBtn}</button></div>`;
+  const aceptar=async()=>{
+    const datos={};
+    mForm.querySelectorAll('[name]').forEach(i=>{
+      datos[i.name] = i.type==='checkbox' ? (i.checked?'on':'') : i.value;
+    });
+    const resultado=await conSnapshot(String(titulo).replace(/<[^>]+>/g,''),()=>alGuardar(datos));
+    if(resultado===false) return;
+    cerrarModal();
+  };
+  mForm.querySelector('#mCancelar').onclick=cerrarModal;
+  mForm.querySelector('#mAceptar').onclick=aceptar;
+  mForm.onkeydown=ev=>{
+    if(ev.key==='Enter' && ev.target.tagName==='INPUT' && ev.target.type!=='file'){ ev.preventDefault(); aceptar(); }
+  };
+  modal.showModal();
+  const primero=mForm.querySelector('input,select');
+  if(primero) primero.focus();
+}
+

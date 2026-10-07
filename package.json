@@ -2,19 +2,22 @@
   "name": "tinbrew-contable",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build && node scripts/optimizar.mjs dist",
-    "preview": "vite preview"
+    "predev": "node scripts/armar-app.mjs --sin-minificar",
+    "dev": "next dev",
+    "prebuild": "node scripts/armar-app.mjs",
+    "build": "next build",
+    "start": "next start"
   },
   "dependencies": {
     "@supabase/auth-js": "^2.117.2",
     "@supabase/postgrest-js": "^2.117.2",
-    "@supabase/supabase-js": "^2.45.0"
+    "@supabase/supabase-js": "^2.117.2",
+    "next": "^16.4.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
   },
   "devDependencies": {
-    "vite": "^5.4.0",
-    "esbuild": "^0.21.5"
+    "esbuild": "^0.28.2"
   }
 }

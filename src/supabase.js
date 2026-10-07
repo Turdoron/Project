@@ -1,3 +1,4 @@
+// Se empaqueta junto con el programa (scripts/armar-app.mjs); las dos variables se fijan al construir.
 // Conexión liviana con Supabase: solo autenticación y base de datos (lo que usa la app).
 // La librería completa "@supabase/supabase-js" trae además tiempo real, archivos y funciones, que no se usan:
 // pesaban ~53 KB comprimidos en cada carga. Esta versión usa las mismas piezas internas y la misma clave de sesión,
@@ -6,8 +7,8 @@ import { AuthClient } from '@supabase/auth-js'
 import { PostgrestClient } from '@supabase/postgrest-js'
 
 // Estas dos llaves son públicas por diseño: la seguridad real la aplica RLS en la base de datos.
-const URL = import.meta.env.VITE_SUPABASE_URL || 'https://dvhymhamlyjljpyskmmj.supabase.co'
-const KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_pgqLHs_nnQrQvQhxzroPgA_T8rqynke'
+const URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dvhymhamlyjljpyskmmj.supabase.co'
+const KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_pgqLHs_nnQrQvQhxzroPgA_T8rqynke'
 
 const auth = new AuthClient({
   url: `${URL}/auth/v1`,
