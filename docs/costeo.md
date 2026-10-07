@@ -43,6 +43,12 @@ La mano de obra que no se aplica a órdenes queda como gasto: es mano de obra in
   - Un período de baja producción no encarece cada unidad: el CIF no absorbido (capacidad ociosa) es gasto del período.
   - Por eso la variación va a resultados y no al inventario.
 
+**Empresa nueva, sin historia:** el estimador arma la tasa con lo que se espera:
+- capacidad normal = trabajadores (o máquinas) × horas al mes × 12 × % de aprovechamiento;
+- CIF del año = gastos indirectos esperados por mes × 12.
+
+Con unos meses de operación, «Calcular con lo registrado» la ajusta con el promedio real de CIF y de horas.
+
 **Alternativa, costeo real:** los CIF reales del período se reparten al final entre las órdenes con «Repartir costo común». La base de reparto puede ser unidades, horas, costo de materiales, porcentajes o partes iguales.
 
 ## 4. Recetas: control de lo que se usó
