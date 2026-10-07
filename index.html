@@ -377,6 +377,7 @@ document.documentElement.setAttribute('data-theme',osc?'dark':'light');})();
     <button type="button" class="btn" onclick="location.reload()">Reintentar</button>
   </div>
 </div>
+<script>setTimeout(function(){var e=document.getElementById('esqueleto');if(e&&!e.hidden)document.getElementById('esqError').hidden=false},15000)</script>
 <!-- ============ HTML — Menú lateral, estructura de la app y modales ============ -->
 <button id="menuBtn" class="menu-btn" type="button" aria-label="Mostrar el menú">☰ Menú</button>
 <div id="loginScreen" style="display:none" role="region" aria-label="Inicio de sesión"></div>
@@ -478,7 +479,12 @@ document.documentElement.setAttribute('data-theme',osc?'dark':'light');})();
 <dialog id="modal" aria-modal="true"><div id="modalForm"></div></dialog>
 <dialog id="aviso" role="alertdialog" aria-modal="true"><div id="avisoCuerpo"></div></dialog>
 
-<script>window.sbListo=new Promise(r=>{window.__sbResolve=r});</script>
+<script>
+window.sbListo=new Promise(r=>{window.__sbResolve=r});
+/* El enlace del correo de recuperación trae "type=recovery" en la dirección. Supabase lo lee y lo borra enseguida,
+   y su aviso llega después de que la app ya eligió pantalla: por eso se lee aquí, al instante, antes de todo. */
+window.__recuperando=/[#&]type=recovery(&|$)/.test(location.hash);
+</script>
 <script type="module" src="/src/supabase.js"></script>
 <script>
 /* ============ ALMACENAMIENTO (Supabase) ============ */
@@ -1311,7 +1317,6 @@ function ocultarEsqueleto(){
   const e=document.getElementById('esqueleto'); if(e) e.hidden=true;
   document.body.removeAttribute('aria-busy');
 }
-_tEsq=setTimeout(()=>{ const e=document.getElementById('esqueleto'); if(e&&!e.hidden) document.getElementById('esqError').hidden=false; },15000);
 
 /* ============ ACCESIBILIDAD ============ */
 /* El contenido de las pantallas se arma con plantillas; en vez de corregir cada formulario, esta pasada
@@ -10729,8 +10734,10 @@ ACCIONES.borrarTodo=()=>{
   window.sb.auth.onAuthStateChange(ev=>{
     if(ev==='SIGNED_OUT' && BD.sesion){ BD=VACIO(); pantallaLogin('Tu sesión terminó. Iniciá sesión de nuevo.'); }
   });
-  if(window.__recuperando){ BD=VACIO(); pantallaCambioClave({nombre:'Recuperación de contraseña'}); return; }
+  /* getSession() espera a que Supabase termine de leer el enlace de la URL (si viene del correo de recuperación);
+     solo después se sabe si hay que pedir una contraseña nueva. */
   const {data:{session}}=await window.sb.auth.getSession();
+  if(window.__recuperando){ BD=VACIO(); pantallaCambioClave({nombre:'Recuperación de contraseña'}); return; }
   if(!session){ pantallaLogin(); return; }
   await iniciarSesionApp();
 })();

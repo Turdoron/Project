@@ -39,3 +39,11 @@ Los esqueletos (`#esqueleto`) se ven desde el primer pintado y al iniciar sesió
 
 ## 5. Cómo verificar
 Antes de publicar cambios visuales: revisar claro y oscuro, anchos de 1280 y 1440 px, y correr una auditoría con axe (extensión *axe DevTools* o `axe-core`). El resultado esperado es 0 problemas.
+
+## 6. Rendimiento (carga)
+- `npm run build` hace dos pasos: `vite build` y `scripts/optimizar.mjs`, que minifica el JavaScript y el CSS propios (el comportamiento no cambia) y saca el programa grande a `assets/app.<hash>.js` con `defer`. El HTML queda en ~47 KB y el navegador pinta el esqueleto mientras descarga el programa.
+- `vercel.json` guarda en caché por un año todo lo de `/assets/` (el nombre cambia solo cuando cambia el contenido).
+- La conexión con Supabase (`src/supabase.js`) usa solo autenticación y base de datos, sin tiempo real ni archivos.
+- Las librerías pesadas (Excel, PDF, ZIP) se cargan solo al usarlas, no al abrir el sistema.
+- Medido con 3G rápido y procesador 4× más lento: el login pasó de 2.1 s a 1.4 s, y la descarga de 232 KB a 166 KB.
+- Pendiente a futuro: dividir el programa por módulos (planillas, libros, estados) para que cada pantalla cargue solo lo suyo.

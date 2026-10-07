@@ -3,7 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "scripts": { "dev": "vite", "build": "vite build", "preview": "vite preview" },
-  "dependencies": { "@supabase/supabase-js": "^2.45.0" },
-  "devDependencies": { "vite": "^5.4.0" }
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && node scripts/optimizar.mjs dist",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@supabase/auth-js": "^2.117.2",
+    "@supabase/postgrest-js": "^2.117.2",
+    "@supabase/supabase-js": "^2.45.0"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0",
+    "esbuild": "^0.21.5"
+  }
 }
