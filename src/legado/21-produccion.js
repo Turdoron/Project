@@ -491,12 +491,30 @@ ACCIONES.configuracionCostos=()=>{
        <div class="campo full"><label>Cómo se cargan</label><select name="modo">
          <option value="tasa"${c.cif.modo==='tasa'?' selected':''}>Tasa predeterminada (presupuesto ÷ capacidad normal) — costeo normal</option>
          <option value="real"${c.cif.modo==='real'?' selected':''}>Reales del período, repartidos al final — costeo real</option></select></div>
+     </div>
+     <div id="cifTasa">
+     <div class="rej" style="margin-top:12px">
        <div class="campo"><label>Base de aplicación</label><select name="base">${Object.entries(BASES_CIF).map(([k,v])=>`<option value="${k}"${k===c.cif.base?' selected':''}>${v.nombre}</option>`).join('')}</select></div>
        <div class="campo"><label>Capacidad normal anual (en la base)</label><input name="capacidadNormal" type="number" step="0.01" min="0" value="${c.cif.capacidadNormal||''}"></div>
        <div class="campo"><label>CIF fijos presupuestados del año (Q)</label><input name="presupuestoFijo" type="number" step="0.01" min="0" value="${c.cif.presupuestoFijo||''}"></div>
-       <div class="campo"><label>CIF variable por unidad de base (Q)</label><input name="variablePorBase" type="number" step="0.0001" min="0" value="${c.cif.variablePorBase||''}"></div>
+       <div class="campo"><label>CIF variable por unidad de base (Q, opcional)</label><input name="variablePorBase" type="number" step="0.0001" min="0" value="${c.cif.variablePorBase||''}"></div>
      </div>
-     <p id="tasaPrev" style="margin:8px 0 0;font-weight:600"></p>
+     <details id="estimador" style="margin-top:12px;border:1px solid var(--linea);border-radius:var(--radio-chico);padding:10px 14px"${!(c.cif.capacidadNormal>0)?' open':''}>
+       <summary style="cursor:pointer;font-weight:600;font-size:14px">¿Empresa nueva, sin estos datos? Estimar la tasa</summary>
+       <p style="margin:8px 0 10px;font-size:13px;color:var(--tinta-suave)">Sin historia, la tasa se arma con una estimación técnica de lo que se espera. Después de unos meses se ajusta con "Calcular con lo registrado".</p>
+       <div class="rej">
+         <div class="campo"><label id="estCantLbl">Trabajadores directos en producción</label><input name="est_cant" type="number" step="1" min="0" value="${(e.empleados||[]).filter(x=>x.activo!==false).length||''}"></div>
+         <div class="campo" id="estHorasCampo"><label id="estHorasLbl">Horas de cada uno al mes</label><input name="est_horas" type="number" step="0.01" min="0" value="${HORAS_MES.toFixed(2)}"></div>
+         <div class="campo" id="estPctCampo"><label>% del tiempo que se produce</label><input name="est_pct" type="number" step="1" min="1" max="100" value="85"></div>
+         <div class="campo"><label>Gastos indirectos esperados por mes (Q)</label><input name="est_gasto" type="number" step="0.01" min="0" placeholder="energía, alquiler de planta, mantenimiento…"></div>
+       </div>
+       <p style="margin:8px 0 0;font-size:12.5px;color:var(--tinta-suave)">Incluí lo que cuesta tener la planta funcionando aunque no se produzca: energía, alquiler o depreciación de local y maquinaria, mantenimiento, supervisión, seguros. No incluyas materiales ni sueldos de quienes producen (esos ya van directo). Las horas por defecto son la jornada ordinaria de 44 horas semanales.</p>
+       <p style="margin:10px 0 0"><button class="btn mini" type="button" id="usarEstimacion">Usar esta estimación</button> <span id="estRes" style="font-size:13px;color:var(--tinta-suave)"></span></p>
+     </details>
+     <p style="margin:10px 0 0;font-size:13px"><button class="btn mini sec" type="button" id="calcRegistrado">Calcular con lo registrado</button> <span id="regRes" style="color:var(--tinta-suave)"></span></p>
+     <p id="tasaPrev" style="margin:10px 0 0;font-weight:600"></p>
+     </div>
+     <p id="realNota" style="margin:10px 0 0;font-size:13px;color:var(--tinta-suave)" hidden>Con costeo real no hace falta presupuesto ni capacidad: al final de cada período, los CIF que realmente se gastaron se reparten entre las órdenes o corridas con "Repartir costo común". Es lo más sencillo para empezar; cuando haya unos meses de historia se puede pasar a tasa predeterminada.</p>
      <p style="margin:12px 0 6px;font-size:13px;color:var(--tinta-suave)">Cuentas donde la empresa registra los CIF reales (energía de la planta, depreciación de maquinaria, mantenimiento, mano de obra indirecta…). Al cierre del período se comparan con los aplicados.</p>
      <div style="max-height:180px;overflow:auto;border:1px solid var(--linea);border-radius:var(--radio-chico);padding:8px 12px">
        ${gastos.map(x=>`<label style="display:flex;gap:8px;align-items:center;font-size:13px;padding:3px 0"><input type="checkbox" name="cifcta_${x.c}"${c.cif.cuentas.includes(x.c)?' checked':''}> ${x.c} — ${esc(x.n)}</label>`).join('')}
@@ -520,6 +538,11 @@ ACCIONES.configuracionCostos=()=>{
     },'Guardar configuración');
   const g=n=>mForm.querySelector(`[name="${n}"]`);
   const prev=()=>{
+    const real=g('modo').value==='real', base=g('base').value;
+    document.getElementById('cifTasa').hidden=real; document.getElementById('realNota').hidden=!real;
+    document.getElementById('estCantLbl').textContent=base==='horasMaquina'?'Máquinas en producción':base==='unidades'?'Unidades que se esperan producir al mes':'Trabajadores directos en producción';
+    document.getElementById('estHorasLbl').textContent=base==='horasMaquina'?'Horas de cada máquina al mes':'Horas de cada uno al mes';
+    document.getElementById('estHorasCampo').hidden=base==='unidades'; document.getElementById('estPctCampo').hidden=base==='unidades';
     const cap=+g('capacidadNormal').value||0, fijo=+g('presupuestoFijo').value||0, vari=+g('variablePorBase').value||0;
     const tasa=(cap>0?fijo/cap:0)+vari;
     document.getElementById('tasaPrev').textContent=g('modo').value==='real'?'Costeo real: los CIF del período se reparten con "Repartir costo común".'
@@ -527,6 +550,42 @@ ACCIONES.configuracionCostos=()=>{
   };
   mForm.querySelectorAll('input,select').forEach(i=>{ i.addEventListener('input',prev); i.addEventListener('change',prev); });
   prev();
+  /* Estimación técnica para una empresa nueva: capacidad = cantidad × horas × 12 × % de aprovechamiento. */
+  document.getElementById('usarEstimacion').onclick=()=>{
+    const base=g('base').value, cant=+g('est_cant').value||0, horas=+g('est_horas').value||0, pct=(+g('est_pct').value||0)/100, gasto=+g('est_gasto').value||0;
+    const out=document.getElementById('estRes');
+    if(!(cant>0)||!(gasto>0)||(base!=='unidades'&&(!(horas>0)||!(pct>0)))){ out.textContent='Completá los datos de la estimación.'; return; }
+    let cap=base==='unidades'?cant*12:cant*horas*12*pct;
+    if(base==='costoMOD'){ const t=+g('tarifaGeneral').value||0; if(!(t>0)){ out.textContent='Para la base "costo de mano de obra" primero escribí la tarifa por hora.'; return; } cap*=t; }
+    g('capacidadNormal').value=Math.round(cap*100)/100; g('presupuestoFijo').value=Math.round(gasto*12*100)/100;
+    out.textContent=`Capacidad normal ${fmtCant(Math.round(cap*100)/100)} ${BASES_CIF[base].unidad} al año · CIF del año Q${Q(gasto*12)}.`;
+    prev();
+  };
+  /* Con historia: promedio mensual de los CIF reales (cuentas marcadas) y de la base registrada en las boletas. */
+  document.getElementById('calcRegistrado').onclick=()=>{
+    const out=document.getElementById('regRes'), base=g('base').value;
+    const cuentas=gastos.filter(x=>g('cifcta_'+x.c)&&g('cifcta_'+x.c).checked).map(x=>x.c);
+    if(!cuentas.length){ out.textContent='Primero marcá abajo las cuentas de CIF reales.'; return; }
+    /* Último año con datos: los 12 meses que terminan en el último movimiento de CIF registrado. */
+    const cierres=new Set((e.cierresCIF||[]).map(x=>x.partidaId));
+    const conCIF=e.partidas.filter(p=>!cierres.has(p.id)&&p.lineas.some(l=>cuentas.includes(l.cta)));
+    const d1=conCIF.reduce((mx,p)=>p.fecha>mx?p.fecha:mx,'');
+    const desde=new Date((d1||hoy())+'T12:00'); desde.setFullYear(desde.getFullYear()-1); const d0=desde.toISOString().slice(0,10);
+    const meses=new Set(); let real=0;
+    conCIF.filter(p=>p.fecha>d0).forEach(p=>p.lineas.forEach(l=>{ if(cuentas.includes(l.cta)){ real+=(+l.debe||0)-(+l.haber||0); meses.add(p.fecha.slice(0,7)); } }));
+    if(!meses.size||!(real>0)){ out.textContent='Todavía no hay CIF reales registrados en esas cuentas: usá la estimación.'; return; }
+    const ords=e.ordenesProduccion||[];
+    const dentro=x=>x.fecha>d0&&meses.has(x.fecha.slice(0,7));
+    const cantBase=base==='horasMOD'?ords.flatMap(o=>o.manoObra||[]).filter(dentro).reduce((s2,x)=>s2+(+x.horas||0),0)
+      :base==='costoMOD'?ords.flatMap(o=>o.manoObra||[]).filter(dentro).reduce((s2,x)=>s2+(+x.monto||0),0)
+      :base==='horasMaquina'?ords.flatMap(o=>o.manoObra||[]).filter(dentro).reduce((s2,x)=>s2+(+x.horasMaq||0),0)
+      :ords.filter(o=>o.estado==='cerrada'&&o.fechaCierre&&dentro({fecha:o.fechaCierre})).reduce((s2,o)=>s2+(+o.cantidadTerminada||0),0);
+    if(!(cantBase>0)){ out.textContent=`Hay CIF reales en ${meses.size} mes(es), pero todavía no hay ${BASES_CIF[base].unidad} registradas en producción: usá la estimación.`; return; }
+    const n=meses.size;
+    g('capacidadNormal').value=Math.round(cantBase/n*12*100)/100; g('presupuestoFijo').value=Math.round(real/n*12*100)/100;
+    out.textContent=`Promedio de ${n} mes(es): CIF Q${Q(real/n)} y ${fmtCant(Math.round(cantBase/n*100)/100)} ${BASES_CIF[base].unidad} por mes.${n<3?' Con menos de 3 meses conviene revisarlo más adelante.':''}`;
+    prev();
+  };
   document.getElementById('sugerirTarifa').onclick=()=>{
     const s=tarifaDesdePlanilla(e), out=document.getElementById('tarifaSugerida');
     if(!s){ out.textContent='No hay planillas generadas todavía.'; return; }
