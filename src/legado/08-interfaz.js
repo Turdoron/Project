@@ -15,6 +15,59 @@ function ocultarEsqueleto(){
   document.body.removeAttribute('aria-busy');
 }
 
+/* ============ CAMPOS DE FECHA ESCRITOS A MANO ============ */
+/* Al escribir una fecha, el navegador avisa un cambio por cada parte: con el mes ya hay fecha
+   (con el año viejo) y con el primer dígito del año queda "0002". Las pantallas que se redibujan
+   al cambiar la fecha (filtros Desde/Hasta de libros y reportes) sacaban el cursor del campo y
+   nunca se podía terminar de escribir el año. Aquí, mientras se escribe, esos avisos se retienen,
+   y se entregan una sola vez al terminar: al salir del campo, con Enter, o al elegir del calendario
+   (eso llega sin teclas y pasa directo). Una fecha con año menor a 1900 se toma como incompleta. */
+(()=>{
+  const esFecha=el=>el&&el.tagName==='INPUT'&&el.type==='date';
+  const tecleando=new WeakSet(), retenido=new WeakSet();
+  const incompleta=el=>!!el.value&&+el.value.slice(0,4)<1900;
+  const entregar=el=>{
+    retenido.delete(el);
+    if(incompleta(el)) return;
+    el.dispatchEvent(new Event('input',{bubbles:true}));
+    el.dispatchEvent(new Event('change',{bubbles:true}));
+  };
+  document.addEventListener('keydown',ev=>{
+    const el=ev.target; if(!esFecha(el)) return;
+    if(ev.key==='Enter'){ if(retenido.has(el)){ ev.preventDefault(); entregar(el); } return; }
+    if(ev.key!=='Tab'&&ev.key!=='Shift'&&ev.key!=='Escape') tecleando.add(el);
+  },true);
+  ['input','change'].forEach(tipo=>document.addEventListener(tipo,ev=>{
+    const el=ev.target;
+    if(!esFecha(el)||!ev.isTrusted) return;          // los que entrega este mismo código pasan
+    if(tecleando.has(el)||incompleta(el)){ ev.stopImmediatePropagation(); retenido.add(el); }
+  },true));
+  /* Si se sale del campo tocando otra cosa (un botón de acción u otro campo) y al entregar la fecha la
+     pantalla se redibuja, lo tocado ya no existe cuando se suelta el clic: se busca su equivalente
+     nuevo y se pulsa (botón) o se enfoca (campo). */
+  let tocado=null;
+  document.addEventListener('pointerdown',ev=>{
+    const el=ev.target.closest&&ev.target.closest('[data-accion],input,select,textarea,button');
+    tocado=el?{el,accion:el.dataset.accion||'',id:el.dataset.id||'',domId:el.id||'',t:Date.now()}:null;
+  },true);
+  const equivalente=t=>t.accion
+    ? [...document.querySelectorAll(`[data-accion="${CSS.escape(t.accion)}"]`)].find(b=>(b.dataset.id||'')===t.id)
+    : (t.domId?document.getElementById(t.domId):null);
+  document.addEventListener('focusout',ev=>{
+    const el=ev.target; if(!esFecha(el)) return;
+    tecleando.delete(el);
+    if(!retenido.has(el)) return;
+    const t=tocado&&Date.now()-tocado.t<1000?tocado:null;
+    entregar(el);
+    if(t&&!t.el.isConnected){
+      document.addEventListener('pointerup',()=>setTimeout(()=>{
+        const nuevo=equivalente(t); if(!nuevo) return;
+        if(t.accion) nuevo.click(); else nuevo.focus();
+      },0),{once:true,capture:true});
+    }
+  },true);
+})();
+
 /* ============ ACCESIBILIDAD ============ */
 /* El contenido de las pantallas se arma con plantillas; en vez de corregir cada formulario, esta pasada
    les da nombre a los controles, encabezados a las tablas y estado al menú, cada vez que se dibuja algo. */
