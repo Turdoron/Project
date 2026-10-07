@@ -19,7 +19,8 @@ export default async function handler(req, res) {
     const token = (req.headers.authorization || '').replace(/^Bearer /, '')
     const { data: { user }, error: eAuth } = await db.auth.getUser(token)
     if (eAuth || !user) throw new Err('Sesión no válida.', 401)
-    const { data: yo } = await db.from('perfiles').select('*').eq('id', user.id).single()
+    const { data: yo, error: eYo } = await db.from('perfiles').select('*').eq('id', user.id).single()
+    if (eYo) throw new Err('No se pudo leer tu perfil en la base de datos: ' + eYo.message, 500)
     if (!yo || !yo.activo) throw new Err('Cuenta no autorizada.', 403)
     if (yo.rol !== 'superadmin' && yo.rol !== 'administrador') throw new Err('No tenés permiso para gestionar usuarios.', 403)
 
