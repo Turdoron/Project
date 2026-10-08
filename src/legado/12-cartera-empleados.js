@@ -179,6 +179,22 @@ VISTAS.usuarios=()=>{
       aplica en esta aplicación; el acceso a los datos de cada empresa lo controla la base de datos, según el Administrador al que pertenezca.</div>`;
 };
 
+/* Configuración de los accesos directos (Alt + número): qué pantalla abre cada tecla. */
+function tarjetaAtajos(){
+  const m=atajosVista();
+  const grupos=APPS.map(a=>{
+    const bs=[...document.querySelectorAll(`nav .app-menu[data-app="${a.id}"] [data-v]`)].filter(b=>b.style.display!=='none');
+    return bs.length?{nombre:a.nombre,ops:bs.map(b=>({v:b.dataset.v,n:textoBoton(b)}))}:null;
+  }).filter(Boolean);
+  const sel=t=>`<select id="atajo${t}" data-tecla-atajo="${t}"><option value="">— Sin atajo —</option>${grupos.map(g=>`<optgroup label="${esc(g.nombre)}">${g.ops.map(o=>`<option value="${o.v}"${m[t]===o.v?' selected':''}>${esc(o.n)}</option>`).join('')}</optgroup>`).join('')}</select>`;
+  return `<div class="tarjeta"><h3>Accesos directos</h3>
+    <p>Elegí qué pantalla abre cada atajo de teclado (mantené <kbd>Alt</kbd> y tocá el número). Se muestran en el inicio y en el menú.
+      <kbd>Alt+0</kbd> siempre vuelve al inicio. Se guardan para tu usuario en esta computadora.</p>
+    <div class="atajos-config">${TECLAS_ATAJO.map(t=>`<div class="campo"><label for="atajo${t}">Alt+${t}</label>${sel(t)}</div>`).join('')}</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+      <button class="btn sec" data-accion="guardarAtajos">Guardar accesos directos</button>
+      <button class="btn sec" data-accion="restablecerAtajos">Volver a los de fábrica</button></div></div>`;
+}
 VISTAS.config=()=>cab('Configuración','Ajustes del sistema, no de una empresa en particular.')
   + `<div class="tarjeta">
       <h3>Visibilidad</h3>
@@ -192,6 +208,7 @@ VISTAS.config=()=>cab('Configuración','Ajustes del sistema, no de una empresa e
         <span id="escalaTexto" style="color:var(--tinta-suave);font-size:14px">${Math.round(escalaActual()*100)}%</span>
       </div>
     </div>
+    ${tarjetaAtajos()}
     ${(()=>{
       const e=emp();
       if(!e) return `<div class="tarjeta"><h3>Salario mínimo</h3>

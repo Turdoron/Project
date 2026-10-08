@@ -284,6 +284,8 @@ nav .nav-inicio.volver:hover{color:var(--tinta)}
 .acceso-app{font-size:12px;color:var(--tinta-suave)}
 .accesos kbd,.accesos-pie kbd{font:500 12px/1 var(--tipo-mono,ui-monospace,monospace);padding:4px 7px;border:1px solid var(--linea-fuerte);
   border-bottom-width:2px;border-radius:6px;background:var(--fondo-suave);color:var(--tinta);white-space:nowrap}
+.atajos-config{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px 14px;margin-top:12px}
+.tarjeta kbd{font:500 12px/1 var(--tipo-mono,ui-monospace,monospace);padding:3px 6px;border:1px solid var(--linea-fuerte);border-bottom-width:2px;border-radius:6px;background:var(--fondo-suave)}
 .accesos-pie{font-size:13px;color:var(--tinta-suave);margin:0 0 30px;line-height:1.9}
 @media(max-width:820px){.accesos{grid-template-columns:1fr}}
 /* Empresa en uso: una sola línea arriba del menú; el detalle se abre en un recuadro */

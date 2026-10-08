@@ -466,6 +466,16 @@ ACCIONES.cerrarCostoVentas=d=>{
 ACCIONES.escalaMenos=()=>aplicarEscala(escalaActual()-0.1);
 ACCIONES.escalaMas=()=>aplicarEscala(escalaActual()+0.1);
 ACCIONES.escalaNormal=()=>aplicarEscala(ESCALA_BASE);
+ACCIONES.guardarAtajos=()=>{
+  const m={}, primera={};
+  document.querySelectorAll('[data-tecla-atajo]').forEach(s=>{ m[s.dataset.teclaAtajo]=s.value; });
+  for(const t of TECLAS_ATAJO){ const v=m[t]; if(!v) continue;
+    if(primera[v]){ avisar(`Alt+${primera[v]} y Alt+${t} abren la misma pantalla. Dejá cada pantalla en un solo atajo.`); return; }
+    primera[v]=t; }
+  guardarAtajosVista(m); registrarLog('Cambió los accesos directos',TECLAS_ATAJO.map(t=>`Alt+${t}=${m[t]||'—'}`).join(', ')); pintar();
+  avisar('Listo: los accesos directos quedaron guardados.','Accesos directos');
+};
+ACCIONES.restablecerAtajos=()=>{ guardarAtajosVista(null); registrarLog('Restableció los accesos directos',''); pintar(); };
 ACCIONES.guardarDeduccionPersonal=()=>{
   const e=emp(), anio=+document.getElementById('dedAnio').value, v=document.getElementById('dedMonto').value;
   if(!(anio>=2000&&anio<=2100)){avisar('Escribí un año válido.');return}

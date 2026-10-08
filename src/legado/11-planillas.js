@@ -346,7 +346,7 @@ VISTAS.home=()=>{
 /* Accesos directos del inicio: las pantallas que tienen atajo de teclado (Alt + número),
    solo las que el cargo de la persona y la empresa en uso tienen disponibles. */
 function accesosDirectos(){
-  const lista=Object.entries(ATAJOS_VISTA).filter(([,v])=>v!=='home').map(([tecla,v])=>{
+  const lista=Object.entries(atajosVista()).filter(([,v])=>v!=='home').map(([tecla,v])=>{
     const b=document.querySelector(`nav [data-v="${v}"]`);
     if(!b||b.style.display==='none'||!puedeVer(v)) return null;
     const app=APPS.find(a=>a.id===b.closest('.app-menu')?.dataset.app);
@@ -357,7 +357,7 @@ function accesosDirectos(){
     <ul class="accesos">${lista.map(x=>`<li><button type="button" class="acceso" data-atajo="${x.v}">
       <span class="acceso-txt"><span class="acceso-nombre">${esc(x.nombre)}</span>${x.app?`<span class="acceso-app">${esc(x.app)}</span>`:''}</span>
       <kbd>Alt+${x.tecla}</kbd></button></li>`).join('')}</ul>
-    <p class="accesos-pie">Con el teclado: mantené <kbd>Alt</kbd> y tocá el número. <kbd>Alt+0</kbd> vuelve a este inicio y <kbd>Alt+H</kbd> muestra esta lista en cualquier pantalla.</p>`;
+    <p class="accesos-pie">Con el teclado: mantené <kbd>Alt</kbd> y tocá el número. <kbd>Alt+0</kbd> vuelve a este inicio y <kbd>Alt+H</kbd> muestra esta lista en cualquier pantalla. Se cambian en Administración → Configuración.</p>`;
 }
 /* Resumen del ejercicio y Tablero fiscal van juntos, en dos pestañas. */
 function pestanasResumen(activa){

@@ -152,20 +152,43 @@ function marcarNavegacion(){
 
 /* ============ ATAJOS DE TECLADO (Alt + número) ============ */
 /* Usan los mismos botones del menú: si el cargo de la persona no ve una pantalla, el atajo tampoco la abre.
-   Se usa Alt (y no Ctrl) para no pisar atajos del navegador como Ctrl+P (imprimir) o Ctrl+S. */
-const ATAJOS_VISTA={'1':'facturas','2':'partidas','3':'diario','4':'mayor','5':'libroVentas','6':'libroCompras',
-  '7':'balanza','8':'resultados','9':'balance','0':'home'};
-(()=>{
-  Object.entries(ATAJOS_VISTA).forEach(([tecla,v])=>{
+   Se usa Alt (y no Ctrl) para no pisar atajos del navegador como Ctrl+P (imprimir) o Ctrl+S.
+   Cada persona puede cambiar qué pantalla abre cada número en Configuración; se guarda en esta computadora.
+   Alt+0 siempre vuelve al inicio y Alt+H muestra la lista. */
+const ATAJOS_DEFECTO={'1':'facturas','2':'tablero','3':'diario','4':'mayor','5':'planillas','6':'contratos',
+  '7':'balanza','8':'resultados','9':'balance'};
+const TECLAS_ATAJO=['1','2','3','4','5','6','7','8','9'];
+const claveAtajos=()=>'contagt_atajos_'+((typeof usuarioActual==='function'&&usuarioActual()&&usuarioActual().id)||'');
+/* Pantallas que se pueden poner en un atajo: las del menú lateral (sin el inicio). */
+const pantallasAtajo=()=>[...document.querySelectorAll('nav .app-menu [data-v]')].map(b=>b.dataset.v);
+function atajosVista(){
+  let g=null; try{ g=JSON.parse(localStorage.getItem(claveAtajos())||'null'); }catch(err){}
+  const validas=new Set(pantallasAtajo()), m={};
+  TECLAS_ATAJO.forEach(t=>{ const v=g&&Object.prototype.hasOwnProperty.call(g,t)?g[t]:ATAJOS_DEFECTO[t];
+    if(v&&validas.has(v)) m[t]=v; });
+  m['0']='home';
+  return m;
+}
+function guardarAtajosVista(m){
+  try{ if(m) localStorage.setItem(claveAtajos(),JSON.stringify(m)); else localStorage.removeItem(claveAtajos()); }catch(err){}
+  etiquetarAtajos();
+}
+/* Etiqueta «Alt+N» en los botones del menú lateral. */
+function etiquetarAtajos(){
+  document.querySelectorAll('nav [data-v] .atajo').forEach(x=>x.remove());
+  document.querySelectorAll('nav [data-v][title^="Atajo:"]').forEach(b=>b.removeAttribute('title'));
+  Object.entries(atajosVista()).forEach(([tecla,v])=>{
     const b=document.querySelector(`nav [data-v="${v}"]`);
     if(!b) return;
     b.insertAdjacentHTML('beforeend',`<span class="atajo">Alt+${tecla}</span>`);
     b.title=`Atajo: Alt+${tecla}`;
   });
-})();
+}
+etiquetarAtajos();
 function ayudaAtajos(){
   const nombre=v=>{ const b=document.querySelector(`nav [data-v="${v}"]`); return b?textoBoton(b):v; };
-  avisar(Object.entries(ATAJOS_VISTA).map(([t,v])=>`Alt+${t}  —  ${nombre(v)}`).join('\n')+'\nAlt+H  —  Esta ayuda','Atajos de teclado');
+  const m=atajosVista();
+  avisar(TECLAS_ATAJO.concat('0').filter(t=>m[t]).map(t=>`Alt+${t}  —  ${nombre(m[t])}`).join('\n')+'\nAlt+H  —  Esta ayuda\n\nSe cambian en Administración → Configuración.','Atajos de teclado');
 }
 document.addEventListener('keydown',ev=>{
   if(!ev.altKey||ev.ctrlKey||ev.metaKey||ev.shiftKey) return;
@@ -173,7 +196,7 @@ document.addEventListener('keydown',ev=>{
   if(modal.open || document.getElementById('aviso').open) return;   // con una ventana abierta no se navega
   const tecla=(ev.code||'').replace(/^(Digit|Numpad)/,'');
   if(tecla==='KeyH'){ ev.preventDefault(); ayudaAtajos(); return; }
-  const v=ATAJOS_VISTA[tecla];
+  const v=atajosVista()[tecla];
   if(!v) return;
   const b=document.querySelector(`nav [data-v="${v}"]`);
   if(!b||b.style.display==='none') return;   // pantalla no disponible para este cargo o esta empresa
@@ -361,6 +384,7 @@ function pintarMenuApps(){
 function pintar(){
   const u=usuarioActual();
   if(!u){ pantallaLogin(); return; }
+  etiquetarAtajos();   // los atajos son de cada usuario
   const permitidas=vistasPermitidas();
   const e0=emp();
   document.querySelectorAll('nav [data-v], #recuadroAdmin [data-v]').forEach(a=>{
