@@ -341,8 +341,24 @@ VISTAS.home=()=>{
         <span class="app-nombre">${esc(a.nombre)}</span><span class="app-desc">${esc(a.desc)}</span></button>`).join('')}</div>`
     :'<div class="vacio">Tu cargo todavía no tiene aplicaciones asignadas. Consultá con el administrador.</div>';
   return cab(`${saludo}${nombre?', '+esc(nombre):''}`,`${esc(e.nombre)} · ejercicio ${e.ejercicio} · ${esc(REGIMENES[e.regimen]||'—')}. Elegí con qué vas a trabajar.`)
-    + lanzador;
+    + lanzador + accesosDirectos();
 };
+/* Accesos directos del inicio: las pantallas que tienen atajo de teclado (Alt + número),
+   solo las que el cargo de la persona y la empresa en uso tienen disponibles. */
+function accesosDirectos(){
+  const lista=Object.entries(ATAJOS_VISTA).filter(([,v])=>v!=='home').map(([tecla,v])=>{
+    const b=document.querySelector(`nav [data-v="${v}"]`);
+    if(!b||b.style.display==='none'||!puedeVer(v)) return null;
+    const app=APPS.find(a=>a.id===b.closest('.app-menu')?.dataset.app);
+    return {tecla,v,nombre:textoBoton(b),app:app?app.nombre:''};
+  }).filter(Boolean);
+  if(!lista.length) return '';
+  return `<h2 class="tit-accesos">Accesos directos</h2>
+    <ul class="accesos">${lista.map(x=>`<li><button type="button" class="acceso" data-atajo="${x.v}">
+      <span class="acceso-txt"><span class="acceso-nombre">${esc(x.nombre)}</span>${x.app?`<span class="acceso-app">${esc(x.app)}</span>`:''}</span>
+      <kbd>Alt+${x.tecla}</kbd></button></li>`).join('')}</ul>
+    <p class="accesos-pie">Con el teclado: mantené <kbd>Alt</kbd> y tocá el número. <kbd>Alt+0</kbd> vuelve a este inicio y <kbd>Alt+H</kbd> muestra esta lista en cualquier pantalla.</p>`;
+}
 /* Resumen del ejercicio y Tablero fiscal van juntos, en dos pestañas. */
 function pestanasResumen(activa){
   const p=(id,txt,acc)=>puedeVer(id)?`<button type="button" class="pestana${activa===id?' on':''}" data-accion="${acc}"${activa===id?' aria-current="page"':''}>${txt}</button>`:'';

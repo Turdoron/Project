@@ -411,6 +411,7 @@ function pintar(){
     conSnapshot(b.textContent.trim()||b.dataset.accion,()=>acc(b.dataset));
   });
   nodo.querySelectorAll('[data-app]').forEach(b=>b.onclick=()=>abrirApp(b.dataset.app));
+  nodo.querySelectorAll('[data-atajo]').forEach(b=>b.onclick=()=>{ const n=document.querySelector(`nav [data-v="${b.dataset.atajo}"]`); if(n) n.click(); });
   nodo.querySelectorAll('[data-filtro]').forEach(i=>{
     i.oninput=i.onchange=()=>{filtros[i.dataset.filtro]=i.value;pintar()};
   });
