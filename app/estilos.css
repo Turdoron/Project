@@ -342,6 +342,12 @@ nav .sub-cuerpo .app-sec:first-child{margin-top:6px}
 .ct-hoja .falta{background:#FFF1B8;color:#6B4E00;border-radius:3px;padding:0 3px;font-family:Inter,system-ui,sans-serif;font-size:.82em}
 .ct-hoja .ct-legal{margin-top:24px;font-size:14px}
 .lista-chequeo{display:flex;flex-direction:column;gap:8px}
+.funciones-puesto{margin-top:12px;padding:10px 14px;border:1px solid var(--linea);border-radius:var(--radio-chico);background:var(--papel);font-size:13px}
+.funciones-puesto ul{margin:6px 0 0;padding-left:18px;color:var(--tinta-suave)}
+.base-puestos{max-height:52vh;overflow:auto;padding-right:6px}
+.bp-area h4{margin:14px 0 6px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--tinta-suave)}
+.bp-area:first-child h4{margin-top:0}
+.bp-item{padding:6px 0}
 .chequeo{display:flex;gap:10px;align-items:flex-start;font-size:14px;cursor:pointer}
 .chequeo input{width:auto;margin-top:3px}
 .chequeo small{color:var(--tinta-suave)}

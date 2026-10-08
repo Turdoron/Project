@@ -43,30 +43,35 @@ const generoTxt=(sexo,m,f)=>sexo==='F'?f:m;
 const nacionalidadTxt=(nac,sexo)=>{ const n=(nac||'guatemalteco').trim().toLowerCase(); return sexo==='F'?n.replace(/o$/,'a'):n; };
 
 /* ---------- Puestos y funciones ---------- */
-const PUESTOS_COMUNES=[
-  {nombre:'Auxiliar contable',funciones:['Registrar facturas de compras y ventas en el sistema contable','Elaborar partidas contables y conciliaciones bancarias','Archivar y resguardar la documentación contable','Apoyar en la preparación de declaraciones de impuestos','Llevar el control de cuentas por cobrar y por pagar']},
-  {nombre:'Contador general',funciones:['Llevar la contabilidad completa de la empresa y sus libros legales','Elaborar los estados financieros mensuales y anuales','Preparar y presentar las declaraciones de impuestos ante la SAT','Supervisar el trabajo del personal contable','Atender auditorías y requerimientos de la Administración Tributaria']},
-  {nombre:'Secretaria / Recepcionista',funciones:['Atender a clientes, proveedores y visitantes','Atender y canalizar llamadas telefónicas y correos','Llevar la agenda y el archivo de la oficina','Redactar notas, cartas y documentos','Controlar la papelería y útiles de oficina']},
-  {nombre:'Vendedor',funciones:['Atender y asesorar a los clientes','Ofrecer y vender los productos o servicios de la empresa','Elaborar cotizaciones y dar seguimiento a pedidos','Gestionar el cobro de las ventas realizadas','Reportar sus ventas y metas al jefe inmediato']},
-  {nombre:'Bodeguero',funciones:['Recibir, revisar y almacenar la mercadería','Despachar los productos según los pedidos autorizados','Llevar el control de entradas y salidas de inventario','Mantener la bodega limpia y ordenada','Participar en los conteos físicos de inventario']},
-  {nombre:'Piloto repartidor',funciones:['Conducir el vehículo asignado para la entrega de productos','Cargar y descargar la mercadería con cuidado','Entregar los pedidos y recabar las firmas de recibido','Velar por el buen estado y mantenimiento del vehículo','Cumplir las leyes de tránsito y las rutas asignadas']},
-  {nombre:'Operario de producción',funciones:['Operar la maquinaria y herramientas de producción asignadas','Cumplir las recetas, especificaciones y estándares de calidad','Reportar los materiales utilizados y el tiempo trabajado','Usar el equipo de protección personal','Mantener limpia y ordenada su área de trabajo']},
-  {nombre:'Encargado de mantenimiento',funciones:['Dar mantenimiento preventivo y correctivo a instalaciones y equipo','Realizar reparaciones eléctricas, de plomería y generales','Llevar el control de las herramientas y materiales a su cargo','Reportar las fallas y necesidades de repuestos','Cumplir las normas de seguridad industrial']},
-  {nombre:'Guardia de seguridad',funciones:['Vigilar las instalaciones y bienes de la empresa','Controlar el ingreso y egreso de personas y vehículos','Realizar rondas de vigilancia y llevar la bitácora','Reportar de inmediato cualquier incidente','Actuar conforme a los protocolos de seguridad establecidos']},
-  {nombre:'Conserje',funciones:['Mantener limpias las oficinas, baños y áreas comunes','Recoger y clasificar la basura','Controlar los insumos de limpieza','Apoyar en mandados y traslados internos','Reportar daños en las instalaciones']},
-  {nombre:'Gerente general',funciones:['Dirigir y supervisar las operaciones de la empresa','Planificar y controlar el presupuesto','Coordinar a los jefes de las distintas áreas','Representar a la empresa ante clientes, proveedores e instituciones','Velar por el cumplimiento de las metas y políticas de la empresa']},
-];
+/* Puesto del catálogo de la empresa; si no está pero existe en la base de puestos, se agrega solo. */
+function asegurarPuesto(e,nombre){
+  const n=(nombre||'').trim(); if(!n) return null;
+  e.puestos=e.puestos||[];
+  let p=e.puestos.find(x=>x.nombre.toLowerCase()===n.toLowerCase());
+  if(p) return p;
+  const base=PUESTOS_BASE.find(x=>x.nombre.toLowerCase()===n.toLowerCase());
+  if(!base) return null;
+  p={id:uid(),nombre:base.nombre,area:base.area,salario:0,funciones:[...base.funciones]}; e.puestos.push(p);
+  return p;
+}
+const puestoDeEmpleado=(e,x)=>(e.puestos||[]).find(p=>p.id===x.puestoId)||(e.puestos||[]).find(p=>p.nombre.toLowerCase()===(x.puesto||'').toLowerCase())||null;
+/* Opciones para elegir puesto: primero los de la empresa, después los de la base que todavía no están. */
+function opcionesPuestos(e){
+  const ya=new Set((e.puestos||[]).map(p=>p.nombre.toLowerCase()));
+  return (e.puestos||[]).map(p=>`<option value="${esc(p.nombre)}">${esc(p.area||'Puesto de la empresa')}</option>`).join('')
+    +PUESTOS_BASE.filter(p=>!ya.has(p.nombre.toLowerCase())).map(p=>`<option value="${esc(p.nombre)}">${esc(p.area)} · de la base de puestos</option>`).join('');
+}
 const funcionesDe=p=>(p&&p.funciones||[]).filter(Boolean);
 VISTAS.puestos=()=>{
   const e=emp(), lista=(e.puestos||[]).slice().sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
   const empleadosEn=p=>(e.empleados||[]).filter(x=>x.activo!==false&&(x.puesto||'').toLowerCase()===p.nombre.toLowerCase()).length;
   return cab('Puestos y funciones','Cada puesto con sus funciones: pasan solas a la cláusula del cargo en el contrato de trabajo.',
-    `<button class="btn sec" data-accion="puestosComunes">Agregar de la lista de puestos comunes</button><button class="btn" data-accion="editarPuesto">Nuevo puesto</button>`)
+    `<button class="btn sec" data-accion="puestosComunes">Agregar de la base de puestos</button><button class="btn" data-accion="editarPuesto">Nuevo puesto</button>`)
   +(lista.length?`<table><thead><tr><th>Puesto</th><th>Funciones</th><th class="num">Salario sugerido</th><th class="num">Empleados</th><th class="num"></th></tr></thead><tbody>
     ${lista.map(p=>`<tr><td><strong>${esc(p.nombre)}</strong></td><td style="font-size:13px;color:var(--tinta-suave)">${funcionesDe(p).slice(0,3).map(esc).join(' · ')}${funcionesDe(p).length>3?` · y ${funcionesDe(p).length-3} más`:''}</td>
       <td class="num">${p.salario?Q(p.salario):'—'}</td><td class="num">${empleadosEn(p)}</td>
       <td class="num" style="white-space:nowrap"><button class="btn mini sec" data-accion="editarPuesto" data-id="${p.id}">Editar</button> <button class="btn mini peligro" data-accion="borrarPuesto" data-id="${p.id}">Eliminar</button></td></tr>`).join('')}</tbody></table>`
-   :`<div class="vacio">Todavía no hay puestos. Creá uno o agregalos desde la lista de puestos comunes (auxiliar contable, vendedor, bodeguero, piloto…) y ajustá sus funciones.</div>`);
+   :`<div class="vacio">Todavía no hay puestos. Agregalos desde la base de puestos (${PUESTOS_BASE.length} puestos con sus funciones, por área) o creá uno propio. También se agregan solos al elegir el puesto en la ficha de un empleado.</div>`);
 };
 ACCIONES.editarPuesto=d=>{
   const e=emp(); e.puestos=e.puestos||[];
@@ -91,34 +96,43 @@ ACCIONES.borrarPuesto=d=>{
 };
 ACCIONES.puestosComunes=()=>{
   const e=emp(), ya=new Set((e.puestos||[]).map(p=>p.nombre.toLowerCase()));
-  abrirModal('Puestos comunes',
-    `<p style="margin:0 0 12px;font-size:13px;color:var(--tinta-suave)">Marcá los puestos que tiene la empresa. Se agregan con funciones típicas, que después podés ajustar.</p>
-    <div class="lista-chequeo">${PUESTOS_COMUNES.map((p,i)=>`<label class="chequeo"><input type="checkbox" name="pc_${i}"${ya.has(p.nombre.toLowerCase())?' disabled':''}>
-      <span><strong>${esc(p.nombre)}</strong>${ya.has(p.nombre.toLowerCase())?' <em>(ya está)</em>':''}<br><small>${esc(p.funciones.slice(0,2).join(' · '))}…</small></span></label>`).join('')}</div>`,
+  abrirModal('Base de puestos',
+    `<p style="margin:0 0 10px;font-size:13px;color:var(--tinta-suave)">Marcá los puestos que tiene la empresa. Se agregan con sus funciones, que después podés ajustar.</p>
+    <input id="buscaPuesto" type="search" placeholder="Buscar puesto (ej.: bodega, contador, piloto)" aria-label="Buscar puesto" style="margin-bottom:12px">
+    <div class="base-puestos">${Object.keys(PUESTOS_BASE_AREAS).map(area=>`<div class="bp-area"><h4>${esc(area)}</h4>${PUESTOS_BASE.map((p,i)=>p.area!==area?'':`<label class="chequeo bp-item" data-busca="${esc((p.nombre+' '+p.funciones.join(' ')).toLowerCase())}"><input type="checkbox" name="pb_${i}"${ya.has(p.nombre.toLowerCase())?' disabled checked':''}>
+      <span><strong>${esc(p.nombre)}</strong>${ya.has(p.nombre.toLowerCase())?' <em>(ya está)</em>':''}<br><small>${esc(p.funciones.slice(0,2).join(' · '))}…</small></span></label>`).join('')}</div>`).join('')}</div>`,
     f=>{
       e.puestos=e.puestos||[]; let n=0;
-      PUESTOS_COMUNES.forEach((p,i)=>{ if(f['pc_'+i]==='on'&&!ya.has(p.nombre.toLowerCase())){ e.puestos.push({id:uid(),nombre:p.nombre,salario:0,funciones:[...p.funciones]}); n++; } });
+      PUESTOS_BASE.forEach((p,i)=>{ if(f['pb_'+i]==='on'&&!ya.has(p.nombre.toLowerCase())){ asegurarPuesto(e,p.nombre); n++; } });
       if(!n){avisar('Marcá al menos un puesto.');return false}
-      registrarLog('Agregó puestos comunes',`${n} puesto(s)`); guardar();
+      registrarLog('Agregó puestos de la base',`${n} puesto(s)`); guardar();
     },'Agregar');
+  const b=document.getElementById('buscaPuesto');
+  b.addEventListener('input',()=>{ const q=b.value.trim().toLowerCase();
+    mForm.querySelectorAll('.bp-item').forEach(it=>{ it.hidden=!!q&&!it.dataset.busca.includes(q); });
+    mForm.querySelectorAll('.bp-area').forEach(a=>{ a.hidden=![...a.querySelectorAll('.bp-item')].some(it=>!it.hidden); }); });
 };
 
 /* ---------- Datos de la empresa para los contratos ---------- */
 function datosContratoEmpresa(e){
   const d=e.datosContrato||{};
-  return {ciudad:d.ciudad||'Guatemala',municipio:d.municipio||'Guatemala',departamento:d.departamento||'Guatemala',
+  const pareceSociedad=e.tipoSociedad==='sociedad'||/sociedad an[oó]nima|\bs\.\s?a\.?$/i.test(e.nombre||'');
+  return {esSociedad:d.esSociedad!==undefined?!!d.esSociedad:pareceSociedad,ciudad:d.ciudad||'Guatemala',municipio:d.municipio||'Guatemala',departamento:d.departamento||'Guatemala',
     rep:Object.assign({nombre:e.representante||'',sexo:'M',fechaNac:'',estadoCivil:'casado',profesion:'',nacionalidad:'guatemalteco',vecindad:'',dpi:''},d.rep||{}),
     personeria:Object.assign({notario:'',fecha:'',registro:'',folio:'',libro:''},d.personeria||{})};
 }
 ACCIONES.datosContratoEmpresa=()=>{
-  const e=emp(), d=datosContratoEmpresa(e), r=d.rep, p=d.personeria, soc=e.tipoSociedad==='sociedad';
+  const e=emp(), d=datosContratoEmpresa(e), r=d.rep, p=d.personeria, soc=d.esSociedad;
   const ec=Object.entries(ESTADOS_CIVILES).map(([k,v])=>`<option value="${k}"${r.estadoCivil===k?' selected':''}>${v[0]} / ${v[1]}</option>`).join('');
   abrirModal('Datos de la empresa para los contratos',
-    `<p style="margin:0 0 12px;font-size:13px;color:var(--tinta-suave)">Se llenan una sola vez y se usan en todos los contratos. ${soc?'Por ser sociedad, comparece su representante legal.':'Por ser empresa individual, comparece el propietario.'}</p>
+    `<p style="margin:0 0 12px;font-size:13px;color:var(--tinta-suave)">Se llenan una sola vez y se usan en todos los contratos.</p>
     <div class="rej">
+      <div class="campo full"><label>La empresa es</label><select name="esSociedad">
+        <option value="si"${soc?' selected':''}>Sociedad (anónima u otra) — comparece su representante legal, nombrado por acta notarial</option>
+        <option value="no"${soc?'':' selected'}>Empresa individual — comparece el propietario</option></select></div>
       <div class="campo"><label>Municipio donde se firman</label><input name="municipio" value="${esc(d.municipio)}"></div>
       <div class="campo"><label>Departamento</label><input name="departamento" value="${esc(d.departamento)}"></div>
-      <div class="campo full"><label>${soc?'Representante legal':'Propietario'} — nombre completo</label><input name="r_nombre" value="${esc(r.nombre)}"></div>
+      <div class="campo full"><label id="lblRep">${soc?'Representante legal':'Propietario'} — nombre completo</label><input name="r_nombre" value="${esc(r.nombre)}"></div>
       <div class="campo"><label>Sexo</label><select name="r_sexo"><option value="M"${r.sexo!=='F'?' selected':''}>Masculino</option><option value="F"${r.sexo==='F'?' selected':''}>Femenino</option></select></div>
       <div class="campo"><label>Fecha de nacimiento</label><input name="r_fechaNac" type="date" value="${esc(r.fechaNac)}"></div>
       <div class="campo"><label>Estado civil</label><select name="r_estadoCivil">${ec}</select></div>
@@ -127,20 +141,31 @@ ACCIONES.datosContratoEmpresa=()=>{
       <div class="campo"><label>Vecino del municipio de</label><input name="r_vecindad" value="${esc(r.vecindad)}" placeholder="Guatemala"></div>
       <div class="campo full"><label>DPI (CUI)</label><input name="r_dpi" value="${esc(r.dpi)}" placeholder="2695 40784 0801" inputmode="numeric"></div>
     </div>
-    ${soc?`<h4 style="margin:16px 0 8px">Nombramiento del representante legal</h4><div class="rej">
+    <div id="bloqueNombramiento"${soc?'':' hidden'}><h4 style="margin:16px 0 4px">Razón de nombramiento del representante legal</h4>
+    <p style="margin:0 0 8px;font-size:12.5px;color:var(--tinta-suave)">Del acta notarial de nombramiento y su razón de inscripción en el Registro Mercantil. En el contrato salen en letras y en números.</p><div class="rej">
       <div class="campo"><label>Acta notarial autorizada por el notario</label><input name="p_notario" value="${esc(p.notario)}"></div>
-      <div class="campo"><label>Fecha del acta</label><input name="p_fecha" type="date" value="${esc(p.fecha)}"></div>
-      <div class="campo"><label>Inscrita en el Registro Mercantil, número</label><input name="p_registro" value="${esc(p.registro)}" inputmode="numeric"></div>
+      <div class="campo"><label>Fecha del acta notarial</label><input name="p_fecha" type="date" value="${esc(p.fecha)}"></div>
+      <div class="campo"><label>Registro número</label><input name="p_registro" value="${esc(p.registro)}" inputmode="numeric"></div>
       <div class="campo"><label>Folio</label><input name="p_folio" value="${esc(p.folio)}" inputmode="numeric"></div>
       <div class="campo"><label>Libro (de Auxiliares de Comercio)</label><input name="p_libro" value="${esc(p.libro)}" inputmode="numeric"></div>
-    </div>`:''}`,
-    f=>{
-      e.datosContrato={municipio:(f.municipio||'').trim(),departamento:(f.departamento||'').trim(),ciudad:(f.municipio||'').trim(),
+      <div class="campo full" id="prevNombramiento" style="font-size:12.5px;color:var(--tinta-suave)"></div>
+    </div></div>`,
+    async f=>{
+      const socF=f.esSociedad==='si';
+      if(socF&&(!(f.p_registro||'').trim()||!(f.p_folio||'').trim()||!(f.p_libro||'').trim()||!(f.p_notario||'').trim()||!f.p_fecha)){
+        if(!(await preguntar('Falta parte de la razón de nombramiento (notario, fecha, registro, folio o libro). En el contrato quedará marcado como pendiente.','Guardar así'))) return false; }
+      e.datosContrato={esSociedad:socF,municipio:(f.municipio||'').trim(),departamento:(f.departamento||'').trim(),ciudad:(f.municipio||'').trim(),
         rep:{nombre:(f.r_nombre||'').trim(),sexo:f.r_sexo,fechaNac:f.r_fechaNac||'',estadoCivil:f.r_estadoCivil,profesion:(f.r_profesion||'').trim(),nacionalidad:(f.r_nacionalidad||'').trim(),vecindad:(f.r_vecindad||'').trim(),dpi:(f.r_dpi||'').trim()},
-        personeria:soc?{notario:(f.p_notario||'').trim(),fecha:f.p_fecha||'',registro:(f.p_registro||'').trim(),folio:(f.p_folio||'').trim(),libro:(f.p_libro||'').trim()}:{}};
+        personeria:socF?{notario:(f.p_notario||'').trim(),fecha:f.p_fecha||'',registro:(f.p_registro||'').trim(),folio:(f.p_folio||'').trim(),libro:(f.p_libro||'').trim()}:{}};
       if(!e.representante&&e.datosContrato.rep.nombre) e.representante=e.datosContrato.rep.nombre;
       registrarLog('Actualizó los datos para contratos',e.nombre); guardar();
     },'Guardar');
+  const g=n=>mForm.querySelector(`[name="${n}"]`);
+  const act=()=>{ const so=g('esSociedad').value==='si';
+    document.getElementById('bloqueNombramiento').hidden=!so; document.getElementById('lblRep').textContent=(so?'Representante legal':'Propietario')+' — nombre completo';
+    const n=x=>x&&/^\d+$/.test(x.trim())?`${enteroEnLetras(+x).toUpperCase()} (${x.trim()})`:'—';
+    document.getElementById('prevNombramiento').textContent=so?`Así queda: registro ${n(g('p_registro').value)}, folio ${n(g('p_folio').value)}, libro ${n(g('p_libro').value)} de Auxiliares de Comercio.`:''; };
+  ['esSociedad','p_registro','p_folio','p_libro'].forEach(k=>{ const el=g(k); if(el){ el.addEventListener('input',act); el.addEventListener('change',act); } }); act();
 };
 
 /* ---------- El contrato ---------- */
@@ -158,7 +183,7 @@ const CLAUSULAS_OPCIONALES={
   legalizacion:{nombre:'Acta de legalización de firmas (notario)',def:false}};
 let contratoActual=null;
 function nuevoDatosContrato(e,x){
-  const p=(e.puestos||[]).find(y=>y.nombre.toLowerCase()===(x.puesto||'').toLowerCase());
+  const p=puestoDeEmpleado(e,x)||asegurarPuesto(e,x.puesto);
   return {empleadoId:x.id,fecha:hoy(),fechaInicio:x.fechaIngreso||hoy(),plazo:'indefinido',plazoHasta:'',obra:'',
     jornada:'diurna',horario:JORNADAS.diurna.horario,descanso:'sábado y domingo',almuerzo:'de las doce a las trece horas',
     salario:x.salarioBase||0,pago:'quincenal',lugar:'',puesto:x.puesto||'',funciones:funcionesDe(p).join('\n'),
@@ -168,7 +193,7 @@ function nuevoDatosContrato(e,x){
 const faltaCt=t=>`<span class="falta" title="Falta: ${esc(t)}">[${esc(t)}]</span>`;
 const valCt=(x,t)=>x?esc(x):faltaCt(t);
 function htmlContrato(e,c){
-  const dc=datosContratoEmpresa(e), r=dc.rep, per=dc.personeria, soc=e.tipoSociedad==='sociedad';
+  const dc=datosContratoEmpresa(e), r=dc.rep, per=dc.personeria, soc=dc.esSociedad;
   const t=(e.empleados||[]).find(x=>x.id===c.empleadoId)||{}, sx=t.sexo, cl=c.clausulas||{};
   const edadT=edadAl(t.fechaNac,c.fecha), edadR=edadAl(r.fechaNac,c.fecha);
   const ecT=t.estadoCivil?ESTADOS_CIVILES[t.estadoCivil][sx==='F'?1:0]:'', ecR=r.estadoCivil?ESTADOS_CIVILES[r.estadoCivil][r.sexo==='F'?1:0]:'';
@@ -181,7 +206,7 @@ function htmlContrato(e,c){
     :c.plazo==='obra'?`PARA OBRA DETERMINADA, que consiste en: ${valCt(c.obra,'descripción de la obra')}`:'TIEMPO INDEFINIDO';
   const n=[]; const cl_=(titulo,txt)=>n.push(`<p><strong>${n.length+1}. ${titulo}:</strong> ${txt}</p>`);
   const comp=soc
-    ?`comparece ${generoTxt(r.sexo,'el señor','la señora')} ${valCt((r.nombre||'').toUpperCase(),'nombre del representante legal')}, de ${edadR!==null?enteroEnLetras(edadR):faltaCt('edad')} años de edad, ${valCt(ecR,'estado civil')}, ${valCt(r.profesion,'profesión')}, ${esc(nacionalidadTxt(r.nacionalidad,r.sexo))}, ${generoTxt(r.sexo,'vecino','vecina')} del municipio de ${valCt(r.vecindad,'vecindad')}, quien se identifica con Documento Personal de Identificación con Código Único de Identificación número ${dpiR?`${cifrasEnLetras(dpiR)} (${esc(dpiR)})`:faltaCt('DPI del representante')}, extendido por el Registro Nacional de las Personas de la República de Guatemala, quien actúa en su calidad de representante legal de la entidad ${emp_}, lo que acredita con el acta notarial de su nombramiento autorizada en esta ciudad por el Notario ${valCt(per.notario,'notario')}, el ${per.fecha?fechaEnLetras(per.fecha):faltaCt('fecha del acta')}, inscrita en el Registro Mercantil General de la República bajo el número ${per.registro?`${enteroEnLetras(+per.registro).toUpperCase()} (${esc(per.registro)})`:faltaCt('registro')}, folio ${per.folio?`${enteroEnLetras(+per.folio).toUpperCase()} (${esc(per.folio)})`:faltaCt('folio')}, del libro ${per.libro?`${enteroEnLetras(+per.libro).toUpperCase()} (${esc(per.libro)})`:faltaCt('libro')} de Auxiliares de Comercio`
+    ?`comparece ${generoTxt(r.sexo,'el señor','la señora')} ${valCt((r.nombre||'').toUpperCase(),'nombre del representante legal')}, de ${edadR!==null?enteroEnLetras(edadR):faltaCt('edad')} años de edad, ${valCt(ecR,'estado civil')}, ${valCt(r.profesion,'profesión')}, ${esc(nacionalidadTxt(r.nacionalidad,r.sexo))}, ${generoTxt(r.sexo,'vecino','vecina')} del municipio de ${valCt(r.vecindad,'vecindad')}, quien se identifica con Documento Personal de Identificación con Código Único de Identificación número ${dpiR?`${cifrasEnLetras(dpiR)} (${esc(dpiR)})`:faltaCt('DPI del representante')}, extendido por el Registro Nacional de las Personas de la República de Guatemala, quien actúa en su calidad de representante legal de la entidad ${emp_}, lo que acredita con el acta notarial de su nombramiento autorizada por el Notario ${valCt(per.notario,'notario')}, el ${per.fecha?fechaEnLetras(per.fecha):faltaCt('fecha del acta')}, inscrita en el Registro Mercantil General de la República bajo el número ${per.registro?`${enteroEnLetras(+per.registro).toUpperCase()} (${esc(per.registro)})`:faltaCt('registro')}, folio ${per.folio?`${enteroEnLetras(+per.folio).toUpperCase()} (${esc(per.folio)})`:faltaCt('folio')}, del libro ${per.libro?`${enteroEnLetras(+per.libro).toUpperCase()} (${esc(per.libro)})`:faltaCt('libro')} de Auxiliares de Comercio`
     :`comparece ${generoTxt(r.sexo,'el señor','la señora')} ${valCt((r.nombre||'').toUpperCase(),'nombre del propietario')}, de ${edadR!==null?enteroEnLetras(edadR):faltaCt('edad')} años de edad, ${valCt(ecR,'estado civil')}, ${valCt(r.profesion,'profesión')}, ${esc(nacionalidadTxt(r.nacionalidad,r.sexo))}, ${generoTxt(r.sexo,'vecino','vecina')} del municipio de ${valCt(r.vecindad,'vecindad')}, quien se identifica con Documento Personal de Identificación con Código Único de Identificación número ${dpiR?`${cifrasEnLetras(dpiR)} (${esc(dpiR)})`:faltaCt('DPI del propietario')}, extendido por el Registro Nacional de las Personas de la República de Guatemala, en su calidad de ${generoTxt(r.sexo,'propietario','propietaria')} de la empresa ${emp_}`;
   const encabezado=`<p class="ct-num">Contrato No. ${esc(String(c.numero||''))}</p><h1 class="ct-titulo">CONTRATO INDIVIDUAL DE TRABAJO</h1>
     <p>En el municipio de ${valCt(dc.municipio,'municipio')}, departamento de ${valCt(dc.departamento,'departamento')}, el ${c.fecha?fechaEnLetras(c.fecha):faltaCt('fecha')}, constituidos en las instalaciones de ${emp_}, ubicada en ${valCt(e.direccion,'dirección de la empresa')}; por una parte ${comp}; y por la otra parte comparece ${valCt((t.nombre||'').toUpperCase(),'nombre del trabajador')}, de ${edadT!==null?enteroEnLetras(edadT):faltaCt('edad')} años de edad, ${valCt(ecT,'estado civil')}, ${valCt(t.profesion,'profesión u oficio')}, ${esc(nacionalidadTxt(t.nacionalidad,sx))}, ${generoTxt(sx,'vecino','vecina')} del municipio de ${valCt(t.municipio,'municipio')}, departamento de ${valCt(t.departamento,'departamento')}, quien se identifica con Documento Personal de Identificación con Código Único de Identificación número ${dpiT?`${cifrasEnLetras(dpiT)} (${esc(dpiT)})`:faltaCt('DPI del trabajador')}, extendido por el Registro Nacional de las Personas de la República de Guatemala; quienes para los efectos de este contrato se denominarán “EL PATRONO” y “EL TRABAJADOR”, respectivamente, y celebran el presente CONTRATO INDIVIDUAL DE TRABAJO de conformidad con las cláusulas siguientes:</p>`;
@@ -222,7 +247,7 @@ VISTAS.contratos=()=>{
   const nombreEmp=id=>((e.empleados||[]).find(x=>x.id===id)||{}).nombre||'(empleado eliminado)';
   return cab('Contratos de trabajo','Contrato individual de trabajo con los datos de la empresa y del trabajador. Se llena con un formulario, se ve en vivo y se puede corregir a mano.',
     `<button class="btn sec" data-accion="datosContratoEmpresa">Datos de la empresa</button><button class="btn" data-accion="nuevoContrato">Nuevo contrato</button>`)
-  +(faltaEmp?`<div class="aviso">Antes del primer contrato completá los <strong>datos de la empresa</strong> (${e.tipoSociedad==='sociedad'?'representante legal y su nombramiento':'propietario'}, DPI y dirección). Se llenan una sola vez. <button class="btn mini" data-accion="datosContratoEmpresa" style="margin-left:6px">Completar</button></div>`:'')
+  +(faltaEmp?`<div class="aviso">Antes del primer contrato completá los <strong>datos de la empresa</strong> (${dc.esSociedad?'representante legal y su razón de nombramiento':'propietario'}, DPI y dirección). Se llenan una sola vez. <button class="btn mini" data-accion="datosContratoEmpresa" style="margin-left:6px">Completar</button></div>`:'')
   +(lista.length?`<table><thead><tr><th>No.</th><th>Trabajador</th><th>Puesto</th><th>Inicio</th><th>Plazo</th><th>Estado</th><th class="num"></th></tr></thead><tbody>
     ${lista.map(c=>`<tr><td>${c.numero}</td><td>${esc(nombreEmp(c.empleadoId))}</td><td>${esc(c.puesto||'—')}</td><td>${fFecha(c.fechaInicio)}</td><td>${esc(PLAZOS_CONTRATO[c.plazo]||'')}</td>
       <td>${c.htmlManual?'<span class="etiqueta">Editado a mano</span>':''}</td>
@@ -278,9 +303,9 @@ VISTAS.contratoEditar=()=>{
       </div>
       <h3>Puesto y funciones</h3>
       <div class="rej">
-        <div class="campo full"><label>Puesto</label><input data-ct="puesto" list="dlPuestosCt" value="${esc(c.puesto||'')}"><datalist id="dlPuestosCt">${(e.puestos||[]).map(p=>`<option value="${esc(p.nombre)}">`).join('')}</datalist></div>
+        <div class="campo full"><label>Puesto</label><input data-ct="puesto" list="dlPuestosCt" value="${esc(c.puesto||'')}"><datalist id="dlPuestosCt">${opcionesPuestos(e)}</datalist></div>
         <div class="campo full"><label>Funciones (una por línea)</label><textarea data-ct="funciones" rows="6">${esc(c.funciones||'')}</textarea>
-          <span class="ayuda-campo">Al elegir un puesto del catálogo se cargan sus funciones. Los puestos se manejan en "Puestos y funciones".</span></div>
+          <span class="ayuda-campo">Al elegir un puesto de la lista (de la empresa o de la base de puestos) se cargan sus funciones; se pueden ajustar acá solo para este contrato.</span></div>
       </div>
       <h3>Condiciones</h3>
       <div class="rej">
@@ -321,11 +346,16 @@ function enlazarEditorContrato(){
   const guardarPronto=()=>{ clearTimeout(tGuardarContrato); tGuardarContrato=setTimeout(guardar,600); };
   const visibilidad=()=>form.querySelectorAll('[data-si]').forEach(el=>{ const s=el.dataset.si;
     el.hidden=s.startsWith('cl:')?!(c.clausulas||{})[s.slice(3)]:c[s.split('=')[0]]!==s.split('=')[1]; });
-  const faltan=()=>{ const n=hoja.querySelectorAll('.falta').length; document.getElementById('ctFaltan').innerHTML=n?`<strong>${n}</strong> dato(s) por completar`:'✓ Contrato completo'; };
+  let tHojas=null;
+  const faltan=()=>{ const n=hoja.querySelectorAll('.falta').length;
+    const base=n?`<strong>${n}</strong> dato(s) por completar`:'✓ Contrato completo';
+    document.getElementById('ctFaltan').innerHTML=base;
+    clearTimeout(tHojas); tHojas=setTimeout(()=>{ const el=document.getElementById('ctFaltan'); if(!el) return; const pg=paginasContrato(c);
+      el.innerHTML=`${base} · ${pg.hojas} hoja${pg.hojas===1?'':'s'}${pg.hojaLegal?` · legalización de firmas en la hoja ${pg.hojaLegal}${pg.blanco?` (la ${pg.hojas+1} queda en blanco)`:''}`:''}`; },250); };
   const refrescar=()=>{ if(!c.htmlManual) hoja.innerHTML=htmlContrato(e,c); faltan(); };
   form.querySelectorAll('[data-ct]').forEach(i=>{ const k=i.dataset.ct; const ev=i.tagName==='SELECT'?'change':'input';
     i.addEventListener(ev,()=>{ c[k]=k==='salario'?r2(+i.value||0):i.value;
-      if(k==='puesto'){ const p=(e.puestos||[]).find(y=>y.nombre.toLowerCase()===i.value.trim().toLowerCase());
+      if(k==='puesto'){ const p=asegurarPuesto(e,i.value);
         if(p&&funcionesDe(p).length){ c.funciones=funcionesDe(p).join('\n'); form.querySelector('[data-ct="funciones"]').value=c.funciones; } }
       if(k==='jornada'){ c.horario=(JORNADAS[i.value]||JORNADAS.diurna).horario; form.querySelector('[data-ct="horario"]').value=c.horario; }
       visibilidad(); refrescar(); guardarPronto(); }); });
@@ -341,23 +371,53 @@ function enlazarEditorContrato(){
   visibilidad(); faltan();
 }
 /* Hoja lista para imprimir o para Word: los datos faltantes quedan como línea en blanco. */
+const HOJA_CONTRATO={anchoPx:608,altoPx:867};   // carta, márgenes 3 cm izquierda y 2.5 cm en los demás lados (96 px por pulgada)
 function documentoContrato(c,paraWord){
   const cuerpo=textoContrato(c).replace(/<span class="falta"[^>]*>\[[^\]]*\]<\/span>/g,'______________________');
+  let html=paraWord?cuerpo.replace(/<div class="ct-firmas"><div>(.*?)<\/div><div>(.*?)<\/div><\/div>/s,'<table class="firmas" width="100%"><tr><td>$1</td><td>$2</td></tr></table>'):cuerpo;
+  /* La legalización de firmas va en hoja aparte (en Word, desde una hoja nueva). */
+  if(paraWord) html=html.replace(/<p class="ct-legal">/,'<br clear="all" style="page-break-before:always"><p class="ct-legal">');
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Contrato No. ${c.numero}</title><style>
     @page{size:letter;margin:2.5cm 2.5cm 2.5cm 3cm}
-    body{font-family:'Times New Roman',Times,serif;font-size:12pt;line-height:1.5;color:#000;margin:0}
+    body{font-family:'Times New Roman',Times,serif;font-size:12pt;line-height:1.5;color:#000;margin:0;orphans:1;widows:1}
+    @media screen{body{width:${HOJA_CONTRATO.anchoPx}px}}
     p{margin:0 0 10pt;text-align:justify} .ct-num{text-align:right;font-size:11pt} .ct-titulo{text-align:center;font-size:14pt;margin:6pt 0 14pt;letter-spacing:.5pt}
     .ct-lista{margin:0 0 10pt 24pt} .ct-lista li{margin:0 0 4pt;text-align:justify}
-    .ct-firmas{display:flex;justify-content:space-between;gap:40pt;margin:60pt 0 30pt;text-align:center} .ct-firmas div{flex:1}
+    .ct-firmas{display:flex;justify-content:space-between;gap:40pt;margin:60pt 0 30pt;text-align:center;break-inside:avoid} .ct-firmas div{flex:1}
     .ct-linea{display:block;border-top:1px solid #000;margin-bottom:4pt}
-    ${paraWord?'table.firmas td{width:50%;text-align:center;padding-top:60pt}':''}
-  </style></head><body>${paraWord?cuerpo.replace(/<div class="ct-firmas"><div>(.*?)<\/div><div>(.*?)<\/div><\/div>/s,'<table class="firmas" width="100%"><tr><td>______________________________<br>$1</td><td>______________________________<br>$2</td></tr></table>'):cuerpo}</body></html>`;
+    .hoja-legal,.hoja-blanco{break-before:page;page-break-before:always} .hoja-blanco{height:1px}
+    table.firmas td{width:50%;text-align:center;padding-top:60pt;border-top:0}
+  </style></head><body><div id="ctCuerpo">${html}</div></body></html>`;
+}
+/* Separa la legalización en su propia hoja y la deja en hoja impar: mide cuántas hojas ocupa el contrato
+   y, si termina en hoja impar, deja una hoja en blanco (3 hojas de contrato → legalización en la 5). */
+function paginarContrato(doc){
+  const legal=doc.querySelector('#ctCuerpo .ct-legal'), cuerpo=doc.getElementById('ctCuerpo');
+  const hojas=Math.max(1,Math.ceil((cuerpo.getBoundingClientRect().height-(legal?legal.getBoundingClientRect().height:0)-1)/HOJA_CONTRATO.altoPx));
+  if(!legal) return {hojas,hojaLegal:null,blanco:false};
+  const caja=doc.createElement('div'); caja.className='hoja-legal';
+  let n=legal; const mover=[]; while(n){ mover.push(n); n=n.nextSibling; } mover.forEach(x=>caja.appendChild(x));
+  const blanco=hojas%2===1;
+  if(blanco){ const b=doc.createElement('div'); b.className='hoja-blanco'; b.innerHTML='&nbsp;'; doc.body.appendChild(b); }
+  doc.body.appendChild(caja);
+  return {hojas,hojaLegal:blanco?hojas+2:hojas+1,blanco};
+}
+function marcoMedida(){
+  let fr=document.getElementById('marcoContrato');
+  if(!fr){ fr=document.createElement('iframe'); fr.id='marcoContrato'; fr.setAttribute('aria-hidden','true'); fr.tabIndex=-1;
+    fr.style.cssText='position:fixed;left:-10000px;top:0;width:900px;height:600px;border:0;visibility:hidden'; document.body.appendChild(fr); }
+  return fr;
+}
+function paginasContrato(c){
+  const fr=marcoMedida(), d=fr.contentDocument; d.open(); d.write(documentoContrato(c,false)); d.close();
+  return paginarContrato(d);
 }
 ACCIONES.imprimirContrato=()=>{
   const c=(emp().contratos||[]).find(x=>x.id===contratoActual); if(!c) return;
-  const fr=document.createElement('iframe'); fr.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+  const fr=document.createElement('iframe'); fr.style.cssText='position:fixed;left:-10000px;top:0;width:900px;height:600px;border:0';
   document.body.appendChild(fr);
-  fr.contentDocument.open(); fr.contentDocument.write(documentoContrato(c,false)); fr.contentDocument.close();
+  const d=fr.contentDocument; d.open(); d.write(documentoContrato(c,false)); d.close();
+  paginarContrato(d);
   setTimeout(()=>{ try{ fr.contentWindow.focus(); fr.contentWindow.print(); }catch(err){} setTimeout(()=>fr.remove(),2000); },250);
 };
 ACCIONES.wordContrato=()=>{

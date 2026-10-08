@@ -261,11 +261,12 @@ function formEmpleado(existente){
   abrirModal(existente?'Editar empleado':'Agregar empleado',
     `<div class="rej">
       <div class="campo full"><label>Nombre completo</label><input name="nombre" value="${esc(x.nombre||'')}"></div>
-      <div class="campo"><label>Puesto</label><input name="puesto" list="dlPuestosEmp" value="${esc(x.puesto||'')}"><datalist id="dlPuestosEmp">${(e0.puestos||[]).map(p=>`<option value="${esc(p.nombre)}">`).join('')}</datalist></div>
+      <div class="campo"><label>Puesto</label><input name="puesto" list="dlPuestosEmp" value="${esc(x.puesto||'')}" placeholder="Escribí o elegí de la lista"><datalist id="dlPuestosEmp">${opcionesPuestos(e0)}</datalist></div>
       <div class="campo"><label>Salario base mensual</label><input name="salarioBase" type="number" step="0.01" min="0" value="${x.salarioBase||''}" placeholder="Sin la bonificación de Q250"></div>
       <div class="campo"><label>Fecha de ingreso</label><input name="fechaIngreso" type="date" value="${x.fechaIngreso||''}"></div>
       <div class="campo"><label>Correo (para avisarle de sus pagos)</label><input name="email" type="email" value="${esc(x.email||'')}" placeholder="nombre@correo.com"></div>
     </div>
+    <div id="funcionesPuesto" class="funciones-puesto" hidden></div>
     <p style="margin:6px 0 0;font-size:13px;color:var(--tinta-suave)">La fecha de ingreso se usa para calcular el
       aguinaldo y el Bono 14 proporcional si entró a mitad del período legal — no hace falta tocar nada más,
       el sistema lo prorratea solo.</p>
@@ -289,6 +290,9 @@ function formEmpleado(existente){
       if(dpiLimpio&&dpiLimpio.length!==13){avisar('El DPI tiene 13 dígitos (por ejemplo 2695 40784 0801).');return false}
       const personales={dpi:dpiLimpio?dpiFormato(dpiLimpio):'',fechaNac:d.fechaNac||'',sexo:d.sexo||'M',estadoCivil:d.estadoCivil||'',profesion:(d.profesion||'').trim(),
         nacionalidad:(d.nacionalidad||'').trim()||'guatemalteco',municipio:(d.municipio||'').trim(),departamento:(d.departamento||'').trim()};
+      /* El empleado queda ligado al puesto del catálogo (si viene de la base de puestos, se agrega solo). */
+      const pu=asegurarPuesto(e,d.puesto);
+      personales.puestoId=pu?pu.id:''; if(pu) d.puesto=pu.nombre;
       if(existente){
         existente.nombre=d.nombre.trim(); existente.puesto=d.puesto.trim(); existente.salarioBase=r2(salario);
         existente.fechaIngreso=d.fechaIngreso||existente.fechaIngreso||''; existente.email=(d.email||'').trim();
@@ -302,7 +306,14 @@ function formEmpleado(existente){
     },existente?'Guardar cambios':'Agregar empleado');
   /* Al elegir un puesto del catálogo con salario sugerido, se propone ese salario si todavía no hay uno. */
   const pu=mForm.querySelector('[name="puesto"]'), sal=mForm.querySelector('[name="salarioBase"]');
-  pu.addEventListener('change',()=>{ const p=(e0.puestos||[]).find(y=>y.nombre.toLowerCase()===pu.value.trim().toLowerCase()); if(p&&p.salario&&!sal.value) sal.value=p.salario; });
+  const verFunciones=()=>{
+    const n=pu.value.trim().toLowerCase(), p=(e0.puestos||[]).find(y=>y.nombre.toLowerCase()===n)||PUESTOS_BASE.find(y=>y.nombre.toLowerCase()===n);
+    const caja=document.getElementById('funcionesPuesto'); if(!caja) return;
+    caja.hidden=!p;
+    if(p) caja.innerHTML=`<strong>${esc(p.nombre)}</strong>${(e0.puestos||[]).includes(p)?'':' <span class="etiqueta">de la base de puestos: se agrega al guardar</span>'}<ul>${funcionesDe(p).map(f=>`<li>${esc(f)}</li>`).join('')}</ul>`;
+    if(p&&p.salario&&!sal.value) sal.value=p.salario;
+  };
+  pu.addEventListener('change',verFunciones); pu.addEventListener('input',verFunciones); verFunciones();
 }
 ACCIONES.alternarEmpleado=d=>{
   if(!puedeEliminar()){avisar('Tu rol no tiene permiso para dar de baja empleados. Pedile a tu gerente que lo haga.');return}
