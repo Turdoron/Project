@@ -342,6 +342,9 @@ nav .sub-cuerpo .app-sec:first-child{margin-top:6px}
 .ct-hoja .falta{background:#FFF1B8;color:#6B4E00;border-radius:3px;padding:0 3px;font-family:Inter,system-ui,sans-serif;font-size:.82em}
 .ct-hoja .ct-legal{margin-top:24px;font-size:14px}
 .lista-chequeo{display:flex;flex-direction:column;gap:8px}
+.ct-patrono{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:10px 14px;border:1px solid var(--linea);border-radius:var(--radio-chico);background:var(--papel);font-size:13.5px}
+.ct-patrono p{margin:0;line-height:1.5}
+.ct-patrono.incompleto{border-left:3px solid var(--alerta)}
 .funciones-puesto{margin-top:12px;padding:10px 14px;border:1px solid var(--linea);border-radius:var(--radio-chico);background:var(--papel);font-size:13px}
 .funciones-puesto ul{margin:6px 0 0;padding-left:18px;color:var(--tinta-suave)}
 .base-puestos{max-height:52vh;overflow:auto;padding-right:6px}

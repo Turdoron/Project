@@ -14,6 +14,7 @@ VISTAS.empresas=()=>{
     <td class="num">
       ${e.id===BD.activa?'<span class="ok">En uso</span>':`<button class="btn mini" data-accion="usarEmpresa" data-id="${e.id}">Usar</button>`}
       <button class="btn mini" data-accion="editarEmpresa" data-id="${e.id}">Editar</button>
+      <button class="btn mini sec" data-accion="datosContratoEmpresa" data-id="${e.id}">Representante legal</button>
       <button class="btn mini peligro" data-accion="borrarEmpresa" data-id="${e.id}">Eliminar</button>
     </td></tr>`).join('');
   return cab('Empresas','Cada empresa lleva su propio catálogo, sus partidas y su régimen. Solo ves las que creaste vos.',

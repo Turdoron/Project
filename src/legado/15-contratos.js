@@ -42,6 +42,25 @@ const ESTADOS_CIVILES={soltero:['soltero','soltera'],casado:['casado','casada'],
 const generoTxt=(sexo,m,f)=>sexo==='F'?f:m;
 const nacionalidadTxt=(nac,sexo)=>{ const n=(nac||'guatemalteco').trim().toLowerCase(); return sexo==='F'?n.replace(/o$/,'a'):n; };
 
+/* Dirección en letras, como se escribe en un contrato: "3av 3-80 zona 7" → "tercera avenida tres guion
+   ochenta, zona siete". Hasta la décima se usa el ordinal (primera avenida, quinta calle); después, el
+   número (once calle, treinta y tres avenida). Es una propuesta: se puede corregir a mano. */
+const ORDINALES_F=['','primera','segunda','tercera','cuarta','quinta','sexta','séptima','octava','novena','décima'];
+function direccionEnLetras(dir){
+  if(!dir) return '';
+  let t=' '+String(dir).replace(/\s+/g,' ').trim()+' ';
+  const via=(n,tipo)=>{ const k=+n; return `${k>=1&&k<=10?ORDINALES_F[k]:enteroEnLetras(k)} ${tipo}`; };
+  t=t.replace(/(\d+)\s*(?:a\.?|ª|°|º)?\s*(av(?:enida|e)?\.?)(?=[\s,"“])/gi,(m,n)=>via(n,'avenida'));
+  t=t.replace(/(\d+)\s*(?:a\.?|ª|°|º)?\s*(calle|cll?\.?|c\.)(?=[\s,"“])/gi,(m,n)=>via(n,'calle'));
+  t=t.replace(/\b(diagonal|diag\.?)\s*(\d+)/gi,(m,x,n)=>`diagonal ${enteroEnLetras(+n)}`);
+  t=t.replace(/(\d+)\s*-\s*(\d+)/g,(m,a,b)=>`${enteroEnLetras(+a)} guion ${enteroEnLetras(+b)}`);
+  t=t.replace(/\bz(?:ona|\.)\s*(\d+)/gi,(m,n)=>`zona ${enteroEnLetras(+n)}`);
+  t=t.replace(/\bkm\.?\s*([\d.]+)/gi,(m,n)=>`kilómetro ${String(n).split('.').map(x=>enteroEnLetras(+x)).join(' punto ')}`);
+  t=t.replace(/\b(col|res|resid|ofi?c?|loc|mun|depto|dpto)\.(?=\s)/gi,(m,a)=>({col:'Colonia',res:'Residenciales',resid:'Residenciales',of:'oficina',ofi:'oficina',ofic:'oficina',loc:'local',mun:'municipio',depto:'departamento',dpto:'departamento'})[a.toLowerCase()]||m);
+  t=t.replace(/\b(\d+)\b/g,(m,n)=>enteroEnLetras(+n));
+  return t.replace(/\s+,/g,',').replace(/\s+/g,' ').trim();
+}
+
 /* ---------- Puestos y funciones ---------- */
 /* Puesto del catálogo de la empresa; si no está pero existe en la base de puestos, se agrega solo. */
 function asegurarPuesto(e,nombre){
@@ -118,21 +137,31 @@ function datosContratoEmpresa(e){
   const d=e.datosContrato||{};
   const pareceSociedad=e.tipoSociedad==='sociedad'||/sociedad an[oó]nima|\bs\.\s?a\.?$/i.test(e.nombre||'');
   return {esSociedad:d.esSociedad!==undefined?!!d.esSociedad:pareceSociedad,ciudad:d.ciudad||'Guatemala',municipio:d.municipio||'Guatemala',departamento:d.departamento||'Guatemala',
-    rep:Object.assign({nombre:e.representante||'',sexo:'M',fechaNac:'',estadoCivil:'casado',profesion:'',nacionalidad:'guatemalteco',vecindad:'',dpi:''},d.rep||{}),
+    direccionLetras:d.direccionLetras||'',
+    cargo:d.cargo||'representante legal',
+    rep:Object.assign({nombre:(d.esSociedad!==undefined?d.esSociedad:pareceSociedad)?'':(e.representante||''),sexo:'M',fechaNac:'',estadoCivil:'casado',profesion:'',nacionalidad:'guatemalteco',vecindad:'',dpi:''},d.rep||{}),
     personeria:Object.assign({notario:'',fecha:'',registro:'',folio:'',libro:''},d.personeria||{})};
 }
-ACCIONES.datosContratoEmpresa=()=>{
-  const e=emp(), d=datosContratoEmpresa(e), r=d.rep, p=d.personeria, soc=d.esSociedad;
+ACCIONES.datosContratoEmpresa=(d0={})=>{
+  const e=(d0.id&&BD.empresas.find(x=>x.id===d0.id))||emp(), d=datosContratoEmpresa(e), r=d.rep, p=d.personeria, soc=d.esSociedad;
   const ec=Object.entries(ESTADOS_CIVILES).map(([k,v])=>`<option value="${k}"${r.estadoCivil===k?' selected':''}>${v[0]} / ${v[1]}</option>`).join('');
-  abrirModal('Datos de la empresa para los contratos',
+  const CARGOS=['representante legal','administrador único y representante legal','gerente general y representante legal','presidente del consejo de administración y representante legal'];
+  abrirModal(`Representante legal y datos para contratos — ${esc(e.nombre)}`,
     `<p style="margin:0 0 12px;font-size:13px;color:var(--tinta-suave)">Se llenan una sola vez y se usan en todos los contratos.</p>
     <div class="rej">
       <div class="campo full"><label>La empresa es</label><select name="esSociedad">
         <option value="si"${soc?' selected':''}>Sociedad (anónima u otra) — comparece su representante legal, nombrado por acta notarial</option>
         <option value="no"${soc?'':' selected'}>Empresa individual — comparece el propietario</option></select></div>
-      <div class="campo"><label>Municipio donde se firman</label><input name="municipio" value="${esc(d.municipio)}"></div>
+      <div class="campo full"><label>Dirección fiscal (como en el RTU)</label><input value="${esc(e.direccion||'')}" disabled></div>
+      <div class="campo full"><label>Dirección para el contrato (en letras)</label><textarea name="direccionLetras" rows="2" style="width:100%">${esc(d.direccionLetras||direccionEnLetras(e.direccion))}</textarea>
+        <span class="ayuda-campo">El sistema la escribe en letras a partir de la dirección fiscal; revisala y corregila si hace falta. <button type="button" class="btn mini sec" id="dirAuto">Volver a escribirla desde la dirección fiscal</button></span></div>
+      <div class="campo"><label>Municipio</label><input name="municipio" value="${esc(d.municipio)}"></div>
       <div class="campo"><label>Departamento</label><input name="departamento" value="${esc(d.departamento)}"></div>
-      <div class="campo full"><label id="lblRep">${soc?'Representante legal':'Propietario'} — nombre completo</label><input name="r_nombre" value="${esc(r.nombre)}"></div>
+    </div>
+    <h4 id="titRep" style="margin:16px 0 8px">${soc?'Representante legal (persona que firma por la sociedad)':'Propietario'}</h4>
+    <div class="rej">
+      <div class="campo full" id="campoCargo"${soc?'':' hidden'}><label>Cargo</label><select name="cargo">${CARGOS.map(x=>`<option value="${x}"${d.cargo===x?' selected':''}>${x.charAt(0).toUpperCase()+x.slice(1)}</option>`).join('')}</select></div>
+      <div class="campo full"><label id="lblRep">Nombre completo de la persona</label><input name="r_nombre" value="${esc(r.nombre)}" placeholder="Ej.: Julio Arnoldo González Aguilar"></div>
       <div class="campo"><label>Sexo</label><select name="r_sexo"><option value="M"${r.sexo!=='F'?' selected':''}>Masculino</option><option value="F"${r.sexo==='F'?' selected':''}>Femenino</option></select></div>
       <div class="campo"><label>Fecha de nacimiento</label><input name="r_fechaNac" type="date" value="${esc(r.fechaNac)}"></div>
       <div class="campo"><label>Estado civil</label><select name="r_estadoCivil">${ec}</select></div>
@@ -152,17 +181,19 @@ ACCIONES.datosContratoEmpresa=()=>{
     </div></div>`,
     async f=>{
       const socF=f.esSociedad==='si';
+      if(socF&&(f.r_nombre||'').trim().toLowerCase()===(e.nombre||'').trim().toLowerCase()){avisar('Ese es el nombre de la sociedad. Escribí el nombre de la persona que la representa (representante legal o administrador único).');return false}
       if(socF&&(!(f.p_registro||'').trim()||!(f.p_folio||'').trim()||!(f.p_libro||'').trim()||!(f.p_notario||'').trim()||!f.p_fecha)){
         if(!(await preguntar('Falta parte de la razón de nombramiento (notario, fecha, registro, folio o libro). En el contrato quedará marcado como pendiente.','Guardar así'))) return false; }
-      e.datosContrato={esSociedad:socF,municipio:(f.municipio||'').trim(),departamento:(f.departamento||'').trim(),ciudad:(f.municipio||'').trim(),
+      e.datosContrato={esSociedad:socF,cargo:f.cargo||'representante legal',direccionLetras:(f.direccionLetras||'').trim(),municipio:(f.municipio||'').trim(),departamento:(f.departamento||'').trim(),ciudad:(f.municipio||'').trim(),
         rep:{nombre:(f.r_nombre||'').trim(),sexo:f.r_sexo,fechaNac:f.r_fechaNac||'',estadoCivil:f.r_estadoCivil,profesion:(f.r_profesion||'').trim(),nacionalidad:(f.r_nacionalidad||'').trim(),vecindad:(f.r_vecindad||'').trim(),dpi:(f.r_dpi||'').trim()},
         personeria:socF?{notario:(f.p_notario||'').trim(),fecha:f.p_fecha||'',registro:(f.p_registro||'').trim(),folio:(f.p_folio||'').trim(),libro:(f.p_libro||'').trim()}:{}};
-      if(!e.representante&&e.datosContrato.rep.nombre) e.representante=e.datosContrato.rep.nombre;
       registrarLog('Actualizó los datos para contratos',e.nombre); guardar();
     },'Guardar');
   const g=n=>mForm.querySelector(`[name="${n}"]`);
+  document.getElementById('dirAuto').onclick=()=>{ g('direccionLetras').value=direccionEnLetras(e.direccion); };
   const act=()=>{ const so=g('esSociedad').value==='si';
-    document.getElementById('bloqueNombramiento').hidden=!so; document.getElementById('lblRep').textContent=(so?'Representante legal':'Propietario')+' — nombre completo';
+    document.getElementById('bloqueNombramiento').hidden=!so; document.getElementById('campoCargo').hidden=!so;
+    document.getElementById('titRep').textContent=so?'Representante legal (persona que firma por la sociedad)':'Propietario';
     const n=x=>x&&/^\d+$/.test(x.trim())?`${enteroEnLetras(+x).toUpperCase()} (${x.trim()})`:'—';
     document.getElementById('prevNombramiento').textContent=so?`Así queda: registro ${n(g('p_registro').value)}, folio ${n(g('p_folio').value)}, libro ${n(g('p_libro').value)} de Auxiliares de Comercio.`:''; };
   ['esSociedad','p_registro','p_folio','p_libro'].forEach(k=>{ const el=g(k); if(el){ el.addEventListener('input',act); el.addEventListener('change',act); } }); act();
@@ -199,17 +230,17 @@ function htmlContrato(e,c){
   const ecT=t.estadoCivil?ESTADOS_CIVILES[t.estadoCivil][sx==='F'?1:0]:'', ecR=r.estadoCivil?ESTADOS_CIVILES[r.estadoCivil][r.sexo==='F'?1:0]:'';
   const dpiT=dpiFormato(t.dpi), dpiR=dpiFormato(r.dpi);
   const emp_=`“${esc((e.nombre||'').toUpperCase())}”`;
-  const lugar=c.lugar||`${e.direccion||''}`;
+  const lugar=c.lugar||(dc.direccionLetras||direccionEnLetras(e.direccion)?`las instalaciones de ${emp_}, ubicadas en ${dc.direccionLetras||direccionEnLetras(e.direccion)}, del municipio de ${dc.municipio}, departamento de ${dc.departamento}`:'');
   const J=JORNADAS[c.jornada]||JORNADAS.diurna;
   const funciones=(c.funciones||'').split('\n').map(s=>s.trim()).filter(Boolean);
   const plazoTxt=c.plazo==='fijo'?`A PLAZO FIJO, hasta el ${c.plazoHasta?fechaEnLetras(c.plazoHasta):faltaCt('fecha de terminación')}`
     :c.plazo==='obra'?`PARA OBRA DETERMINADA, que consiste en: ${valCt(c.obra,'descripción de la obra')}`:'TIEMPO INDEFINIDO';
   const n=[]; const cl_=(titulo,txt)=>n.push(`<p><strong>${n.length+1}. ${titulo}:</strong> ${txt}</p>`);
   const comp=soc
-    ?`comparece ${generoTxt(r.sexo,'el señor','la señora')} ${valCt((r.nombre||'').toUpperCase(),'nombre del representante legal')}, de ${edadR!==null?enteroEnLetras(edadR):faltaCt('edad')} años de edad, ${valCt(ecR,'estado civil')}, ${valCt(r.profesion,'profesión')}, ${esc(nacionalidadTxt(r.nacionalidad,r.sexo))}, ${generoTxt(r.sexo,'vecino','vecina')} del municipio de ${valCt(r.vecindad,'vecindad')}, quien se identifica con Documento Personal de Identificación con Código Único de Identificación número ${dpiR?`${cifrasEnLetras(dpiR)} (${esc(dpiR)})`:faltaCt('DPI del representante')}, extendido por el Registro Nacional de las Personas de la República de Guatemala, quien actúa en su calidad de representante legal de la entidad ${emp_}, lo que acredita con el acta notarial de su nombramiento autorizada por el Notario ${valCt(per.notario,'notario')}, el ${per.fecha?fechaEnLetras(per.fecha):faltaCt('fecha del acta')}, inscrita en el Registro Mercantil General de la República bajo el número ${per.registro?`${enteroEnLetras(+per.registro).toUpperCase()} (${esc(per.registro)})`:faltaCt('registro')}, folio ${per.folio?`${enteroEnLetras(+per.folio).toUpperCase()} (${esc(per.folio)})`:faltaCt('folio')}, del libro ${per.libro?`${enteroEnLetras(+per.libro).toUpperCase()} (${esc(per.libro)})`:faltaCt('libro')} de Auxiliares de Comercio`
+    ?`comparece ${generoTxt(r.sexo,'el','la')} ${esc(dc.cargo.split(' y ')[0])} de la citada entidad, ${generoTxt(r.sexo,'el señor','la señora')} ${valCt((r.nombre||'').toUpperCase(),'nombre del representante legal')}, de ${edadR!==null?enteroEnLetras(edadR):faltaCt('edad')} años de edad, ${valCt(ecR,'estado civil')}, ${valCt(r.profesion,'profesión')}, ${esc(nacionalidadTxt(r.nacionalidad,r.sexo))}, ${generoTxt(r.sexo,'vecino','vecina')} del municipio de ${valCt(r.vecindad,'vecindad')}, quien se identifica con Documento Personal de Identificación con Código Único de Identificación número ${dpiR?`${cifrasEnLetras(dpiR)} (${esc(dpiR)})`:faltaCt('DPI del representante')}, extendido por el Registro Nacional de las Personas de la República de Guatemala, quien sustenta la representación legal de la entidad ${emp_} en su calidad de ${esc(dc.cargo)}, mediante acta notarial autorizada por el Notario ${valCt(per.notario,'notario')}, el día ${per.fecha?fechaEnLetras(per.fecha):faltaCt('fecha del acta')}, inscrita en el Registro Mercantil General de la República bajo el registro número ${per.registro?`${enteroEnLetras(+per.registro).toUpperCase()} (${esc(per.registro)})`:faltaCt('registro')}, folio ${per.folio?`${enteroEnLetras(+per.folio).toUpperCase()} (${esc(per.folio)})`:faltaCt('folio')}, del libro ${per.libro?`${enteroEnLetras(+per.libro).toUpperCase()} (${esc(per.libro)})`:faltaCt('libro')} de Auxiliares de Comercio`
     :`comparece ${generoTxt(r.sexo,'el señor','la señora')} ${valCt((r.nombre||'').toUpperCase(),'nombre del propietario')}, de ${edadR!==null?enteroEnLetras(edadR):faltaCt('edad')} años de edad, ${valCt(ecR,'estado civil')}, ${valCt(r.profesion,'profesión')}, ${esc(nacionalidadTxt(r.nacionalidad,r.sexo))}, ${generoTxt(r.sexo,'vecino','vecina')} del municipio de ${valCt(r.vecindad,'vecindad')}, quien se identifica con Documento Personal de Identificación con Código Único de Identificación número ${dpiR?`${cifrasEnLetras(dpiR)} (${esc(dpiR)})`:faltaCt('DPI del propietario')}, extendido por el Registro Nacional de las Personas de la República de Guatemala, en su calidad de ${generoTxt(r.sexo,'propietario','propietaria')} de la empresa ${emp_}`;
   const encabezado=`<p class="ct-num">Contrato No. ${esc(String(c.numero||''))}</p><h1 class="ct-titulo">CONTRATO INDIVIDUAL DE TRABAJO</h1>
-    <p>En el municipio de ${valCt(dc.municipio,'municipio')}, departamento de ${valCt(dc.departamento,'departamento')}, el ${c.fecha?fechaEnLetras(c.fecha):faltaCt('fecha')}, constituidos en las instalaciones de ${emp_}, ubicada en ${valCt(e.direccion,'dirección de la empresa')}; por una parte ${comp}; y por la otra parte comparece ${valCt((t.nombre||'').toUpperCase(),'nombre del trabajador')}, de ${edadT!==null?enteroEnLetras(edadT):faltaCt('edad')} años de edad, ${valCt(ecT,'estado civil')}, ${valCt(t.profesion,'profesión u oficio')}, ${esc(nacionalidadTxt(t.nacionalidad,sx))}, ${generoTxt(sx,'vecino','vecina')} del municipio de ${valCt(t.municipio,'municipio')}, departamento de ${valCt(t.departamento,'departamento')}, quien se identifica con Documento Personal de Identificación con Código Único de Identificación número ${dpiT?`${cifrasEnLetras(dpiT)} (${esc(dpiT)})`:faltaCt('DPI del trabajador')}, extendido por el Registro Nacional de las Personas de la República de Guatemala; quienes para los efectos de este contrato se denominarán “EL PATRONO” y “EL TRABAJADOR”, respectivamente, y celebran el presente CONTRATO INDIVIDUAL DE TRABAJO de conformidad con las cláusulas siguientes:</p>`;
+    <p>En el municipio de ${valCt(dc.municipio,'municipio')}, departamento de ${valCt(dc.departamento,'departamento')}, el ${c.fecha?fechaEnLetras(c.fecha):faltaCt('fecha')}, constituidos en las instalaciones de ${soc?'la entidad ':'la empresa '}${emp_}, ubicada en ${valCt(dc.direccionLetras||direccionEnLetras(e.direccion),'dirección de la empresa')}, del municipio de ${valCt(dc.municipio,'municipio')}, departamento de ${valCt(dc.departamento,'departamento')}; por una parte ${comp}; y por la otra parte comparece ${valCt((t.nombre||'').toUpperCase(),'nombre del trabajador')}, de ${edadT!==null?enteroEnLetras(edadT):faltaCt('edad')} años de edad, ${valCt(ecT,'estado civil')}, ${valCt(t.profesion,'profesión u oficio')}, ${esc(nacionalidadTxt(t.nacionalidad,sx))}, ${generoTxt(sx,'vecino','vecina')} del municipio de ${valCt(t.municipio,'municipio')}, departamento de ${valCt(t.departamento,'departamento')}, quien se identifica con Documento Personal de Identificación con Código Único de Identificación número ${dpiT?`${cifrasEnLetras(dpiT)} (${esc(dpiT)})`:faltaCt('DPI del trabajador')}, extendido por el Registro Nacional de las Personas de la República de Guatemala; quienes para los efectos de este contrato se denominarán “EL PATRONO” y “EL TRABAJADOR”, respectivamente, y celebran el presente CONTRATO INDIVIDUAL DE TRABAJO de conformidad con las cláusulas siguientes:</p>`;
   cl_('INICIO DE LA RELACIÓN DE TRABAJO',`La relación de trabajo se inicia el ${c.fechaInicio?fechaEnLetras(c.fechaInicio):faltaCt('fecha de inicio')}.`);
   cl_('CARGO Y SERVICIOS DEL TRABAJADOR',`El trabajador desempeñará su trabajo con la eficiencia y esmero apropiados, en la forma, tiempo y lugar indicados por el patrono, ocupando el cargo de ${valCt((c.puesto||'').toUpperCase(),'puesto')}, y le corresponden los servicios inherentes al mismo, que de manera enunciativa y no limitativa son los siguientes:</p>${funciones.length?`<ol class="ct-lista" type="a">${funciones.map(f=>`<li>${esc(f)}</li>`).join('')}</ol>`:`<p>${faltaCt('funciones del puesto')}</p>`}<p>`);
   cl_('LUGAR DE PRESTACIÓN DE LOS SERVICIOS',`Los servicios se prestarán en ${valCt(lugar,'lugar de trabajo')}, y en cualquier otro lugar que por la naturaleza del trabajo así se requiera dentro de la República de Guatemala, previa notificación del jefe inmediato.`);
@@ -246,7 +277,7 @@ VISTAS.contratos=()=>{
   const dc=datosContratoEmpresa(e), faltaEmp=!dc.rep.nombre||!dc.rep.dpi||!e.direccion;
   const nombreEmp=id=>((e.empleados||[]).find(x=>x.id===id)||{}).nombre||'(empleado eliminado)';
   return cab('Contratos de trabajo','Contrato individual de trabajo con los datos de la empresa y del trabajador. Se llena con un formulario, se ve en vivo y se puede corregir a mano.',
-    `<button class="btn sec" data-accion="datosContratoEmpresa">Datos de la empresa</button><button class="btn" data-accion="nuevoContrato">Nuevo contrato</button>`)
+    `<button class="btn sec" data-accion="datosContratoEmpresa">${dc.esSociedad?'Representante legal y datos de la empresa':'Propietario y datos de la empresa'}</button><button class="btn" data-accion="nuevoContrato">Nuevo contrato</button>`)
   +(faltaEmp?`<div class="aviso">Antes del primer contrato completá los <strong>datos de la empresa</strong> (${dc.esSociedad?'representante legal y su razón de nombramiento':'propietario'}, DPI y dirección). Se llenan una sola vez. <button class="btn mini" data-accion="datosContratoEmpresa" style="margin-left:6px">Completar</button></div>`:'')
   +(lista.length?`<table><thead><tr><th>No.</th><th>Trabajador</th><th>Puesto</th><th>Inicio</th><th>Plazo</th><th>Estado</th><th class="num"></th></tr></thead><tbody>
     ${lista.map(c=>`<tr><td>${c.numero}</td><td>${esc(nombreEmp(c.empleadoId))}</td><td>${esc(c.puesto||'—')}</td><td>${fFecha(c.fechaInicio)}</td><td>${esc(PLAZOS_CONTRATO[c.plazo]||'')}</td>
@@ -290,6 +321,13 @@ VISTAS.contratoEditar=()=>{
     <form class="ct-form" id="ctForm" autocomplete="off">
       ${manual?`<div class="aviso">Editaste el texto a mano, así que el formulario está bloqueado para no borrar tus cambios. <button type="button" class="btn mini" data-accion="rearmarContrato">Volver a armar desde el formulario</button></div>`:''}
       <fieldset${dis}>
+      <h3>Patrono</h3>
+      ${(()=>{ const dc=datosContratoEmpresa(e), r=dc.rep, per=dc.personeria;
+        const okRep=r.nombre&&r.dpi&&(!dc.esSociedad||(per.notario&&per.fecha&&per.registro&&per.folio&&per.libro));
+        return `<div class="ct-patrono${okRep?'':' incompleto'}"><p><strong>${esc(e.nombre)}</strong>${dc.esSociedad?' (sociedad)':' (empresa individual)'}<br>
+          ${dc.esSociedad?`${esc(dc.cargo.charAt(0).toUpperCase()+dc.cargo.slice(1))}: `:'Propietario: '}${r.nombre?esc(r.nombre):'<em>sin definir</em>'}
+          ${dc.esSociedad?`<br>Nombramiento: ${per.registro?`registro ${esc(per.registro)}, folio ${esc(per.folio||'—')}, libro ${esc(per.libro||'—')}`:'<em>sin razón de nombramiento</em>'}`:''}</p>
+          <button type="button" class="btn mini${okRep?' sec':''}" data-accion="datosContratoEmpresa">${okRep?'Editar':'Completar'} ${dc.esSociedad?'representante legal':'propietario'}</button></div>`; })()}
       <h3>Trabajador</h3>
       <div class="rej">
         <div class="campo"><label>DPI (CUI)</label><input data-emp="dpi" value="${esc(t.dpi||'')}" placeholder="0000 00000 0000" inputmode="numeric"></div>
