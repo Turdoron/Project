@@ -446,7 +446,7 @@ VISTAS.contratoEditar=()=>{
             <button type="button" class="btn mini sec" data-quitar-desc="${i}" aria-label="Quitar este descanso">Quitar</button></div>`).join('')}
           <button type="button" class="btn mini sec" id="ctAgregarDesc">+ Agregar descanso</button></div>
         <div class="campo full" id="ctResumenJornada" aria-live="polite"></div>
-        <div class="campo"><label>Salario mensual (Q)</label><input data-ct="salario" type="number" step="0.01" min="0" value="${c.salario||''}"></div>
+        <div class="campo"><label for="ctSalario">Salario mensual sin bonificaciones (Q)</label><input id="ctSalario" data-ct="salario" type="number" step="0.01" min="0" value="${c.salario||''}" aria-describedby="ctSalarioAyuda"><span class="ayuda-campo" id="ctSalarioAyuda">Solo el salario ordinario. No sumes la bonificación incentivo de Q 250.00: el contrato la agrega aparte.</span></div>
         <div class="campo"><label>Pago</label><select data-ct="pago">${opt(PAGOS_CONTRATO,c.pago)}</select></div>
         <div class="campo full"><label>Lugar de trabajo</label><input data-ct="lugar" value="${esc(c.lugar||'')}" placeholder="Vacío: las instalaciones de la empresa"><span class="ayuda-campo">Escribila como quieras (con números): en el contrato sale en letras.</span></div>
       </div>
