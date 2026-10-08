@@ -381,8 +381,7 @@ VISTAS.contratoEditar=()=>{
   const manual=!!c.htmlManual, dis=manual?' disabled':'';
   return cab(`Contrato No. ${c.numero} — ${esc(t.nombre||'')}`,'A la izquierda los datos; a la derecha cómo queda el contrato. Lo que falta se marca en amarillo.',
     `<button class="btn sec" data-accion="volverContratos">Volver</button>
-     <button class="btn sec" data-accion="wordContrato">Descargar Word</button>
-     <button class="btn" data-accion="imprimirContrato">Imprimir o guardar PDF</button>`)
+     <button class="btn" data-accion="pdfContrato">Descargar PDF</button>`)
   +`<div class="ct-editor">
     <form class="ct-form" id="ctForm" autocomplete="off">
       ${manual?`<div class="aviso">Editaste el texto a mano, así que el formulario está bloqueado para no borrar tus cambios. <button type="button" class="btn mini" data-accion="rearmarContrato">Volver a armar desde el formulario</button></div>`:''}
@@ -460,7 +459,7 @@ function enlazarEditorContrato(){
   const faltan=()=>{ const n=hoja.querySelectorAll('.falta').length;
     const base=n?`<strong>${n}</strong> dato(s) por completar`:'✓ Contrato completo';
     document.getElementById('ctFaltan').innerHTML=base;
-    clearTimeout(tHojas); tHojas=setTimeout(()=>{ const el=document.getElementById('ctFaltan'); if(!el) return; const pg=paginasContrato(c);
+    clearTimeout(tHojas); tHojas=setTimeout(async()=>{ let pg; try{ pg=await paginasContrato(c); }catch(err){ return; } const el=document.getElementById('ctFaltan'); if(!el) return;
       el.innerHTML=`${base} · ${pg.hojas} hoja${pg.hojas===1?'':'s'}${pg.hojaLegal?` · legalización de firmas en la hoja ${pg.hojaLegal}${pg.blanco?` (la ${pg.hojas+1} queda en blanco)`:''}`:''}`; },250); };
   const refrescar=()=>{ if(!c.htmlManual) hoja.innerHTML=htmlContrato(e,c); faltan(); };
   form.querySelectorAll('[data-ct]').forEach(i=>{ const k=i.dataset.ct; const ev=i.tagName==='SELECT'?'change':'input';
@@ -491,60 +490,106 @@ function enlazarEditorContrato(){
   };
   visibilidad(); faltan();
 }
-/* Hoja lista para imprimir o para Word: los datos faltantes quedan como línea en blanco. */
-const HOJA_CONTRATO={anchoPx:608,altoPx:867};   // carta, márgenes 3 cm izquierda y 2.5 cm en los demás lados (96 px por pulgada)
-function documentoContrato(c,paraWord){
-  const cuerpo=textoContrato(c).replace(/<span class="falta"[^>]*>\[[^\]]*\]<\/span>/g,'______________________');
-  let html=paraWord?cuerpo.replace(/<div class="ct-firmas"><div>(.*?)<\/div><div>(.*?)<\/div><\/div>/s,'<table class="firmas" width="100%"><tr><td>$1</td><td>$2</td></tr></table>'):cuerpo;
-  /* La legalización de firmas va en hoja aparte (en Word, desde una hoja nueva). */
-  if(paraWord) html=html.replace(/<p class="ct-legal">/,'<br clear="all" style="page-break-before:always"><p class="ct-legal">');
-  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Contrato No. ${c.numero}</title><style>
-    @page{size:letter;margin:2.5cm 2.5cm 2.5cm 3cm}
-    body{font-family:'Times New Roman',Times,serif;font-size:12pt;line-height:1.5;color:#000;margin:0;orphans:1;widows:1}
-    @media screen{body{width:${HOJA_CONTRATO.anchoPx}px}}
-    p{margin:0 0 10pt;text-align:justify} .ct-num{text-align:right;font-size:11pt} .ct-titulo{text-align:center;font-size:14pt;margin:6pt 0 14pt;letter-spacing:.5pt}
-    .ct-lista{margin:0 0 10pt 24pt} .ct-lista li{margin:0 0 4pt;text-align:justify}
-    .ct-firmas{display:flex;justify-content:space-between;gap:40pt;margin:60pt 0 30pt;text-align:center;break-inside:avoid} .ct-firmas div{flex:1}
-    .ct-linea{display:block;border-top:1px solid #000;margin-bottom:4pt}
-    .hoja-legal,.hoja-blanco{break-before:page;page-break-before:always} .hoja-blanco{height:1px}
-    table.firmas td{width:50%;text-align:center;padding-top:60pt;border-top:0}
-  </style></head><body><div id="ctCuerpo">${html}</div></body></html>`;
+/* ---------- PDF del contrato ----------
+   Se arma aquí mismo (no con la impresión del navegador), así el número de hojas es exacto en cualquier
+   computadora: carta, márgenes de 2.54 cm, Times 12, interlineado 1.5, texto justificado. La legalización
+   de firmas va sola y última, en hoja impar: si el contrato termina en hoja impar, la siguiente queda en
+   blanco (contrato de 3 hojas → hoja 4 en blanco → legalización en la 5). */
+const PDF_CT={ancho:612,alto:792,margen:72,tam:12,interlinea:18,espacioParrafo:8};
+/* Del HTML del contrato (armado o corregido a mano) a bloques: párrafos con sus tramos en negrita o cursiva. */
+function bloquesContrato(html){
+  const raiz=document.createElement('div');
+  raiz.innerHTML=html.replace(/<span class="falta"[^>]*>\[[^\]]*\]<\/span>/g,'______________________');
+  const tramos=(nodo,b,i,out)=>{ nodo.childNodes.forEach(n=>{
+    if(n.nodeType===3){ if(n.textContent) out.push({t:n.textContent,b,i}); return; }
+    if(n.nodeType!==1) return;
+    const tag=n.tagName;
+    if(tag==='BR'){ out.push({br:true}); return; }
+    if(['OL','UL','P','DIV','H1','H2','H3'].includes(tag)&&out.length){ out.push({br:true}); }
+    tramos(n,b||tag==='STRONG'||tag==='B'||/^H\d$/.test(tag),i||tag==='EM'||tag==='I',out);
+  }); return out; };
+  const bloques=[];
+  const visitar=el=>{ [...el.children].forEach(n=>{
+    const tag=n.tagName, cls=n.className||'';
+    if(cls.includes('ct-firmas')){ bloques.push({tipo:'firmas',cols:[...n.children].map(d=>tramos(d,false,false,[]).filter(x=>!x.br).map(x=>x.t).join(' ').replace(/\s+/g,' ').trim())}); return; }
+    if(tag==='OL'||tag==='UL'){ [...n.children].forEach((li,k)=>bloques.push({tipo:'item',marca:tag==='OL'?`${String.fromCharCode(97+k)}.`:'•',tramos:tramos(li,false,false,[])})); return; }
+    if(tag==='DIV'&&!cls){ visitar(n); return; }
+    const t=tramos(n,false,false,[]); if(!t.some(x=>x.t&&x.t.trim())) return;
+    bloques.push({tipo:/^H\d$/.test(tag)||cls.includes('ct-titulo')?'titulo':cls.includes('ct-num')?'num':'parrafo',legal:cls.includes('ct-legal'),tramos:t});
+  }); };
+  visitar(raiz);
+  return bloques;
 }
-/* Separa la legalización en su propia hoja y la deja en hoja impar: mide cuántas hojas ocupa el contrato
-   y, si termina en hoja impar, deja una hoja en blanco (3 hojas de contrato → legalización en la 5). */
-function paginarContrato(doc){
-  const legal=doc.querySelector('#ctCuerpo .ct-legal'), cuerpo=doc.getElementById('ctCuerpo');
-  const hojas=Math.max(1,Math.ceil((cuerpo.getBoundingClientRect().height-(legal?legal.getBoundingClientRect().height:0)-1)/HOJA_CONTRATO.altoPx));
-  if(!legal) return {hojas,hojaLegal:null,blanco:false};
-  const caja=doc.createElement('div'); caja.className='hoja-legal';
-  let n=legal; const mover=[]; while(n){ mover.push(n); n=n.nextSibling; } mover.forEach(x=>caja.appendChild(x));
-  const blanco=hojas%2===1;
-  if(blanco){ const b=doc.createElement('div'); b.className='hoja-blanco'; b.innerHTML='&nbsp;'; doc.body.appendChild(b); }
-  doc.body.appendChild(caja);
-  return {hojas,hojaLegal:blanco?hojas+2:hojas+1,blanco};
+function armarPdfContrato(jsPDF,c){
+  const doc=new jsPDF({unit:'pt',format:'letter'}), P=PDF_CT, x0=P.margen, ancho=P.ancho-2*P.margen, abajo=P.alto-P.margen;
+  let y=P.margen;
+  const fuente=(b,i,tam)=>{ doc.setFont('times',b&&i?'bolditalic':b?'bold':i?'italic':'normal'); doc.setFontSize(tam); };
+  const nuevaHoja=()=>{ doc.addPage(); y=P.margen; };
+  /* Escribe tramos con salto de línea y justificación; x/w: área disponible. */
+  const escribir=(tramos,{x=x0,w=ancho,alinear='justify',tam=P.tam,lh=P.interlinea,marca=null,sangria=0}={})=>{
+    const piezas=[]; let espacio=false;
+    tramos.forEach(r=>{ if(r.br){ piezas.push({br:true}); espacio=false; return; }
+      r.t.split(/(\s+)/).forEach(fr=>{ if(!fr) return; if(/^\s+$/.test(fr)){ espacio=true; return; }
+        fuente(r.b,r.i,tam); piezas.push({t:fr,b:r.b,i:r.i,w:doc.getTextWidth(fr),esp:espacio}); espacio=false; }); });
+    fuente(false,false,tam); const anchoEsp=doc.getTextWidth(' ');
+    const lineas=[]; let actual=[], usado=0;
+    const cerrar=(ultima)=>{ if(actual.length) lineas.push({p:actual,ultima}); actual=[]; usado=0; };
+    piezas.forEach(pz=>{
+      if(pz.br){ cerrar(true); return; }
+      const extra=(actual.length&&pz.esp?anchoEsp:0);
+      if(actual.length&&usado+extra+pz.w>w-sangria&&pz.esp){ cerrar(false); actual.push({...pz,esp:false}); usado=pz.w; return; }
+      actual.push(actual.length?pz:{...pz,esp:false}); usado+=extra+pz.w;
+    });
+    cerrar(true);
+    lineas.forEach((ln,k)=>{
+      if(y+lh>abajo+2) nuevaHoja();
+      const xi=x+(k===0?0:sangria), wi=w-(k===0?0:sangria);
+      const huecos=ln.p.filter((q,j)=>j>0&&q.esp).length, libre=wi-ln.p.reduce((s2,q,j)=>s2+q.w+(j>0&&q.esp?anchoEsp:0),0);
+      const extraHueco=alinear==='justify'&&!ln.ultima&&huecos?libre/huecos:0;
+      let cx=alinear==='center'?xi+libre/2:alinear==='right'?xi+libre:xi;
+      if(marca&&k===0){ fuente(false,false,tam); doc.text(marca,x-18,y+tam); }
+      ln.p.forEach((q,j)=>{ if(j>0&&q.esp) cx+=anchoEsp+extraHueco; fuente(q.b,q.i,tam); doc.text(q.t,cx,y+tam); cx+=q.w; });
+      y+=lh;
+    });
+  };
+  const bloques=bloquesContrato(textoContrato(c));
+  const iLegal=bloques.findIndex(bq=>bq.legal);
+  const cuerpo=iLegal>=0?bloques.slice(0,iLegal):bloques, legal=iLegal>=0?bloques.slice(iLegal):[];
+  const pintarBloque=bq=>{
+    if(bq.tipo==='num'){ escribir(bq.tramos,{alinear:'right',tam:11,lh:16}); y+=4; }
+    else if(bq.tipo==='titulo'){ escribir(bq.tramos.map(r=>({...r,b:true})),{alinear:'center',tam:14,lh:20}); y+=10; }
+    else if(bq.tipo==='item'){ escribir(bq.tramos,{x:x0+24,w:ancho-24,marca:bq.marca}); y+=3; }
+    else if(bq.tipo==='firmas'){
+      const alto=60+16*3; if(y+alto>abajo) nuevaHoja();
+      y+=60; const col=(ancho-40)/2;
+      bq.cols.forEach((txt,k)=>{ const cx=x0+k*(col+40); doc.setLineWidth(.6); doc.line(cx,y,cx+col,y);
+        const [nombre,...resto]=txt.split(/\s(?=EL (?:TRABAJADOR|PATRONO)$)/); fuente(false,false,11);
+        doc.text(nombre||'',cx+col/2,y+14,{align:'center'}); if(resto.length){ fuente(true,false,10); doc.text(resto.join(' '),cx+col/2,y+28,{align:'center'}); } });
+      y+=40;
+    }
+    else { escribir(bq.tramos); y+=P.espacioParrafo; }
+  };
+  cuerpo.forEach(pintarBloque);
+  const hojas=doc.getNumberOfPages();
+  let hojaLegal=null, blanco=false;
+  if(legal.length){
+    blanco=hojas%2===1;
+    if(blanco) nuevaHoja();          // hoja en blanco para que la legalización caiga en hoja impar
+    nuevaHoja(); hojaLegal=doc.getNumberOfPages();
+    legal.forEach(pintarBloque);
+  }
+  return {doc,hojas,hojaLegal,blanco,total:doc.getNumberOfPages()};
 }
-function marcoMedida(){
-  let fr=document.getElementById('marcoContrato');
-  if(!fr){ fr=document.createElement('iframe'); fr.id='marcoContrato'; fr.setAttribute('aria-hidden','true'); fr.tabIndex=-1;
-    fr.style.cssText='position:fixed;left:-10000px;top:0;width:900px;height:600px;border:0;visibility:hidden'; document.body.appendChild(fr); }
-  return fr;
+async function paginasContrato(c){
+  const jsPDF=await cargarJsPDF(); const r=armarPdfContrato(jsPDF,c);
+  return {hojas:r.hojas,hojaLegal:r.hojaLegal,blanco:r.blanco};
 }
-function paginasContrato(c){
-  const fr=marcoMedida(), d=fr.contentDocument; d.open(); d.write(documentoContrato(c,false)); d.close();
-  return paginarContrato(d);
-}
-ACCIONES.imprimirContrato=()=>{
-  const c=(emp().contratos||[]).find(x=>x.id===contratoActual); if(!c) return;
-  const fr=document.createElement('iframe'); fr.style.cssText='position:fixed;left:-10000px;top:0;width:900px;height:600px;border:0';
-  document.body.appendChild(fr);
-  const d=fr.contentDocument; d.open(); d.write(documentoContrato(c,false)); d.close();
-  paginarContrato(d);
-  setTimeout(()=>{ try{ fr.contentWindow.focus(); fr.contentWindow.print(); }catch(err){} setTimeout(()=>fr.remove(),2000); },250);
-};
-ACCIONES.wordContrato=()=>{
+ACCIONES.pdfContrato=async()=>{
   const e=emp(), c=(e.contratos||[]).find(x=>x.id===contratoActual); if(!c) return;
   const t=(e.empleados||[]).find(x=>x.id===c.empleadoId)||{};
-  const blob=new Blob(['﻿'+documentoContrato(c,true)],{type:'application/msword'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`Contrato-${c.numero}-${archivoSeguro(t.nombre||'trabajador')}.doc`;
-  document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },500);
+  try{
+    const jsPDF=await cargarJsPDF(), r=armarPdfContrato(jsPDF,c);
+    r.doc.save(`Contrato-${c.numero}-${archivoSeguro(t.nombre||'trabajador')}.pdf`);
+    registrarLog('Descargó un contrato de trabajo',`No. ${c.numero} — ${t.nombre||''}`);
+  }catch(err){ avisar('No se pudo generar el PDF: '+err.message+'\n\nEl generador se descarga de internet la primera vez, así que necesitás conexión.'); }
 };
