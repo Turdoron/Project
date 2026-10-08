@@ -256,33 +256,53 @@ ACCIONES.editarEmpleado=d=>{
   const e=emp(); formEmpleado(e.empleados.find(x=>x.id===d.id));
 };
 function formEmpleado(existente){
-  const x=existente||{};
+  const x=existente||{}, e0=emp();
+  const ec=Object.entries(ESTADOS_CIVILES).map(([k,v])=>`<option value="${k}"${x.estadoCivil===k?' selected':''}>${v[0]} / ${v[1]}</option>`).join('');
   abrirModal(existente?'Editar empleado':'Agregar empleado',
     `<div class="rej">
       <div class="campo full"><label>Nombre completo</label><input name="nombre" value="${esc(x.nombre||'')}"></div>
-      <div class="campo"><label>Puesto</label><input name="puesto" value="${esc(x.puesto||'')}"></div>
+      <div class="campo"><label>Puesto</label><input name="puesto" list="dlPuestosEmp" value="${esc(x.puesto||'')}"><datalist id="dlPuestosEmp">${(e0.puestos||[]).map(p=>`<option value="${esc(p.nombre)}">`).join('')}</datalist></div>
       <div class="campo"><label>Salario base mensual</label><input name="salarioBase" type="number" step="0.01" min="0" value="${x.salarioBase||''}" placeholder="Sin la bonificación de Q250"></div>
       <div class="campo"><label>Fecha de ingreso</label><input name="fechaIngreso" type="date" value="${x.fechaIngreso||''}"></div>
       <div class="campo"><label>Correo (para avisarle de sus pagos)</label><input name="email" type="email" value="${esc(x.email||'')}" placeholder="nombre@correo.com"></div>
     </div>
     <p style="margin:6px 0 0;font-size:13px;color:var(--tinta-suave)">La fecha de ingreso se usa para calcular el
       aguinaldo y el Bono 14 proporcional si entró a mitad del período legal — no hace falta tocar nada más,
-      el sistema lo prorratea solo.</p>`,
+      el sistema lo prorratea solo.</p>
+    <details class="datos-personales"${x.dpi||x.fechaNac?' open':''}><summary>Datos personales (para el contrato de trabajo)</summary>
+      <div class="rej" style="margin-top:10px">
+        <div class="campo"><label>DPI (CUI)</label><input name="dpi" value="${esc(x.dpi||'')}" placeholder="0000 00000 0000" inputmode="numeric"></div>
+        <div class="campo"><label>Fecha de nacimiento</label><input name="fechaNac" type="date" value="${esc(x.fechaNac||'')}"></div>
+        <div class="campo"><label>Sexo</label><select name="sexo"><option value="M"${x.sexo!=='F'?' selected':''}>Masculino</option><option value="F"${x.sexo==='F'?' selected':''}>Femenino</option></select></div>
+        <div class="campo"><label>Estado civil</label><select name="estadoCivil"><option value="">—</option>${ec}</select></div>
+        <div class="campo"><label>Profesión u oficio</label><input name="profesion" value="${esc(x.profesion||'')}"></div>
+        <div class="campo"><label>Nacionalidad</label><input name="nacionalidad" value="${esc(x.nacionalidad||'guatemalteco')}"></div>
+        <div class="campo"><label>Vecino del municipio de</label><input name="municipio" value="${esc(x.municipio||'')}"></div>
+        <div class="campo"><label>Departamento</label><input name="departamento" value="${esc(x.departamento||'')}"></div>
+      </div></details>`,
     d=>{
       const e=emp();
       if(!d.nombre.trim()){avisar('Escribí el nombre del empleado.');return false}
       const salario=+d.salarioBase;
       if(!salario||salario<=0){avisar('Escribí el salario base mensual.');return false}
+      const dpiLimpio=(d.dpi||'').replace(/\D/g,'');
+      if(dpiLimpio&&dpiLimpio.length!==13){avisar('El DPI tiene 13 dígitos (por ejemplo 2695 40784 0801).');return false}
+      const personales={dpi:dpiLimpio?dpiFormato(dpiLimpio):'',fechaNac:d.fechaNac||'',sexo:d.sexo||'M',estadoCivil:d.estadoCivil||'',profesion:(d.profesion||'').trim(),
+        nacionalidad:(d.nacionalidad||'').trim()||'guatemalteco',municipio:(d.municipio||'').trim(),departamento:(d.departamento||'').trim()};
       if(existente){
         existente.nombre=d.nombre.trim(); existente.puesto=d.puesto.trim(); existente.salarioBase=r2(salario);
         existente.fechaIngreso=d.fechaIngreso||existente.fechaIngreso||''; existente.email=(d.email||'').trim();
+        Object.assign(existente,personales);
       }else{
         e.empleados=e.empleados||[];
         e.empleados.push({id:uid(),nombre:d.nombre.trim(),puesto:d.puesto.trim(),salarioBase:r2(salario),
-          fechaIngreso:d.fechaIngreso||'',email:(d.email||'').trim(),activo:true});
+          fechaIngreso:d.fechaIngreso||'',email:(d.email||'').trim(),activo:true,...personales});
       }
       guardar();
     },existente?'Guardar cambios':'Agregar empleado');
+  /* Al elegir un puesto del catálogo con salario sugerido, se propone ese salario si todavía no hay uno. */
+  const pu=mForm.querySelector('[name="puesto"]'), sal=mForm.querySelector('[name="salarioBase"]');
+  pu.addEventListener('change',()=>{ const p=(e0.puestos||[]).find(y=>y.nombre.toLowerCase()===pu.value.trim().toLowerCase()); if(p&&p.salario&&!sal.value) sal.value=p.salario; });
 }
 ACCIONES.alternarEmpleado=d=>{
   if(!puedeEliminar()){avisar('Tu rol no tiene permiso para dar de baja empleados. Pedile a tu gerente que lo haga.');return}

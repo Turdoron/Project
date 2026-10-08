@@ -319,6 +319,36 @@ nav .sub-cuerpo .app-sec:first-child{margin-top:6px}
 .diag-conc li .btn{margin-left:6px;vertical-align:baseline}
 .diag-conc p{margin:6px 0 0}
 .diag-conc .diag-pie{font-weight:600;color:var(--tinta)}
+/* Contratos de trabajo: formulario a la izquierda, hoja a la derecha */
+.ct-editor{display:grid;grid-template-columns:minmax(320px,420px) 1fr;gap:28px;align-items:start}
+.ct-form h3{margin:22px 0 10px;font-size:15px;font-weight:600}
+.ct-form h3:first-of-type{margin-top:0}
+.ct-form fieldset{border:none;margin:0;padding:0;min-width:0}
+.ct-form fieldset[disabled]{opacity:.55}
+.ct-form textarea{width:100%}
+.ct-form .rej{gap:12px;margin-bottom:6px}
+.ayuda-campo{display:block;margin-top:4px;font-size:12px;color:var(--tinta-suave)}
+.ct-previa{position:sticky;top:16px;max-height:calc(var(--alto,100vh) - 32px);display:flex;flex-direction:column;min-width:0}
+.ct-barra{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;font-size:13px;color:var(--tinta-suave)}
+.ct-hoja{flex:1;overflow:auto;background:#fff;color:#111;border:1px solid var(--linea);border-radius:var(--radio);box-shadow:var(--sombra);
+  padding:48px 56px;font:15px/1.6 'Times New Roman',Georgia,serif;text-align:justify}
+.ct-hoja[contenteditable="true"]{outline:2px solid var(--acento);outline-offset:2px;cursor:text}
+.ct-hoja p{margin:0 0 12px}
+.ct-hoja .ct-num{text-align:right;font-size:13.5px}
+.ct-hoja .ct-titulo{text-align:center;font:700 17px/1.3 'Times New Roman',Georgia,serif;letter-spacing:.04em;margin:6px 0 18px}
+.ct-hoja .ct-lista{margin:0 0 12px 26px;padding:0} .ct-hoja .ct-lista li{margin-bottom:4px}
+.ct-hoja .ct-firmas{display:flex;gap:40px;margin:56px 0 24px;text-align:center} .ct-hoja .ct-firmas div{flex:1}
+.ct-hoja .ct-linea{display:block;border-top:1px solid #111;margin-bottom:6px}
+.ct-hoja .falta{background:#FFF1B8;color:#6B4E00;border-radius:3px;padding:0 3px;font-family:Inter,system-ui,sans-serif;font-size:.82em}
+.ct-hoja .ct-legal{margin-top:24px;font-size:14px}
+.lista-chequeo{display:flex;flex-direction:column;gap:8px}
+.chequeo{display:flex;gap:10px;align-items:flex-start;font-size:14px;cursor:pointer}
+.chequeo input{width:auto;margin-top:3px}
+.chequeo small{color:var(--tinta-suave)}
+.datos-personales{margin-top:14px;border:1px solid var(--linea);border-radius:var(--radio-chico);padding:10px 14px}
+.datos-personales summary{cursor:pointer;font-weight:600;font-size:14px}
+.etiqueta{display:inline-block;font-size:11.5px;padding:2px 8px;border-radius:99px;background:var(--activo);color:var(--tinta-suave)}
+@media(max-width:1100px){.ct-editor{grid-template-columns:1fr}.ct-previa{position:static;max-height:none}.ct-hoja{padding:28px 22px}}
 /* Cierre fiscal paso a paso */
 .progreso-cf{display:flex;flex-direction:column;gap:6px;justify-content:flex-end;font-size:13.5px;color:var(--tinta-suave);min-width:220px}
 .progreso-cf strong{color:var(--tinta)}

@@ -132,7 +132,7 @@ function marcarNavegacion(){
   const sel='nav [data-v], #recuadroAdmin [data-v]';
   let actual=null;
   document.querySelectorAll(sel).forEach(x=>{
-    if(x.dataset.v===VISTA){ x.setAttribute('aria-current','page'); actual=actual||x; } else x.removeAttribute('aria-current');
+    if(x.dataset.v===VISTA||x.dataset.v===VISTA_PADRE[VISTA]){ x.setAttribute('aria-current','page'); actual=actual||x; } else x.removeAttribute('aria-current');
   });
   const nombre=actual?textoBoton(actual):'';
   const app=APP_ACTUAL&&VISTA!=='home'?APPS.find(a=>a.id===APP_ACTUAL):null;
@@ -370,7 +370,7 @@ function pintar(){
     if(!oculto && a.dataset.v==='cierreFiscal') oculto = !e0 || !tuvoRegimen(e0,['general']);
     if(!oculto && (a.dataset.v==='libroVentas'||a.dataset.v==='libroCompras')) oculto = !e0 || !tuvoRegimen(e0,['general','simplificado']);
     a.style.display = oculto ? 'none' : '';
-    a.classList.toggle('on',a.dataset.v===VISTA);
+    a.classList.toggle('on',a.dataset.v===VISTA||a.dataset.v===VISTA_PADRE[VISTA]);
   });
   if(!puedeVer(VISTA)){ VISTA = permitidas ? (permitidas[0]||'home') : 'home'; }
   const r=ROLES[u.rol];
@@ -416,6 +416,7 @@ function pintar(){
   });
   if(VISTA==='partidas' && borrador) enlazarFormulario();
   if(VISTA==='planillas' && borradorPlanilla) enlazarFormularioPlanilla();
+  if(VISTA==='contratoEditar') enlazarEditorContrato();
   if(VISTA==='pagoPrestaciones' && borradorPago) enlazarFormularioPago();
   if(VISTA==='capitalSocial' && borradorCapital) enlazarCapitalSocial();
   if(VISTA==='facturas'){

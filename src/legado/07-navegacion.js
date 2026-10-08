@@ -84,7 +84,9 @@ let APP_ACTUAL=null;
 /* Botones de pantalla de una aplicación que la persona puede ver ahora (los esconde pintar()). */
 const pantallasDeApp=id=>[...document.querySelectorAll(`nav .app-menu[data-app="${id}"] [data-v]`)];
 const pantallasVisiblesDeApp=id=>pantallasDeApp(id).filter(b=>b.style.display!=='none');
-const appDeVista=v=>{ const b=document.querySelector(`nav .app-menu [data-v="${v}"]`); return b?b.closest('.app-menu').dataset.app:null; };
+/* Pantallas que no están en el menú pero pertenecen a otra (el editor de un contrato es parte de Contratos). */
+const VISTA_PADRE={contratoEditar:'contratos'};
+const appDeVista=v=>{ const b=document.querySelector(`nav .app-menu [data-v="${VISTA_PADRE[v]||v}"]`); return b?b.closest('.app-menu').dataset.app:null; };
 const appsVisibles=()=>APPS.filter(a=>pantallasVisiblesDeApp(a.id).length);
 function abrirApp(id){
   const b=pantallasVisiblesDeApp(id)[0]; if(!b) return;
