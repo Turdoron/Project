@@ -337,6 +337,19 @@ function htmlContrato(e,c){
 }
 const textoContrato=c=>c.htmlManual||htmlContrato(emp(),c);
 
+/* Numeración: se propone el siguiente al mayor que exista (si se borra el último, su número
+   vuelve a quedar libre) y se puede cambiar a mano para no romper la secuencia. */
+const numerosContratos=(e,salvo)=>(e.contratos||[]).filter(x=>x.id!==salvo).map(x=>+x.numero||0);
+const siguienteNumeroContrato=e=>Math.max(0,...numerosContratos(e))+1;
+function huecosContratos(e,salvo){ const ns=new Set(numerosContratos(e,salvo)), mx=Math.max(0,...ns), out=[];
+  for(let i=1;i<mx;i++) if(!ns.has(i)) out.push(i); return out; }
+const textoHuecos=h=>h.length?`Falta${h.length===1?' el No.':'n los No.'} ${h.slice(0,8).join(', ')}${h.length>8?'…':''} en la secuencia.`:'';
+function revisarNumeroContrato(e,valor,salvo){
+  const n=+String(valor).trim();
+  if(!Number.isInteger(n)||n<1) return {error:'Escribí un número entero mayor que cero.'};
+  if(numerosContratos(e,salvo).includes(n)) return {error:`Ya existe el contrato No. ${n}.`};
+  return {n};
+}
 /* ---------- Lista de contratos ---------- */
 VISTAS.contratos=()=>{
   const e=emp(), lista=(e.contratos||[]).slice().sort((a,b)=>(b.numero||0)-(a.numero||0));
@@ -354,13 +367,17 @@ VISTAS.contratos=()=>{
 ACCIONES.nuevoContrato=()=>{
   const e=emp(), activos=(e.empleados||[]).filter(x=>x.activo!==false);
   if(!activos.length){avisar('Primero agregá al trabajador en "Empleados".');return}
+  const sig=siguienteNumeroContrato(e), hu=huecosContratos(e);
   abrirModal('Nuevo contrato de trabajo',
-    `<div class="rej"><div class="campo full"><label>Trabajador</label><select name="empleadoId">${activos.map(x=>`<option value="${x.id}">${esc(x.nombre)}${x.puesto?' — '+esc(x.puesto):''}</option>`).join('')}</select></div></div>
+    `<div class="rej"><div class="campo"><label>No. de contrato</label><input name="numero" type="number" min="1" step="1" value="${sig}" required>
+       <span class="ayuda-campo">Se propone solo; cambialo si hace falta.${hu.length?' '+textoHuecos(hu):''}</span></div>
+     <div class="campo full"><label>Trabajador</label><select name="empleadoId">${activos.map(x=>`<option value="${x.id}">${esc(x.nombre)}${x.puesto?' — '+esc(x.puesto):''}</option>`).join('')}</select></div></div>
      <p style="margin:6px 0 0;font-size:13px;color:var(--tinta-suave)">El contrato se arma con su ficha (puesto, salario, fecha de ingreso). Lo que falte se completa en el formulario.</p>`,
     f=>{
       const x=activos.find(y=>y.id===f.empleadoId); if(!x) return false;
-      e.contratos=e.contratos||[]; e.correlativoContratos=(e.correlativoContratos||0)+1;
-      const c={id:uid(),numero:e.correlativoContratos,...nuevoDatosContrato(e,x),htmlManual:null,creado:hoy()};
+      const rv=revisarNumeroContrato(e,f.numero); if(rv.error){ avisar(rv.error); return false; }
+      e.contratos=e.contratos||[];
+      const c={id:uid(),numero:rv.n,...nuevoDatosContrato(e,x),htmlManual:null,creado:hoy()};
       e.contratos.push(c); registrarLog('Creó un contrato de trabajo',`No. ${c.numero} — ${x.nombre}`); guardar();
       contratoActual=c.id; setTimeout(()=>{ VISTA='contratoEditar'; pintar(); },0);
     },'Crear y abrir');
@@ -385,6 +402,8 @@ VISTAS.contratoEditar=()=>{
   +`<div class="ct-editor">
     <form class="ct-form" id="ctForm" autocomplete="off">
       ${manual?`<div class="aviso">Editaste el texto a mano, así que el formulario está bloqueado para no borrar tus cambios. <button type="button" class="btn mini" data-accion="rearmarContrato">Volver a armar desde el formulario</button></div>`:''}
+      <div class="rej ct-numero"><div class="campo"><label for="ctNumero">No. de contrato</label><input id="ctNumero" type="number" min="1" step="1" value="${esc(String(c.numero||''))}" aria-describedby="ctNumAviso"></div>
+        <p class="ayuda-campo" id="ctNumAviso">${esc(textoHuecos(huecosContratos(e))||'Se asignó solo; lo podés cambiar.')}</p></div>
       <fieldset${dis}>
       <h3>Patrono</h3>
       ${(()=>{ const dc=datosContratoEmpresa(e), r=dc.rep, per=dc.personeria;
@@ -482,6 +501,15 @@ function enlazarEditorContrato(){
   const bd=document.getElementById('ctAgregarDesc'); if(bd) bd.onclick=()=>{ c.descansos.push({de:'10:00',a:'10:15',tipo:'pagado'}); guardar(); pintar(); };
   resumenJornada();
   form.querySelectorAll('[data-cl]').forEach(i=>i.addEventListener('change',()=>{ c.clausulas=c.clausulas||{}; c.clausulas[i.dataset.cl]=i.checked; visibilidad(); refrescar(); guardarPronto(); }));
+  const inNum=document.getElementById('ctNumero'), avNum=document.getElementById('ctNumAviso');
+  if(inNum) inNum.addEventListener('input',()=>{
+    const rv=revisarNumeroContrato(e,inNum.value,c.id);
+    inNum.setAttribute('aria-invalid',rv.error?'true':'false'); avNum.classList.toggle('error-campo',!!rv.error);
+    if(rv.error){ avNum.textContent=rv.error+' Se mantiene el No. '+c.numero+'.'; return; }
+    c.numero=rv.n; avNum.textContent=textoHuecos(huecosContratos(e))||'Se asignó solo; lo podés cambiar.';
+    const h1=document.querySelector('#vista .tit h1'); if(h1) h1.textContent=`Contrato No. ${c.numero} — ${t.nombre||''}`;
+    if(c.htmlManual){ const pn=hoja.querySelector('.ct-num'); if(pn){ pn.textContent='Contrato No. '+c.numero; c.htmlManual=hoja.innerHTML; } }
+    refrescar(); guardarPronto(); });
   hoja.addEventListener('input',()=>{ if(!c.htmlManual) return; c.htmlManual=hoja.innerHTML; faltan(); guardarPronto(); });
   document.getElementById('ctManual').onclick=()=>{
     if(c.htmlManual) return;
