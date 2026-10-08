@@ -204,6 +204,54 @@ const PLAZOS_CONTRATO={indefinido:'Por tiempo indefinido',fijo:'A plazo fijo',ob
 const JORNADAS={diurna:{nombre:'diurna',horas:44,horario:'de lunes a viernes, de las ocho a las diecisiete horas'},
   mixta:{nombre:'mixta',horas:42,horario:'de lunes a sábado, de las catorce a las veintiún horas'},
   nocturna:{nombre:'nocturna',horas:36,horario:'de lunes a sábado, de las dieciocho a las veinticuatro horas'}};
+/* ---- Horario: días con casillas, horas con selector; el programa lo pasa a letras ---- */
+const DIAS_SEMANA=['lunes','martes','miércoles','jueves','viernes','sábado','domingo'];
+const DIAS_CORTOS=['Lu','Ma','Mi','Ju','Vi','Sá','Do'];
+/* [0,1,2,4,5] → "de lunes a miércoles y de viernes a sábado" */
+function diasEnLetras(dias){
+  const d=[...new Set(dias)].sort((a,b)=>a-b), tramos=[];
+  d.forEach(x=>{ const u=tramos[tramos.length-1]; if(u&&x===u[1]+1) u[1]=x; else tramos.push([x,x]); });
+  const t=tramos.map(([a,b])=>a===b?`el ${DIAS_SEMANA[a]}`:`de ${DIAS_SEMANA[a]} a ${DIAS_SEMANA[b]}`);
+  return t.length<=1?(t[0]||''):t.slice(0,-1).join(', ')+' y '+t[t.length-1];
+}
+const minutosDe=h=>{ const [a,b]=String(h||'').split(':').map(Number); return isNaN(a)?null:a*60+(b||0); };
+/* "08:30" → "las ocho horas con treinta minutos" (sin "horas" si se pide corto) */
+function horaEnLetras(h,corto){
+  const m=minutosDe(h); if(m===null) return '';
+  const hh=Math.floor(m/60)%24, mm=m%60, base=hh===1?'la una':`las ${hh===21?'veintiuna':enteroEnLetras(hh)}`;
+  return mm?`${base} horas con ${enteroEnLetras(mm)} minutos`:(corto?base:`${base} horas`);
+}
+const rangoHorasEnLetras=(de,a)=>{ const md=minutosDe(de)%60===0, ma=minutosDe(a)%60===0;
+  return md&&ma?`de ${horaEnLetras(de,true)} a ${horaEnLetras(a)}`:`de ${horaEnLetras(de)} a ${horaEnLetras(a)}`; };
+const duracionMin=(de,a)=>{ let x=minutosDe(a)-minutosDe(de); if(x<=0) x+=1440; return x; };
+/* Minutos nocturnos (18:00 a 06:00) de un tramo, para saber el tipo de jornada (Arts. 116 y 117). */
+function minutosNocturnos(de,a){
+  let n=0, t=minutosDe(de); const dur=duracionMin(de,a);
+  for(let i=0;i<dur;i++){ const h=((t+i)%1440)/60; if(h>=18||h<6) n++; }
+  return n;
+}
+function analisisJornada(c){
+  const turnos=(c.turnos||[]).filter(t=>t.dias&&t.dias.length&&t.de&&t.a);
+  const noPagados=(c.descansos||[]).filter(d=>d.de&&d.a&&d.tipo!=='pagado');
+  let semanal=0, maxDia=0, noct=0;
+  turnos.forEach(t=>{ const bruto=duracionMin(t.de,t.a);
+    const desc=noPagados.reduce((s,d)=>{ const ini=minutosDe(d.de), fin=minutosDe(d.a), ti=minutosDe(t.de), tf=ti+bruto;
+      return s+Math.max(0,Math.min(fin,tf)-Math.max(ini,ti)); },0);
+    const neto=bruto-desc; semanal+=neto*t.dias.length; maxDia=Math.max(maxDia,neto); noct=Math.max(noct,minutosNocturnos(t.de,t.a)); });
+  const tipo=noct>=210?'nocturna':noct>0?'mixta':'diurna';
+  const libres=[0,1,2,3,4,5,6].filter(d=>!turnos.some(t=>t.dias.includes(d)));
+  const J=JORNADAS[tipo], horasSem=Math.round(semanal/6)/10, horasDia=Math.round(maxDia/6)/10;
+  const maxDiaLegal={diurna:8,mixta:7,nocturna:6}[tipo];
+  const avisos=[];
+  if(horasSem>J.horas) avisos.push(`La jornada ${tipo} no puede pasar de ${J.horas} horas a la semana (Código de Trabajo, Arts. 116 y 117); este horario suma ${horasSem}.`);
+  if(horasDia>maxDiaLegal&&!(tipo==='diurna'&&horasSem<=J.horas)) avisos.push(`La jornada ${tipo} no puede pasar de ${maxDiaLegal} horas diarias; un día de este horario tiene ${horasDia}.`);
+  if(!libres.length) avisos.push('Falta el día de descanso semanal (Art. 126): dejá al menos un día sin marcar.');
+  return {turnos,tipo,horasSem,horasDia,libres,avisos};
+}
+function migrarJornada(c){
+  if(!c.turnos) c.turnos=[{dias:[0,1,2,3,4],de:'08:00',a:'17:00'}];
+  if(!c.descansos) c.descansos=[{de:'12:00',a:'13:00',tipo:'alimentos'}];
+}
 const PAGOS_CONTRATO={quincenal:'quincenal',mensual:'mensual',semanal:'semanal'};
 const CLAUSULAS_OPCIONALES={
   prueba:{nombre:'Período de prueba de dos meses (Art. 81)',def:true},
@@ -216,7 +264,7 @@ let contratoActual=null;
 function nuevoDatosContrato(e,x){
   const p=puestoDeEmpleado(e,x)||asegurarPuesto(e,x.puesto);
   return {empleadoId:x.id,fecha:hoy(),fechaInicio:x.fechaIngreso||hoy(),plazo:'indefinido',plazoHasta:'',obra:'',
-    jornada:'diurna',horario:JORNADAS.diurna.horario,descanso:'sábado y domingo',almuerzo:'de las doce a las trece horas',
+    turnos:[{dias:[0,1,2,3,4],de:'08:00',a:'17:00'}],descansos:[{de:'12:00',a:'13:00',tipo:'alimentos'}],
     salario:x.salarioBase||0,pago:'quincenal',lugar:'',puesto:x.puesto||'',funciones:funcionesDe(p).join('\n'),
     clausulas:Object.fromEntries(Object.entries(CLAUSULAS_OPCIONALES).map(([k,c])=>[k,c.def])),fechaLegalizacion:''};
 }
@@ -231,7 +279,8 @@ function htmlContrato(e,c){
   const dpiT=dpiFormato(t.dpi), dpiR=dpiFormato(r.dpi);
   const emp_=`“${esc((e.nombre||'').toUpperCase())}”`;
   const lugar=c.lugar||(dc.direccionLetras||direccionEnLetras(e.direccion)?`las instalaciones de ${emp_}, ubicadas en ${dc.direccionLetras||direccionEnLetras(e.direccion)}, del municipio de ${dc.municipio}, departamento de ${dc.departamento}`:'');
-  const J=JORNADAS[c.jornada]||JORNADAS.diurna;
+  migrarJornada(c);
+  const AJ=analisisJornada(c);
   const funciones=(c.funciones||'').split('\n').map(s=>s.trim()).filter(Boolean);
   const plazoTxt=c.plazo==='fijo'?`A PLAZO FIJO, hasta el ${c.plazoHasta?fechaEnLetras(c.plazoHasta):faltaCt('fecha de terminación')}`
     :c.plazo==='obra'?`PARA OBRA DETERMINADA, que consiste en: ${valCt(c.obra,'descripción de la obra')}`:'TIEMPO INDEFINIDO';
@@ -245,7 +294,12 @@ function htmlContrato(e,c){
   cl_('CARGO Y SERVICIOS DEL TRABAJADOR',`El trabajador desempeñará su trabajo con la eficiencia y esmero apropiados, en la forma, tiempo y lugar indicados por el patrono, ocupando el cargo de ${valCt((c.puesto||'').toUpperCase(),'puesto')}, y le corresponden los servicios inherentes al mismo, que de manera enunciativa y no limitativa son los siguientes:</p>${funciones.length?`<ol class="ct-lista" type="a">${funciones.map(f=>`<li>${esc(f)}</li>`).join('')}</ol>`:`<p>${faltaCt('funciones del puesto')}</p>`}<p>`);
   cl_('LUGAR DE PRESTACIÓN DE LOS SERVICIOS',`Los servicios se prestarán en ${valCt(lugar,'lugar de trabajo')}, y en cualquier otro lugar que por la naturaleza del trabajo así se requiera dentro de la República de Guatemala, previa notificación del jefe inmediato.`);
   cl_('PLAZO DEL CONTRATO',`La duración del presente contrato es ${plazoTxt}.${cl.prueba?' Los primeros dos meses se consideran período de prueba, conforme al artículo 81 del Código de Trabajo, durante el cual cualquiera de las partes puede ponerle término sin responsabilidad de su parte.':''}`);
-  cl_('JORNADA DE TRABAJO',`La jornada ordinaria de trabajo será ${J.nombre}, ${valCt(c.horario,'horario')}, sin exceder de ${enteroEnLetras(J.horas)} (${J.horas}) horas a la semana${c.almuerzo?`, con un período para tomar alimentos ${esc(c.almuerzo)}, que no forma parte de la jornada`:''}. El descanso semanal será ${valCt(c.descanso,'días de descanso')}. El tiempo trabajado fuera de la jornada ordinaria se pagará como jornada extraordinaria, conforme a los artículos 121, 126 y 127 del Código de Trabajo.`);
+  const horarioTxt=AJ.turnos.length?AJ.turnos.map(t=>`${diasEnLetras(t.dias)}, ${rangoHorasEnLetras(t.de,t.a)}`).join('; y '):faltaCt('horario de trabajo');
+  const descs=(c.descansos||[]).filter(d=>d.de&&d.a);
+  const descTxt=descs.map((d,i)=>{ const quien=d.tipo==='alimentos'?(descs.slice(0,i).some(x=>x.tipo==='alimentos')?'otro período para tomar alimentos':'un período para tomar alimentos'):(i===0?'un descanso':'otro descanso');
+    return `${quien} ${rangoHorasEnLetras(d.de,d.a)}, ${d.tipo==='pagado'?'que forma parte de la jornada y es remunerado':'que no forma parte de la jornada y no es remunerado'}`; });
+  const horasTxt=AJ.horasSem?`${Number.isInteger(AJ.horasSem)?enteroEnLetras(AJ.horasSem):enteroEnLetras(Math.floor(AJ.horasSem))+' horas con '+enteroEnLetras(Math.round((AJ.horasSem%1)*60))+' minutos'} (${AJ.horasSem})`:faltaCt('horas');
+  cl_('JORNADA DE TRABAJO',`La jornada ordinaria de trabajo será ${AJ.tipo}, ${horarioTxt}, totalizando ${horasTxt} horas a la semana${descTxt.length?`, con ${descTxt.length===1?descTxt[0]:descTxt.slice(0,-1).join('; ')+'; y '+descTxt[descTxt.length-1]}`:''}. El descanso semanal será ${AJ.libres.length?(AJ.libres.length===1?`el día ${DIAS_SEMANA[AJ.libres[0]]}`:`los días ${AJ.libres.map(d=>DIAS_SEMANA[d]).slice(0,-1).join(', ')} y ${DIAS_SEMANA[AJ.libres[AJ.libres.length-1]]}`):faltaCt('día de descanso semanal')}, con goce de salario. El tiempo trabajado fuera de la jornada ordinaria se pagará como jornada extraordinaria, conforme a los artículos 121, 126 y 127 del Código de Trabajo.`);
   cl_('SALARIO, BONIFICACIÓN INCENTIVO Y FORMA DE PAGO',`El trabajador devengará un salario ordinario mensual de ${c.salario>0?`${quetzalesEnLetras(c.salario).toUpperCase()} (Q ${Q(c.salario)})`:faltaCt('salario')}. Además se le pagará la Bonificación Incentivo de doscientos cincuenta quetzales exactos (Q 250.00) mensuales, conforme a los Decretos 78-89 y 37-2001 del Congreso de la República.${cl.productividad?' Adicionalmente podrá recibir una bonificación por productividad (artículo 2, Decreto 78-89), según la evaluación de desempeño que el patrono realice conforme a los estándares que le comunique por escrito; esta bonificación es variable, no forma parte del salario y el no recibirla no constituye un cambio en las condiciones de trabajo.':''} Los pagos se harán en forma ${esc(PAGOS_CONTRATO[c.pago]||c.pago)}, mediante transferencia bancaria, cheque o en efectivo en las instalaciones del patrono. La bonificación incentivo no está afecta al pago de cuotas del IGSS, IRTRA e INTECAP.`);
   cl_('OTRAS PRESTACIONES','Las vacaciones, la bonificación anual para trabajadores del sector privado y público (Decreto 42-92) y el aguinaldo (Decreto 76-78) se pagarán al trabajador de conformidad con la ley.');
   cl_('OBLIGACIONES DEL TRABAJADOR',`Además de las contenidas en el artículo 63 del Código de Trabajo, el trabajador se obliga a:</p><ol class="ct-lista" type="a">${[
@@ -352,10 +406,16 @@ VISTAS.contratoEditar=()=>{
         <div class="campo"><label>Plazo</label><select data-ct="plazo">${opt(PLAZOS_CONTRATO,c.plazo)}</select></div>
         <div class="campo" data-si="plazo=fijo"><label>Hasta</label><input data-ct="plazoHasta" type="date" value="${esc(c.plazoHasta||'')}"></div>
         <div class="campo full" data-si="plazo=obra"><label>Obra determinada</label><input data-ct="obra" value="${esc(c.obra||'')}"></div>
-        <div class="campo"><label>Jornada</label><select data-ct="jornada">${opt(JORNADAS,c.jornada)}</select></div>
-        <div class="campo"><label>Días de descanso</label><input data-ct="descanso" value="${esc(c.descanso||'')}"></div>
-        <div class="campo full"><label>Horario</label><input data-ct="horario" value="${esc(c.horario||'')}"></div>
-        <div class="campo full"><label>Tiempo para alimentos</label><input data-ct="almuerzo" value="${esc(c.almuerzo||'')}" placeholder="de las doce a las trece horas"></div>
+        <div class="campo full"><label>Horario de trabajo</label>${(()=>{ migrarJornada(c); const usados=i=>new Set(c.turnos.flatMap((t,j)=>j===i?[]:t.dias));
+          return c.turnos.map((t,i)=>`<div class="ct-turno"><div class="ct-dias" role="group" aria-label="Días del horario ${i+1}">${DIAS_CORTOS.map((d,k)=>`<label class="ct-dia${usados(i).has(k)?' ocupado':''}" title="${DIAS_SEMANA[k]}"><input type="checkbox" data-turno="${i}" data-dia="${k}"${t.dias.includes(k)?' checked':''}${usados(i).has(k)?' disabled':''}><span>${d}</span></label>`).join('')}</div>
+            <div class="ct-horas"><label>De <input type="time" data-turno="${i}" data-campo="de" value="${esc(t.de||'')}" step="900"></label><label>a <input type="time" data-turno="${i}" data-campo="a" value="${esc(t.a||'')}" step="900"></label>
+            ${c.turnos.length>1?`<button type="button" class="btn mini sec" data-quitar-turno="${i}" aria-label="Quitar este horario">Quitar</button>`:''}</div></div>`).join(''); })()}
+          <button type="button" class="btn mini sec" id="ctAgregarTurno">+ Agregar horario para otros días</button></div>
+        <div class="campo full"><label>Descansos durante la jornada</label>${c.descansos.map((d,i)=>`<div class="ct-descanso"><select data-desc="${i}" data-campo="tipo" aria-label="Tipo de descanso ${i+1}"><option value="alimentos"${d.tipo==='alimentos'?' selected':''}>Alimentos (no remunerado)</option><option value="pagado"${d.tipo==='pagado'?' selected':''}>Descanso remunerado</option><option value="noPagado"${d.tipo==='noPagado'?' selected':''}>Descanso no remunerado</option></select>
+            <label>De <input type="time" data-desc="${i}" data-campo="de" value="${esc(d.de||'')}" step="300"></label><label>a <input type="time" data-desc="${i}" data-campo="a" value="${esc(d.a||'')}" step="300"></label>
+            <button type="button" class="btn mini sec" data-quitar-desc="${i}" aria-label="Quitar este descanso">Quitar</button></div>`).join('')}
+          <button type="button" class="btn mini sec" id="ctAgregarDesc">+ Agregar descanso</button></div>
+        <div class="campo full" id="ctResumenJornada" aria-live="polite"></div>
         <div class="campo"><label>Salario mensual (Q)</label><input data-ct="salario" type="number" step="0.01" min="0" value="${c.salario||''}"></div>
         <div class="campo"><label>Pago</label><select data-ct="pago">${opt(PAGOS_CONTRATO,c.pago)}</select></div>
         <div class="campo full"><label>Lugar de trabajo</label><input data-ct="lugar" value="${esc(c.lugar||'')}" placeholder="${esc(e.direccion||'Dirección de la empresa')}"></div>
@@ -395,10 +455,21 @@ function enlazarEditorContrato(){
     i.addEventListener(ev,()=>{ c[k]=k==='salario'?r2(+i.value||0):i.value;
       if(k==='puesto'){ const p=asegurarPuesto(e,i.value);
         if(p&&funcionesDe(p).length){ c.funciones=funcionesDe(p).join('\n'); form.querySelector('[data-ct="funciones"]').value=c.funciones; } }
-      if(k==='jornada'){ c.horario=(JORNADAS[i.value]||JORNADAS.diurna).horario; form.querySelector('[data-ct="horario"]').value=c.horario; }
       visibilidad(); refrescar(); guardarPronto(); }); });
   form.querySelectorAll('[data-emp]').forEach(i=>{ const k=i.dataset.emp; const ev=i.tagName==='SELECT'?'change':'input';
     i.addEventListener(ev,()=>{ t[k]=i.value; refrescar(); guardarPronto(); }); });
+  const resumenJornada=()=>{ const el=document.getElementById('ctResumenJornada'); if(!el) return; const A=analisisJornada(c);
+    el.innerHTML=`<div class="ct-resumen${A.avisos.length?' malo':''}">Jornada <strong>${A.tipo}</strong> · <strong>${A.horasSem}</strong> horas a la semana (máximo ${JORNADAS[A.tipo].horas}) · descanso semanal: ${A.libres.length?A.libres.map(d=>DIAS_SEMANA[d]).join(', '):'ninguno'}${A.avisos.map(x=>`<br>⚠ ${esc(x)}`).join('')}</div>`; };
+  form.querySelectorAll('[data-turno][data-dia]').forEach(i=>i.addEventListener('change',()=>{ const t=c.turnos[+i.dataset.turno], k=+i.dataset.dia;
+    t.dias=i.checked?[...new Set([...t.dias,k])].sort():t.dias.filter(x=>x!==k); guardar(); pintar(); }));
+  form.querySelectorAll('[data-turno][data-campo]').forEach(i=>i.addEventListener('input',()=>{ c.turnos[+i.dataset.turno][i.dataset.campo]=i.value; resumenJornada(); refrescar(); guardarPronto(); }));
+  form.querySelectorAll('[data-desc]').forEach(i=>i.addEventListener(i.tagName==='SELECT'?'change':'input',()=>{ c.descansos[+i.dataset.desc][i.dataset.campo]=i.value; resumenJornada(); refrescar(); guardarPronto(); }));
+  form.querySelectorAll('[data-quitar-turno]').forEach(b=>b.onclick=()=>{ c.turnos.splice(+b.dataset.quitarTurno,1); guardar(); pintar(); });
+  form.querySelectorAll('[data-quitar-desc]').forEach(b=>b.onclick=()=>{ c.descansos.splice(+b.dataset.quitarDesc,1); guardar(); pintar(); });
+  const bt=document.getElementById('ctAgregarTurno'); if(bt) bt.onclick=()=>{ const libres=[0,1,2,3,4,5,6].filter(d=>!c.turnos.some(t=>t.dias.includes(d)));
+    c.turnos.push({dias:libres.includes(5)?[5]:libres.slice(0,1),de:'08:00',a:'12:00'}); guardar(); pintar(); };
+  const bd=document.getElementById('ctAgregarDesc'); if(bd) bd.onclick=()=>{ c.descansos.push({de:'10:00',a:'10:15',tipo:'pagado'}); guardar(); pintar(); };
+  resumenJornada();
   form.querySelectorAll('[data-cl]').forEach(i=>i.addEventListener('change',()=>{ c.clausulas=c.clausulas||{}; c.clausulas[i.dataset.cl]=i.checked; visibilidad(); refrescar(); guardarPronto(); }));
   hoja.addEventListener('input',()=>{ if(!c.htmlManual) return; c.htmlManual=hoja.innerHTML; faltan(); guardarPronto(); });
   document.getElementById('ctManual').onclick=()=>{

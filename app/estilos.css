@@ -342,6 +342,22 @@ nav .sub-cuerpo .app-sec:first-child{margin-top:6px}
 .ct-hoja .falta{background:#FFF1B8;color:#6B4E00;border-radius:3px;padding:0 3px;font-family:Inter,system-ui,sans-serif;font-size:.82em}
 .ct-hoja .ct-legal{margin-top:24px;font-size:14px}
 .lista-chequeo{display:flex;flex-direction:column;gap:8px}
+.ct-turno,.ct-descanso{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:8px 0;border-bottom:1px solid var(--linea)}
+.ct-dias{display:flex;gap:4px}
+.ct-dia{position:relative;cursor:pointer}
+.ct-dia input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer}
+.ct-dia span{display:grid;place-items:center;width:34px;height:30px;border:1px solid var(--linea-fuerte);border-radius:var(--radio-chico);font-size:12.5px;font-weight:600;color:var(--tinta-suave);background:var(--panel)}
+.ct-dia input:checked+span{background:var(--boton);border-color:var(--boton);color:var(--boton-texto)}
+.ct-dia input:focus-visible+span{outline:2px solid var(--acento);outline-offset:2px}
+.ct-dia.ocupado span{opacity:.35;text-decoration:line-through}
+.ct-horas,.ct-descanso{font-size:13px}
+.ct-horas{display:flex;align-items:center;gap:10px}
+.ct-horas label,.ct-descanso label{display:flex;align-items:center;gap:6px;margin:0;font-weight:400;text-transform:none;letter-spacing:0}
+.ct-turno input[type=time],.ct-descanso input[type=time]{width:auto;padding:5px 8px}
+.ct-descanso select{width:auto;padding:5px 8px}
+#ctAgregarTurno,#ctAgregarDesc{margin-top:8px}
+.ct-resumen{font-size:13px;padding:8px 12px;border-radius:var(--radio-chico);background:var(--papel);border:1px solid var(--linea)}
+.ct-resumen.malo{border-left:3px solid var(--alerta)}
 .ct-patrono{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:10px 14px;border:1px solid var(--linea);border-radius:var(--radio-chico);background:var(--papel);font-size:13.5px}
 .ct-patrono p{margin:0;line-height:1.5}
 .ct-patrono.incompleto{border-left:3px solid var(--alerta)}
