@@ -76,7 +76,7 @@ VISTAS.proveedores=()=>{
         <th class="num">Pagado</th><th class="num">Saldo</th><th class="num"></th></tr></thead>
       <tbody>${filas}</tbody></table>
       <p style="font-size:13px;color:var(--tinta-suave);margin-top:8px">
-        Solo se acumulan las compras al crédito (facturas cambiarias). Las de contado no generan saldo.</p>`
+        Solo se acumulan las compras al crédito (facturas cambiarias). Las de contado no generan saldo.</p>${htmlAntiguedad(e,'proveedores')}`
     : `<div class="vacio">Todavía no hay compras al crédito registradas.
        Se acumulan al cargar facturas cambiarias (FCAM) desde "Cargar facturas".</div>`);
 };
@@ -100,7 +100,7 @@ VISTAS.clientes=()=>{
         <th class="num">Cobrado</th><th class="num">Saldo</th><th class="num"></th></tr></thead>
       <tbody>${filas}</tbody></table>
       <p style="font-size:13px;color:var(--tinta-suave);margin-top:8px">
-        Solo se acumulan las ventas al crédito (facturas cambiarias). Las de contado no generan saldo.</p>`
+        Solo se acumulan las ventas al crédito (facturas cambiarias). Las de contado no generan saldo.</p>${htmlAntiguedad(e,'clientes')}`
     : `<div class="vacio">Todavía no hay ventas al crédito registradas.
        Se acumulan al cargar facturas cambiarias (FCAM) desde "Cargar facturas".</div>`);
 };

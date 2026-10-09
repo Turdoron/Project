@@ -808,6 +808,7 @@ function continuarGenerarPartidas(e,activos,excluidas,modo){
       nombre:d.tipo==='compra'?d.emisor:d.receptor,
       bs:d.bs||'B',base:r2(d.base),idp:r2(d.noAcred||0),iva:r2(d.iva),total:r2(d.total),
       alCredito:!!d.alCredito,cta:d.cta,ctaPago:d.ctaPago,pequeno:!!d.pequeno,
+      vencimiento:(d.vencimientos||[]).map(v=>v.fecha).filter(Boolean).sort().pop()||'',   // último abono de la factura cambiaria
       items:d.items||[],   // detalle de producto por línea, solo disponible desde XML
       retencionISR:r2(d.retencionISR||0),retencionIVA:r2(d.retencionIVA||0),retIvaFesp:r2(d.retIvaFesp||0),retIsrFesp:r2(d.retIsrFesp||0),
       ocId:d.ocId||'',ocNumero:(d.ocId&&buscarOC(e,d.ocId))?buscarOC(e,d.ocId).numero:''};
