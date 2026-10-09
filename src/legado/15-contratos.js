@@ -358,10 +358,13 @@ VISTAS.contratos=()=>{
   return cab('Contratos de trabajo','Contrato individual de trabajo con los datos de la empresa y del trabajador. Se llena con un formulario, se ve en vivo y se puede corregir a mano.',
     `<button class="btn sec" data-accion="datosContratoEmpresa">${dc.esSociedad?'Representante legal y datos de la empresa':'Propietario y datos de la empresa'}</button><button class="btn" data-accion="nuevoContrato">Nuevo contrato</button>`)
   +(faltaEmp?`<div class="aviso">Antes del primer contrato completá los <strong>datos de la empresa</strong> (${dc.esSociedad?'representante legal y su razón de nombramiento':'propietario'}, DPI y dirección). Se llenan una sola vez. <button class="btn mini" data-accion="datosContratoEmpresa" style="margin-left:6px">Completar</button></div>`:'')
-  +(lista.length?`<table><thead><tr><th>No.</th><th>Trabajador</th><th>Puesto</th><th>Inicio</th><th>Plazo</th><th>Estado</th><th class="num"></th></tr></thead><tbody>
+  +(()=>{ const pend=lista.map(c=>({c,r:estadoRegistroContrato(c)})).filter(x=>x.r.estado==='pendiente'||x.r.estado==='vencido'), venc=pend.filter(x=>x.r.estado==='vencido');
+      return pend.length?`<div class="aviso${venc.length?' malo':''}"><strong>${pend.length} contrato${pend.length===1?'':'s'} sin presentar a la Dirección General de Trabajo</strong>${venc.length?` (${venc.length} con el plazo vencido)`:''}. La copia se remite dentro de los quince días siguientes a su firma (Art. 28 del Código de Trabajo). Cuando lo presentes, marcalo con «Registro».</div>`:''; })()
+  +(lista.length?`<table><thead><tr><th>No.</th><th>Trabajador</th><th>Puesto</th><th>Inicio</th><th>Plazo</th><th>Registro en Trabajo</th><th>Estado</th><th class="num"></th></tr></thead><tbody>
     ${lista.map(c=>`<tr><td>${c.numero}</td><td>${esc(nombreEmp(c.empleadoId))}</td><td>${esc(c.puesto||'—')}</td><td>${fFecha(c.fechaInicio)}</td><td>${esc(PLAZOS_CONTRATO[c.plazo]||'')}</td>
+      <td>${(r=>`<span class="reg-ct reg-${r.estado}">${esc(r.texto)}</span>`)(estadoRegistroContrato(c))}</td>
       <td>${c.htmlManual?'<span class="etiqueta">Editado a mano</span>':''}</td>
-      <td class="num" style="white-space:nowrap"><button class="btn mini" data-accion="abrirContrato" data-id="${c.id}">Abrir</button> <button class="btn mini peligro" data-accion="borrarContrato" data-id="${c.id}">Eliminar</button></td></tr>`).join('')}</tbody></table>`
+      <td class="num" style="white-space:nowrap"><button class="btn mini" data-accion="abrirContrato" data-id="${c.id}">Abrir</button> <button class="btn mini sec" data-accion="registroContrato" data-id="${c.id}">Registro</button> <button class="btn mini peligro" data-accion="borrarContrato" data-id="${c.id}">Eliminar</button></td></tr>`).join('')}</tbody></table>`
    :`<div class="vacio">Todavía no hay contratos. Usá "Nuevo contrato" y elegí al trabajador.</div>`);
 };
 ACCIONES.nuevoContrato=()=>{
@@ -539,26 +542,34 @@ function bloquesContrato(html){
   const bloques=[];
   const visitar=el=>{ [...el.children].forEach(n=>{
     const tag=n.tagName, cls=n.className||'';
-    if(cls.includes('ct-firmas')){ bloques.push({tipo:'firmas',cols:[...n.children].map(d=>tramos(d,false,false,[]).filter(x=>!x.br).map(x=>x.t).join(' ').replace(/\s+/g,' ').trim())}); return; }
+    if(cls.includes('ct-firmas')){ bloques.push({tipo:'firmas',cols:[...n.children].map(d=>{
+      const lineas=[[]]; tramos(d,false,false,[]).forEach(x=>{ if(x.br) lineas.push([]); else lineas[lineas.length-1].push(x.t); });
+      return lineas.map(l=>l.join(' ').replace(/\s+/g,' ').trim()).filter(Boolean); })}); return; }
     if(tag==='OL'||tag==='UL'){ [...n.children].forEach((li,k)=>bloques.push({tipo:'item',marca:tag==='OL'?`${String.fromCharCode(97+k)}.`:'•',tramos:tramos(li,false,false,[])})); return; }
     if(tag==='DIV'&&!cls){ visitar(n); return; }
     const t=tramos(n,false,false,[]); if(!t.some(x=>x.t&&x.t.trim())) return;
-    bloques.push({tipo:/^H\d$/.test(tag)||cls.includes('ct-titulo')?'titulo':cls.includes('ct-num')?'num':'parrafo',legal:cls.includes('ct-legal'),tramos:t});
+    bloques.push({tipo:/^H\d$/.test(tag)||cls.includes('ct-titulo')?'titulo':cls.includes('ct-num')?'num':cls.includes('ct-membrete')?'membrete':cls.includes('ct-derecha')?'derecha':'parrafo',legal:cls.includes('ct-legal'),tramos:t});
   }); };
   visitar(raiz);
   return bloques;
 }
-function armarPdfContrato(jsPDF,c){
+/* Contrato: su HTML, con la legalización de firmas sola en hoja impar. */
+const armarPdfContrato=(jsPDF,c)=>armarPdfHtml(jsPDF,textoContrato(c));
+/* Documento carta con márgenes de 2.54 cm, a partir del mismo HTML que se ve en pantalla. */
+function armarPdfHtml(jsPDF,html){
   const doc=new jsPDF({unit:'pt',format:'letter'}), P=PDF_CT, x0=P.margen, ancho=P.ancho-2*P.margen, abajo=P.alto-P.margen;
   let y=P.margen;
   const fuente=(b,i,tam)=>{ doc.setFont('times',b&&i?'bolditalic':b?'bold':i?'italic':'normal'); doc.setFontSize(tam); };
   const nuevaHoja=()=>{ doc.addPage(); y=P.margen; };
+  /* Ancho letra por letra: getTextWidth descuenta el kerning ("AT", "TA"...) pero doc.text no lo aplica,
+     y en mayúsculas en negrita las palabras se comían los espacios. */
+  const anchoTexto=t=>[...t].reduce((s2,ch)=>s2+doc.getTextWidth(ch),0);
   /* Escribe tramos con salto de línea y justificación; x/w: área disponible. */
   const escribir=(tramos,{x=x0,w=ancho,alinear='justify',tam=P.tam,lh=P.interlinea,marca=null,sangria=0}={})=>{
     const piezas=[]; let espacio=false;
     tramos.forEach(r=>{ if(r.br){ piezas.push({br:true}); espacio=false; return; }
       r.t.split(/(\s+)/).forEach(fr=>{ if(!fr) return; if(/^\s+$/.test(fr)){ espacio=true; return; }
-        fuente(r.b,r.i,tam); piezas.push({t:fr,b:r.b,i:r.i,w:doc.getTextWidth(fr),esp:espacio}); espacio=false; }); });
+        fuente(r.b,r.i,tam); piezas.push({t:fr,b:r.b,i:r.i,w:anchoTexto(fr),esp:espacio}); espacio=false; }); });
     fuente(false,false,tam); const anchoEsp=doc.getTextWidth(' ');
     const lineas=[]; let actual=[], usado=0;
     const cerrar=(ultima)=>{ if(actual.length) lineas.push({p:actual,ultima}); actual=[]; usado=0; };
@@ -580,20 +591,21 @@ function armarPdfContrato(jsPDF,c){
       y+=lh;
     });
   };
-  const bloques=bloquesContrato(textoContrato(c));
+  const bloques=bloquesContrato(html);
   const iLegal=bloques.findIndex(bq=>bq.legal);
   const cuerpo=iLegal>=0?bloques.slice(0,iLegal):bloques, legal=iLegal>=0?bloques.slice(iLegal):[];
   const pintarBloque=bq=>{
     if(bq.tipo==='num'){ escribir(bq.tramos,{alinear:'right',tam:11,lh:16}); y+=4; }
+    else if(bq.tipo==='membrete'){ escribir(bq.tramos,{alinear:'center',tam:10,lh:14}); y+=6; doc.setLineWidth(.6); doc.line(x0,y,x0+ancho,y); y+=22; }
+    else if(bq.tipo==='derecha'){ escribir(bq.tramos,{alinear:'right'}); y+=P.espacioParrafo+6; }
     else if(bq.tipo==='titulo'){ escribir(bq.tramos.map(r=>({...r,b:true})),{alinear:'center',tam:14,lh:20}); y+=10; }
     else if(bq.tipo==='item'){ escribir(bq.tramos,{x:x0+24,w:ancho-24,marca:bq.marca}); y+=3; }
     else if(bq.tipo==='firmas'){
       const alto=60+16*3; if(y+alto>abajo) nuevaHoja();
-      y+=60; const col=(ancho-40)/2;
-      bq.cols.forEach((txt,k)=>{ const cx=x0+k*(col+40); doc.setLineWidth(.6); doc.line(cx,y,cx+col,y);
-        const [nombre,...resto]=txt.split(/\s(?=EL (?:TRABAJADOR|PATRONO)$)/); fuente(false,false,11);
-        doc.text(nombre||'',cx+col/2,y+14,{align:'center'}); if(resto.length){ fuente(true,false,10); doc.text(resto.join(' '),cx+col/2,y+28,{align:'center'}); } });
-      y+=40;
+      y+=60; const n=bq.cols.length, col=n===1?ancho/2:(ancho-40)/2;
+      bq.cols.forEach((lineas,k)=>{ const cx=n===1?x0+ancho/4:x0+k*(col+40); doc.setLineWidth(.6); doc.line(cx,y,cx+col,y);
+        lineas.forEach((l,j)=>{ fuente(j>0,false,j>0?10:11); doc.text(doc.splitTextToSize(l,col)[0]||'',cx+col/2,y+14+j*14,{align:'center'}); }); });
+      y+=14+14*Math.max(...bq.cols.map(l=>l.length));
     }
     else { escribir(bq.tramos); y+=P.espacioParrafo; }
   };

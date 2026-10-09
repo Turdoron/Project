@@ -270,9 +270,10 @@ function formEmpleado(existente){
     <p style="margin:6px 0 0;font-size:13px;color:var(--tinta-suave)">La fecha de ingreso se usa para calcular el
       aguinaldo y el Bono 14 proporcional si entró a mitad del período legal — no hace falta tocar nada más,
       el sistema lo prorratea solo.</p>
-    <details class="datos-personales"${x.dpi||x.fechaNac?' open':''}><summary>Datos personales (para el contrato de trabajo)</summary>
+    <details class="datos-personales"${x.dpi||x.fechaNac||x.igss?' open':''}><summary>Datos personales (para el contrato y el Libro de Salarios)</summary>
       <div class="rej" style="margin-top:10px">
         <div class="campo"><label>DPI (CUI)</label><input name="dpi" value="${esc(x.dpi||'')}" placeholder="0000 00000 0000" inputmode="numeric"></div>
+        <div class="campo"><label>No. de afiliación al IGSS</label><input name="igss" value="${esc(x.igss||'')}" inputmode="numeric"></div>
         <div class="campo"><label>Fecha de nacimiento</label><input name="fechaNac" type="date" value="${esc(x.fechaNac||'')}"></div>
         <div class="campo"><label>Sexo</label><select name="sexo"><option value="M"${x.sexo!=='F'?' selected':''}>Masculino</option><option value="F"${x.sexo==='F'?' selected':''}>Femenino</option></select></div>
         <div class="campo"><label>Estado civil</label><select name="estadoCivil"><option value="">—</option>${ec}</select></div>
@@ -288,7 +289,7 @@ function formEmpleado(existente){
       if(!salario||salario<=0){avisar('Escribí el salario base mensual.');return false}
       const dpiLimpio=(d.dpi||'').replace(/\D/g,'');
       if(dpiLimpio&&dpiLimpio.length!==13){avisar('El DPI tiene 13 dígitos (por ejemplo 2695 40784 0801).');return false}
-      const personales={dpi:dpiLimpio?dpiFormato(dpiLimpio):'',fechaNac:d.fechaNac||'',sexo:d.sexo||'M',estadoCivil:d.estadoCivil||'',profesion:(d.profesion||'').trim(),
+      const personales={dpi:dpiLimpio?dpiFormato(dpiLimpio):'',igss:(d.igss||'').trim(),fechaNac:d.fechaNac||'',sexo:d.sexo||'M',estadoCivil:d.estadoCivil||'',profesion:(d.profesion||'').trim(),
         nacionalidad:(d.nacionalidad||'').trim()||'guatemalteco',municipio:(d.municipio||'').trim(),departamento:(d.departamento||'').trim()};
       /* El empleado queda ligado al puesto del catálogo (si viene de la base de puestos, se agrega solo). */
       const pu=asegurarPuesto(e,d.puesto);

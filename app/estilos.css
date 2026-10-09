@@ -360,6 +360,18 @@ nav .sub-cuerpo .app-sec:first-child{margin-top:6px}
 .ct-hoja .ct-linea{display:block;border-top:1px solid #111;margin-bottom:6px}
 .ct-hoja .falta{background:#FFF1B8;color:#6B4E00;border-radius:3px;padding:0 3px;font-family:Inter,system-ui,sans-serif;font-size:.82em}
 .ct-hoja .ct-legal{margin-top:24px;font-size:14px}
+.ct-hoja .ct-membrete{text-align:center;font-size:12.5px;border-bottom:1px solid #111;padding-bottom:10px;margin-bottom:22px}
+.ct-hoja .ct-derecha{text-align:right}
+.ct-hoja .ct-firmas small{font-size:12px}
+.ct-hoja.doc-previa{max-height:46vh;flex:none}
+/* Registro del contrato en la Dirección General de Trabajo */
+.reg-ct{font-size:12.5px;white-space:nowrap}
+.reg-ct.reg-ok{color:var(--exito)} .reg-ct.reg-vencido{color:var(--peligro);font-weight:600} .reg-ct.reg-pendiente{color:var(--advertencia)}
+/* Libro de Salarios */
+.ls-trab{margin:0 0 30px}
+.ls-trab h3{margin:0 0 10px}
+.ls-datos{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px 18px;margin:0 0 12px;font-size:13px}
+.ls-datos dt{color:var(--tinta-suave);font-size:12px} .ls-datos dd{margin:0;font-weight:600}
 .lista-chequeo{display:flex;flex-direction:column;gap:8px}
 .ct-turno,.ct-descanso{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:8px 0;border-bottom:1px solid var(--linea)}
 .ct-dias{display:flex;gap:4px}
