@@ -10,7 +10,7 @@ let comprasTab='ordenes';
 
 const normNIT=n=>String(n||'').toUpperCase().replace(/[^0-9A-Z]/g,'');
 /* Aprueban el Administrador y el Gerente de Compras. El Auxiliar prepara, no aprueba. */
-function puedeAprobarCompras(){const u=usuarioActual();return !!u&&(u.rol==='administrador'||u.rol==='compras_gerente');}
+function puedeAprobarCompras(){const u=usuarioActual();return !!u&&(u.rol==='administrador'||u.rol==='propietario'||u.rol==='compras_gerente');}
 function totalesCompra(items,aplicaIVA){
   const subtotal=r2(items.reduce((s,i)=>s+r2((+i.cantidad||0)*(+i.precio||0)),0));
   const iva=aplicaIVA?r2(subtotal*IVA_COMPRAS):0;

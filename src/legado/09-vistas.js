@@ -2,7 +2,7 @@
 const VISTAS={};
 
 VISTAS.empresas=()=>{
-  const visibles=empresasVisibles();
+  const visibles=empresasVisibles(), esAdmin=(usuarioActual()||{}).rol==='administrador';
   const filas=visibles.map(e=>`<tr>
     <td><strong>${esc(e.nombre)}</strong>${e.representante?`<br><span style="font-size:13px;color:var(--tinta-suave)">${esc(e.representante)}</span>`:''}
       ${e.direccion?`<br><span style="font-size:13px;color:var(--tinta-suave)">${esc(e.direccion)}</span>`
@@ -15,10 +15,11 @@ VISTAS.empresas=()=>{
       ${e.id===BD.activa?'<span class="ok">En uso</span>':`<button class="btn mini" data-accion="usarEmpresa" data-id="${e.id}">Usar</button>`}
       <button class="btn mini" data-accion="editarEmpresa" data-id="${e.id}">Editar</button>
       <button class="btn mini sec" data-accion="datosContratoEmpresa" data-id="${e.id}">Representante legal</button>
-      <button class="btn mini peligro" data-accion="borrarEmpresa" data-id="${e.id}">Eliminar</button>
+      ${esAdmin?`<button class="btn mini peligro" data-accion="borrarEmpresa" data-id="${e.id}">Eliminar</button>`:''}
     </td></tr>`).join('');
-  return cab('Empresas','Cada empresa lleva su propio catálogo, sus partidas y su régimen. Solo ves las que creaste vos.',
-    `<button class="btn" data-accion="nuevaEmpresa">Agregar empresa</button>`)
+  return cab('Empresas',esAdmin?'Cada empresa lleva su propio catálogo, sus partidas y su régimen. Solo ves las que creaste vos.'
+      :'Las empresas a las que tenés acceso. Las crea y elimina tu contador (el Administrador).',
+    esAdmin?`<button class="btn" data-accion="nuevaEmpresa">Agregar empresa</button>`:'')
     + (visibles.length
       ? `<table><thead><tr><th>Razón social y representante</th><th>NIT</th><th>Régimen ISR</th><th class="num">Ejercicio</th><th class="num">Partidas</th><th class="num">Acciones</th></tr></thead><tbody>${filas}</tbody></table>`
       : `<div class="vacio">Todavía no hay empresas. Agregá la primera para empezar a registrar.</div>`);

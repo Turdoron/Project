@@ -287,6 +287,7 @@ function usuarioEnAlcance(id){
   if(!x||!actual) return null;
   if(actual.rol==='superadmin') return x.rol==='administrador' ? x : null;
   if(actual.rol==='administrador') return x.administradorId===actual.id ? x : null;
+  if(actual.rol==='propietario') return personalDelPropietario(actual).includes(x) ? x : null;
   return null;
 }
 ACCIONES.nuevoUsuario=()=>formUsuario(null);
@@ -303,7 +304,9 @@ function formUsuario(existente){
     ? `<option value="administrador">Administrador</option>`
     : ROLES_ASIGNABLES.filter(r=>r!=='administrador')
         .map(r=>`<option value="${r}"${x.rol===r?' selected':''}>${ROLES[r].nombre}</option>`).join('');
-  const misEmpresas = esSuper ? [] : BD.empresas.filter(e=>e.administradorId===actual.id);
+  const misEmpresas = esSuper ? [] : actual.rol==='propietario'
+    ? BD.empresas.filter(e=>empresasDelPropietario(actual).includes(e.id))
+    : BD.empresas.filter(e=>e.administradorId===actual.id);
   const asignadasActuales = Array.isArray(x.empresasAsignadas) ? x.empresasAsignadas : null;   // null = cuenta nueva
   const checksEmpresas = misEmpresas.map(e=>`<label style="display:flex;align-items:center;gap:6px;font-weight:400;margin-bottom:4px">
       <input type="checkbox" name="emp_${e.id}" style="width:auto"
@@ -372,7 +375,8 @@ ACCIONES.borrarUsuario=d=>{
 };
 
 
-ACCIONES.nuevaEmpresa=()=>formEmpresa(null);
+const soloAdministrador=()=>{ const u=usuarioActual(); if(u&&u.rol==='administrador') return true; avisar('Las empresas las crea y elimina el Administrador (tu contador).'); return false; };
+ACCIONES.nuevaEmpresa=()=>{ if(soloAdministrador()) formEmpresa(null); };
 ACCIONES.editarEmpresa=d=>{
   const e=empresasVisibles().find(x=>x.id===d.id);
   if(!e){avisar('Esa empresa no está a tu alcance.');return}
@@ -380,6 +384,7 @@ ACCIONES.editarEmpresa=d=>{
 };
 ACCIONES.usarEmpresa=d=>{cambiarEmpresa(d.id)};
 ACCIONES.borrarEmpresa=d=>{
+  if(!soloAdministrador()) return;
   const e=empresasVisibles().find(x=>x.id===d.id);
   if(!e){avisar('Esa empresa no está a tu alcance.');return}
   confirmar(`Se eliminará "${e.nombre}" junto con sus ${e.partidas.length} partidas y su catálogo de cuentas.\n\nEsto no se puede deshacer.`,()=>{

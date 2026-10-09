@@ -144,7 +144,8 @@ VISTAS.usuarios=()=>{
      no tiene servidor: cada despacho tiene su propia copia, aislada. Cada
      Administrador, a su vez, solo ve al personal que él mismo dio de alta —
      no el de otro Administrador que use el mismo archivo. */
-  const lista=(BD.usuarios||[]).filter(x=> esSuper ? x.rol==='administrador' : x.administradorId===u.id);
+  const prop=u.rol==='propietario';
+  const lista=prop?personalDelPropietario(u):(BD.usuarios||[]).filter(x=> esSuper ? x.rol==='administrador' : x.administradorId===u.id);
   const fila=x=>{
     const r=ROLES[x.rol];
     return `<tr${x.activo===false?' style="opacity:.55"':''}>
@@ -160,7 +161,8 @@ VISTAS.usuarios=()=>{
   };
   return cab('Usuarios', esSuper
       ? 'Cuentas de Administrador de este despacho. Cada una puede crear y gestionar sus propias empresas.'
-      : 'Cuentas del personal que trabaja con vos. Cada rol ve solo lo que le corresponde.',
+      : prop?'Cuentas de las personas que trabajan en tu empresa. Cada rol ve solo lo que le corresponde, y solo en tu empresa.'
+      :'Cuentas del personal que trabaja con vos. Cada rol ve solo lo que le corresponde.',
     `<button class="btn" data-accion="nuevoUsuario">${esSuper?'Agregar administrador':'Agregar usuario'}</button>`)
   + (lista.length? `<table><thead><tr><th>Nombre</th><th>Usuario</th><th>Rol</th>${esSuper?'<th>Asistente IA</th>':''}<th class="num"></th></tr></thead>
       <tbody>${lista.map(fila).join('')}</tbody></table>`

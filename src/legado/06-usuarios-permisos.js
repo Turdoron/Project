@@ -7,6 +7,9 @@
 const ROLES={
   superadmin:{nombre:'Superadministrador', grupo:'Dirección'},
   administrador:{nombre:'Administrador', grupo:'Dirección'},
+  /* El dueño de una empresa cliente: hace todo lo del Administrador, pero solo en las empresas que tiene
+     asignadas, y puede dar de alta al personal de esas empresas. No crea ni elimina empresas. */
+  propietario:{nombre:'Propietario', grupo:'Dirección', eliminar:true},
   cont_gerente:{nombre:'Gerente de Contabilidad', grupo:'Contabilidad', depto:'contabilidad', eliminar:true},
   cont_auxiliar:{nombre:'Auxiliar Contable', grupo:'Contabilidad', depto:'contabilidad', eliminar:false},
   rrhh_gerente:{nombre:'Gerente de Recursos Humanos', grupo:'Recursos Humanos', depto:'rrhh', eliminar:true},
@@ -20,7 +23,7 @@ const ROLES={
   compras_auxiliar:{nombre:'Auxiliar de Compras', grupo:'Compras', depto:'compras'},
 };
 /* Agrupados para el selector de "nuevo usuario", en el orden del organigrama. */
-const ROLES_ASIGNABLES=['administrador','cont_gerente','cont_auxiliar','rrhh_gerente','rrhh_auxiliar',
+const ROLES_ASIGNABLES=['administrador','propietario','cont_gerente','cont_auxiliar','rrhh_gerente','rrhh_auxiliar',
   'prod_gerente','prod_auxiliar','ventas_gerente','ventas_auxiliar','ventas_vendedor',
   'compras_gerente','compras_auxiliar'];
 
@@ -68,7 +71,7 @@ function vistasPermitidas(){
   const u=usuarioActual();
   if(!u) return [];
   if(u.rol==='superadmin') return ['usuarios'];
-  if(u.rol==='administrador') return null;
+  if(u.rol==='administrador'||u.rol==='propietario') return null;   // el propietario, limitado a sus empresas
   const r=ROLES[u.rol];
   if(!r) return ['home'];
   if(r.depto==='contabilidad') return ['home','resumen','cierreFiscal','catalogo','partidas','facturas','proveedores','clientes',
@@ -261,3 +264,13 @@ function cerrarSesion(){
   },'Cerrar sesión');
 }
 
+
+/* Propietario: las empresas que tiene asignadas, y el personal que puede gestionar (de esas empresas y de
+   ninguna otra; nunca un Administrador). */
+const esPropietario=()=>{ const u=usuarioActual(); return !!u&&u.rol==='propietario'; };
+const empresasDelPropietario=u=>Array.isArray(u&&u.empresasAsignadas)?u.empresasAsignadas:[];
+function personalDelPropietario(u){
+  const mias=empresasDelPropietario(u);
+  return (BD.usuarios||[]).filter(x=>x.administradorId===u.administradorId&&x.rol!=='administrador'&&x.rol!=='superadmin'
+    &&Array.isArray(x.empresasAsignadas)&&x.empresasAsignadas.length&&x.empresasAsignadas.every(id=>mias.includes(id)));
+}
