@@ -345,14 +345,19 @@ function calcularISO(e){
      pendientes de reintegro por la SAT (Art. 7, Dto. 73-2008): el IVA en devolución (1.1.15) y el ISR
      pagado en exceso que se reclama con el SAT-2350 (1.1.13). */
   const iniAnio=`${e.ejercicio}-01-01`;
-  const activoNetoAnt=r2(saldoTipoAntesDe(e,['activo'],iniAnio)-saldoCuentaAntesDe(e,'1.1.15',iniAnio)-saldoCuentaAntesDe(e,'1.1.13',iniAnio));
+  /* La reserva para cuentas incobrables (1.1.05) resta solo hasta lo que acepta la ley del ISR: el 3% del
+     saldo de clientes y documentos por cobrar del giro al cierre. Lo que pase de ese tope se suma de vuelta. */
+  const reservaAnt=r2(Math.max(0,-saldoCuentaAntesDe(e,'1.1.05',iniAnio)));
+  const topeReserva=r2(Math.max(0,saldoCuentaAntesDe(e,'1.1.04',iniAnio)+saldoCuentaAntesDe(e,'1.1.06',iniAnio))*0.03);
+  const reservaExceso=r2(Math.max(0,reservaAnt-topeReserva));
+  const activoNetoAnt=r2(saldoTipoAntesDe(e,['activo'],iniAnio)-saldoCuentaAntesDe(e,'1.1.15',iniAnio)-saldoCuentaAntesDe(e,'1.1.13',iniAnio)+reservaExceso);
   const baseActivo=activoNetoAnt/4, baseIngresos=ingresosAnt/4;
   let base, criterio;
   if(activoNetoAnt>ingresosAnt*4){ base=baseIngresos; criterio='ingresos brutos (el activo supera 4 veces los ingresos)'; }
   else if(baseActivo>=baseIngresos){ base=baseActivo; criterio='activo neto'; }
   else{ base=baseIngresos; criterio='ingresos brutos'; }
   const isoTrimestral=r2(base*0.01);
-  return {aplica:true,ejercicioAnterior,activoNetoAnt,ingresosAnt,margenBruto,base,criterio,isoTrimestral};
+  return {aplica:true,ejercicioAnterior,activoNetoAnt,ingresosAnt,margenBruto,base,criterio,isoTrimestral,reservaAnt,topeReserva,reservaExceso};
 }
 
 /* Cálculo completo del Estado de Resultados — usado por la pantalla de

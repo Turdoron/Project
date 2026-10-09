@@ -301,7 +301,7 @@ function htmlTarjetaISO(e){
       <div class="cifra"><span>Ingresos brutos ${iso.ejercicioAnterior}</span><strong>${Q(iso.ingresosAnt)}</strong></div>
       <div class="cifra"><span>Base (${esc(iso.criterio)})</span><strong>${Q(iso.base)}</strong></div>
       <div class="cifra"><span>ISO trimestral (1%)</span><strong>${Q(iso.isoTrimestral)}</strong></div>
-    </div>${detalle}`;
+    </div>${iso.reservaExceso>0?`<p style="margin:0 0 12px;font-size:13px;color:var(--tinta-suave)">La reserva para cuentas incobrables al cierre de ${iso.ejercicioAnterior} (Q${Q(iso.reservaAnt)}) pasa del 3% de clientes y documentos por cobrar (Q${Q(iso.topeReserva)}), que es lo que acepta la ley del ISR: el exceso de Q${Q(iso.reservaExceso)} se suma de vuelta al activo neto.</p>`:''}${detalle}`;
 }
 
 /* Cierre de libros — el cierre contable tradicional de fin de ejercicio:
