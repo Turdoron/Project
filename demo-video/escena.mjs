@@ -28,7 +28,7 @@ html,body{margin:0;width:1080px;height:1920px;overflow:hidden;background:var(--f
 #abajo{position:absolute;left:0;bottom:0;width:1080px;height:270px;display:flex;align-items:center;justify-content:center;gap:22px}
 #abajo img{height:120px}
 #abajo div{font-size:26px;letter-spacing:.2em;text-transform:uppercase;color:var(--suave);font-weight:600;line-height:1.6}
-#hoja{position:absolute;left:50%;top:50%;width:760px;margin-left:-380px;transform:translateY(140%) rotate(4deg);transition:transform 1s cubic-bezier(.2,.8,.2,1);z-index:7;
+#hoja{position:absolute;left:50%;top:50%;width:760px;margin-left:-380px;transform:translateY(1300px) rotate(4deg);transition:transform 1s cubic-bezier(.2,.8,.2,1);z-index:7;
   box-shadow:0 40px 90px rgba(0,0,0,.6);border-radius:6px;overflow:hidden;background:#fff}
 #hoja.ver{transform:translateY(-50%) rotate(-1.5deg)}
 #hoja img{display:block;width:100%}
@@ -47,7 +47,7 @@ html,body{margin:0;width:1080px;height:1920px;overflow:hidden;background:var(--f
 <div id="abajo"><img src="data:image/png;base64,${logoB64}" alt=""></div>
 <div id="hoja"><img id="hojaImg" alt=""><b>PDF listo</b></div>
 <div class="pantalla" id="intro"><img src="data:image/png;base64,${logoB64}" alt=""><h1>Tu contabilidad, al día y sin enredos</h1><p>Hecho para empresas guatemaltecas</p></div>
-<div class="pantalla oculta" id="outro"><img src="data:image/png;base64,${logoB64}" alt=""><h1>Contabilidad, impuestos, planillas y contratos</h1><p>En un solo sistema, en la nube</p><div class="pill">Pedí tu demostración</div></div>
+<div class="pantalla oculta" id="outro"><img src="data:image/png;base64,${logoB64}" alt=""><h1>Contabilidad, impuestos, planillas, compras y producción</h1><p>En un solo sistema, en la nube</p><div class="pill">Pedí tu demostración</div></div>
 </body></html>`
 await page.route(BASE+'/',async r=>{ if(r.request().resourceType()!=='document') return r.continue(); const resp=await r.fetch(); const h={...resp.headers()}; delete h['x-frame-options']; r.fulfill({response:resp,headers:h}) })
 await page.route(BASE+'/__escenario',r=>r.fulfill({contentType:'text/html; charset=utf-8',body:ESCENARIO}))
@@ -74,17 +74,17 @@ async function camara(z=1,cx=W/2,cy=H/2,ms=1100){
   camZ=z; camX=Math.min(0,Math.max(W-W*z,W/2-cx*z)); camY=Math.min(0,Math.max(H-H*z,H/2-cy*z))
   await page.evaluate(([x,y,z,ms])=>{ const c=document.getElementById('cam'); c.style.transitionDuration=ms+'ms'; c.style.transform=`translate(${x}px,${y}px) scale(${z})` },[camX,camY,z,ms])
 }
-async function rect(sel){ return marco.$eval(sel,el=>{ const r=el.getBoundingClientRect(); return {x:r.left,y:r.top,w:r.width,h:r.height} }) }
+async function rect(sel){ try{ return await marco.$eval(sel,el=>{ const r=el.getBoundingClientRect(); return {x:r.left,y:r.top,w:r.width,h:r.height} }) }catch(err){ await page.screenshot({path:SP+'/fallo.png'}).catch(()=>{}); console.log('ESTADO',await marco.evaluate(()=>JSON.stringify({v:VISTA,m:modal.open,a:document.getElementById('aviso').open,t:document.getElementById('avisoCuerpo').textContent.slice(0,200)})).catch(()=>'')); throw err } }
 async function enfocar(sel,z,ajY=0){ const r=await rect(sel); await camara(z,r.x+r.w/2,r.y+r.h/2+ajY) }
 async function cursorA(sel,dx=0.5,dy=0.5){
   const r=await rect(sel); const x=(r.x+r.w*dx)*camZ+camX, y=(r.y+r.h*dy)*camZ+camY
   await page.evaluate(([x,y])=>{ const c=document.getElementById('cursor'); c.style.opacity=1; c.style.transform=`translate(${x-6}px,${y-4}px)` },[x,y])
-  await esperar(750); return {x,y}
+  await esperar(520); return {x,y}
 }
 async function clicar(sel,{dx=0.5,dy=0.5}={}){
   const p=await cursorA(sel,dx,dy)
   await page.evaluate(([x,y])=>{ const o=document.createElement('div'); o.className='onda'; o.style.left=x+'px'; o.style.top=y+'px'; document.getElementById('ventana').appendChild(o); setTimeout(()=>o.remove(),700) },[p.x,p.y])
-  await esperar(120); await marco.$eval(sel,el=>el.click()); await esperar(350)
+  await esperar(120); await marco.$eval(sel,el=>el.click()); await esperar(220)
 }
 async function escribir(sel,txt){
   await marco.$eval(sel,el=>{ el.focus(); el.value=''; el.dispatchEvent(new Event('input',{bubbles:true})) })

@@ -1,5 +1,5 @@
 import sys, numpy as np, soundfile as sf
-sr=44100; dur=61.3; n=int(dur*sr); t=np.arange(n)/sr
+sr=44100; dur=111.6; n=int(dur*sr); t=np.arange(n)/sr
 bpm=96; beat=60/bpm; bar=beat*4
 def nota(m): return 440*2**((m-69)/12)
 prog=[[60,64,67,71],[57,60,64,67],[53,57,60,64],[55,59,62,67]]  # Cmaj7 Am7 Fmaj7 G

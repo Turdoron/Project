@@ -1,16 +1,18 @@
 # Video demostrativo de ADCONTIS (redes sociales)
 
-Material para el video vertical de 1 minuto (1080×1920). No es parte del sistema.
+Material para el video vertical de ~1 min 50 s (1080×1920). No es parte del sistema.
 
-- `video-sin-sonido.mp4`: el video ya grabado, sin audio (61 s).
-- Grabación: `base.mjs` + `datos.mjs` + `escena.mjs` + `guion.mjs` se concatenan en un solo
-  script de Playwright (`cat base.mjs datos.mjs escena.mjs guion.mjs > video.mjs`) y se corre con
+- `video-sin-sonido.mp4`: el video ya grabado, sin audio (111 s).
+- Grabación: `base.mjs` + `datos.mjs` + `datos2.mjs` + `escena.mjs` + `guion.mjs` se concatenan en un solo
+  script de Playwright (`cat base.mjs datos.mjs datos2.mjs escena.mjs guion.mjs > video.mjs`) y se corre con
   `BASE=http://localhost:4195 SP=<carpeta> node video.mjs`, con el sistema compilado (`npm run build`,
   `npx next start -p 4195`) desde la rama `claude/sharp-thompson-npjar1` (tiene los accesos directos que
   salen en el video). `base.mjs` espera jsPDF local en `<SP>/jspdfpkg/node_modules` (`npm i jspdf jspdf-autotable`).
-  La salida queda en `<SP>/video/`.
+  La salida queda en `<SP>/video/`. `datos2.mjs` prepara el personal, la planilla de septiembre, una orden de compra por aprobar,
+  una orden de producción y una segunda empresa; el guion cubre facturas, libros en PDF, conciliación, tablero fiscal, estados
+  financieros, activos fijos, planillas y liquidación, contratos, compras, producción, varias empresas y atajos.
 - Audio:
-  - `musica.py`: música de fondo sintetizada (sin derechos), 61.3 s → `python musica.py musica.wav`.
+  - `musica.py`: música de fondo sintetizada (sin derechos), 111.6 s → `python musica.py musica.wav`.
   - `narrar_piper.py`: narración con voces Piper (`python narrar_piper.py modelo.onnx salida.wav`).
   - `narrar.py`: narración con Kokoro (descartada: sonaba artificial).
   - Los tiempos de cada frase están en la lista `G` de los scripts de narración (inicio, fin disponible, texto).

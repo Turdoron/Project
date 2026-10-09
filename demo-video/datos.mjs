@@ -1,10 +1,10 @@
 /* Datos de la empresa de demostración (ficticia). Se pega después de base.mjs. */
-const YO=[NIT,'Distribuidora Los Volcanes, S. A.']
+const YO=[NIT,'Industrias Los Volcanes, S. A.']
 const PRV={cafe:['3101','Finca El Mirador, S. A.'],azu:['3102','Ingenio La Unión'],ene:['3103','Empresa Eléctrica'],alq:['3104','Inmobiliaria Central']}
 const CLT={a:['4201','Supermercados La Ceiba'],b:['4202','Cafetería Antigua'],c:['4203','Hoteles del Lago, S. A.']}
 await page.evaluate(([NIT])=>{
   const id=crypto.randomUUID()
-  const e={id,nombre:'Distribuidora Los Volcanes, S. A.',nit:NIT,direccion:'12 calle 1-25, zona 10',representante:'',administradorId:BD.sesion,cuentas:nuevoCatalogo(),partidas:[],documentos:[],pagos:[],cobros:[],
+  const e={id,nombre:'Industrias Los Volcanes, S. A.',nit:NIT,direccion:'12 calle 1-25, zona 10',representante:'Industrias Los Volcanes, S. A.',administradorId:BD.sesion,cuentas:nuevoCatalogo(),partidas:[],documentos:[],pagos:[],cobros:[],
     empleados:[],planillas:[],socios:[],mapeoNit:{},mapeoCat:{},mapeoBS:{},mapeoProducto:{},inventarioFinal:{},historialRegimen:[{regimen:'general',vigenteDesde:'2026-01-01'}],historialISO:[{opcion:'pagos',vigenteDesde:'2026-01-01'}],
     regimen:'general',metodoCosteo:'promedio',metodoCosteoConfirmado:true,tipoActividad:'comercializadora',tipoSociedad:'sociedad',correlativo:1,ejercicio:2026,salarioMinimo:SALARIO_MINIMO}
   e.partidas.push({id:crypto.randomUUID(),numero:e.correlativo++,fecha:'2026-01-02',concepto:'Aporte de capital inicial',lineas:[{cta:'1.1.03',desc:'',debe:250000,haber:0},{cta:'3.1.01',desc:'',debe:0,haber:250000}]})
