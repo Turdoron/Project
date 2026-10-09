@@ -13,6 +13,9 @@ Material para el video vertical de 1 minuto (1080×1920). No es parte del sistem
   - `musica.py`: música de fondo sintetizada (sin derechos), 61.3 s → `python musica.py musica.wav`.
   - `narrar_piper.py`: narración con voces Piper (`python narrar_piper.py modelo.onnx salida.wav`).
   - `narrar.py`: narración con Kokoro (descartada: sonaba artificial).
+  - `narrar_chatterbox.py`: narración con Chatterbox Multilingual en español (`pip install chatterbox-tts`;
+    `python narrar_chatterbox.py voz.wav [referencia.wav]`). Baja los pesos de `huggingface.co`. La referencia
+    opcional (~10 s de una voz latinoamericana con derechos de uso) fija el acento; sin ella usa la voz por defecto.
   - Los tiempos de cada frase están en la lista `G` de los scripts de narración (inicio, fin disponible, texto).
 
 ## Mezcla (voz + música sobre el video)
