@@ -14,6 +14,8 @@ export default {
       { source: '/:ruta*', headers: seguridad },
       // El programa lleva en el nombre un resumen de su contenido: cada versión nueva es otro archivo.
       { source: '/app/:archivo*', headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }] },
+      // El service worker se revisa siempre, para que la app instalada nunca quede con una versión vieja.
+      { source: '/sw.js', headers: [{ key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' }, { key: 'Content-Type', value: 'application/javascript; charset=utf-8' }] },
     ]
   },
 }

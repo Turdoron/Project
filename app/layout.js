@@ -8,7 +8,7 @@ const inter = Inter({ subsets: ['latin'], axes: ['opsz'], display: 'swap', varia
 // Fraunces: solo los títulos de pantalla (sin cifras). No se precarga: así no le quita velocidad al programa en la primera visita.
 const fraunces = Fraunces({ subsets: ['latin'], axes: ['opsz'], display: 'swap', variable: '--fuente-fraunces', preload: false })
 
-export const viewport = { width: 'device-width', initialScale: 1 }
+export const viewport = { width: 'device-width', initialScale: 1, themeColor: '#2B2E83' }
 
 // Tema guardado (claro, oscuro o el del sistema): se aplica antes de dibujar nada, para que no parpadee.
 const TEMA = `(function(){var t='sistema';try{t=localStorage.getItem('contagt_tema')||'sistema'}catch(e){}
@@ -21,7 +21,9 @@ document.documentElement.setAttribute('data-theme',osc?'dark':'light');})();`
 // El título de la pestaña lo maneja el programa (cambia por pantalla); si lo diera Next.js, React lo volvería a poner al hidratar.
 const PREVIO = `document.title='Módulo Contable ADCONTIS';
 window.sbListo=new Promise(function(r){window.__sbResolve=r});
-window.__recuperando=/[#&]type=recovery(&|$)/.test(location.hash);`
+window.__recuperando=/[#&]type=recovery(&|$)/.test(location.hash);
+if('serviceWorker' in navigator){addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){})})}
+addEventListener('beforeinstallprompt',function(ev){ev.preventDefault();window.__instalar=ev});`
 
 export default function RaizLayout({ children }) {
   // suppressHydrationWarning: el tema y la visibilidad (zoom) los ajusta el programa en <html> y <body>.

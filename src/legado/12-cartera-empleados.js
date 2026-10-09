@@ -247,6 +247,11 @@ VISTAS.config=()=>cab('Configuración','Ajustes del sistema, no de una empresa e
         ? (claveIA()?'Habilitado por el Superadministrador. Lo encontrás en Partidas contables → Registrar partida.'
                     :'Habilitado por el Superadministrador, pero todavía no guardó la clave de API en este navegador: pedile que la configure en Usuarios.')
         : 'No está habilitado para tu despacho. Lo habilita el Superadministrador, desde Usuarios.'}</p></div>
+    <div class="tarjeta"><h3>Instalar la app</h3>
+     <p>ADCONTIS se instala en el teléfono o en la computadora como una app, con su ícono y a pantalla completa.
+       <strong>Android:</strong> en Chrome, menú ⋮ → «Instalar app» (o el botón de abajo). <strong>iPhone:</strong> en Safari, Compartir → «Agregar a pantalla de inicio».
+       Con «Vencimientos → Agregar a mi calendario» los avisos quedan en el calendario del teléfono.</p>
+     ${window.matchMedia&&matchMedia('(display-mode: standalone)').matches?'<p><strong>Ya estás usando la app instalada.</strong></p>':`<button class="btn sec" data-accion="instalarApp">Instalar app</button>`}</div>
     <div class="tarjeta"><h3>Respaldos diarios en la nube</h3>
      <p>Cada día en que se modifica una empresa, la nube guarda sola cómo estaba al empezar el día, y una copia si se elimina. Se conservan 30 días y se pueden restaurar desde acá.</p>
      <button class="btn sec" data-accion="verRespaldos">Ver y restaurar respaldos de esta empresa</button></div>

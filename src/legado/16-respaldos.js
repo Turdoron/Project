@@ -39,3 +39,12 @@ ACCIONES.verRespaldos=async()=>{
     },'Restaurar');
   });
 };
+
+/* Instalar como app: usa el aviso del navegador si lo dio; si no, explica cómo hacerlo a mano. */
+ACCIONES.instalarApp=async()=>{
+  const p=window.__instalar;
+  if(p){ p.prompt(); try{ const r=await p.userChoice; if(r&&r.outcome==='accepted') window.__instalar=null; }catch(err){} return; }
+  avisar(/iphone|ipad/i.test(navigator.userAgent)
+    ?'En el iPhone: abrí ADCONTIS en Safari, tocá Compartir (el cuadro con la flecha) y elegí «Agregar a pantalla de inicio».'
+    :'Abrí el menú del navegador (⋮ en Chrome o Edge) y elegí «Instalar app» o «Agregar a pantalla de inicio». Si no aparece, puede que ya esté instalada.','Instalar la app');
+};
