@@ -73,7 +73,7 @@ function vistasPermitidas(){
   if(!r) return ['home'];
   if(r.depto==='contabilidad') return ['home','resumen','cierreFiscal','catalogo','partidas','facturas','proveedores','clientes',
     'diario','mayor','inventario','libroInventarios','activosFijos','libroPequeno','libroVentas','libroCompras','devolucionIVA','retenciones','conciliacion','balanza','resultados','balance','flujoEfectivo','estadosFinancieros','tablero','vencimientos','aumentosCapital'];
-  if(r.depto==='rrhh') return ['home','vencimientos','empleados','planillas','pagoPrestaciones','libroSalarios','contratos','contratoEditar','documentosLaborales','puestos'];
+  if(r.depto==='rrhh') return ['home','empleados','planillas','pagoPrestaciones','libroSalarios','contratos','contratoEditar','documentosLaborales','puestos'];
   if(r.depto==='produccion') return ['home','produccion'];
   if(r.depto==='ventas') return ['home','ventas'];
   if(r.depto==='compras') return ['home','compras'];
