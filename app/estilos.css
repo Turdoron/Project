@@ -367,6 +367,8 @@ nav .sub-cuerpo .app-sec:first-child{margin-top:6px}
 /* Registro del contrato en la Dirección General de Trabajo */
 .reg-ct{font-size:12.5px;white-space:nowrap}
 .reg-ct.reg-ok{color:var(--exito)} .reg-ct.reg-vencido{color:var(--peligro);font-weight:600} .reg-ct.reg-pendiente{color:var(--advertencia)}
+/* Listas largas por partes */
+.mostrar-mas{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0 0;font-size:13px;color:var(--tinta-suave)}
 /* Antigüedad de saldos */
 .ant-tit{margin:30px 0 10px}
 td.ant-venc{color:var(--advertencia);font-weight:600} td.ant-grave{color:var(--peligro)}

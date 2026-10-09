@@ -45,9 +45,13 @@ VISTAS.catalogo=()=>{
 VISTAS.partidas=()=>{
   if(borrador) return formularioPartida();
   const e=emp();
-  const lista=[...e.partidas].sort((a,b)=>a.fecha.localeCompare(b.fecha)||a.numero-b.numero);
+  /* Por defecto, las del ejercicio de trabajo (el correlativo reinicia cada año); se pueden ver otros años o todas. */
+  const anios=[...new Set(e.partidas.map(p=>(p.fecha||'').slice(0,4)).filter(Boolean))].sort().reverse();
+  const anioSel=filtros.anioPart===undefined?String(e.ejercicio):filtros.anioPart;
+  const lista=[...e.partidas].filter(p=>!anioSel||(p.fecha||'').startsWith(anioSel)).sort((a,b)=>a.fecha.localeCompare(b.fecha)||a.numero-b.numero);
   const fuera=lista.some((p,i)=>i>0 && p.numero<lista[i-1].numero);
-  const filas=lista.map(p=>{
+  const limite=+filtros.limPart||200;
+  const filas=lista.slice(0,limite).map(p=>{
     const t=p.lineas.reduce((s,l)=>s+(+l.debe||0),0);
     return `<tr><td class="num" style="text-align:left">${p.numero}</td><td>${fFecha(p.fecha)}</td>
       <td>${esc(p.concepto)}${p.docNum?`<br><span style="font-size:13px;color:var(--tinta-suave)">${esc(p.docTipo||'Documento')} ${esc(p.docSerie?p.docSerie+'-':'')}${esc(p.docNum)}${p.contraparte?' · '+esc(p.contraparte):''}</span>`:''}</td>
@@ -61,8 +65,10 @@ VISTAS.partidas=()=>{
     + (fuera?`<div class="aviso malo">Hay partidas cuyo número no sigue el orden de las fechas.
         El Diario debe ser cronológico y el correlativo debe acompañarlo.
         <button class="btn mini" data-accion="renumerar" style="margin-left:8px">Renumerar</button></div>`:'')
-    + (lista.length? `<table><thead><tr><th>No.</th><th>Fecha</th><th>Concepto</th><th class="num">Monto</th><th class="num"></th></tr></thead><tbody>${filas}</tbody></table>`
-      : `<div class="vacio">No hay partidas registradas en esta empresa.</div>`);
+    + `<div class="barra"><div class="campo"><label for="anioPart">Año</label><select id="anioPart" data-filtro="anioPart">
+        ${[...new Set([String(e.ejercicio),...anios])].sort().reverse().map(a=>`<option value="${a}"${a===anioSel?' selected':''}>${a}</option>`).join('')}<option value=""${anioSel===''?' selected':''}>Todos los años</option></select></div></div>`
+    + (lista.length? `<table><thead><tr><th>No.</th><th>Fecha</th><th>Concepto</th><th class="num">Monto</th><th class="num"></th></tr></thead><tbody>${filas}</tbody></table>${botonMostrarMas(lista.length,limite,'limPart',200,'partidas')}`
+      : `<div class="vacio">No hay partidas registradas ${anioSel?`en ${anioSel}`:'en esta empresa'}.</div>`);
 };
 
 function formularioPartida(){
@@ -187,18 +193,21 @@ VISTAS.diario=()=>{
   const d=filtros.desde||`${e.ejercicio}-01-01`, h=filtros.hasta||`${e.ejercicio}-12-31`;
   const lista=e.partidas.filter(p=>p.fecha>=d&&p.fecha<=h)
     .sort((a,b)=>a.fecha.localeCompare(b.fecha)||a.numero-b.numero);
+  /* Las sumas van sobre todo el rango; en pantalla se muestran de a 150 partidas, porque una página con miles
+     de renglones hace lenta cada acción (abrir una ventana, escribir). El PDF siempre lleva todo. */
+  const nombreCta=Object.fromEntries(e.cuentas.map(c=>[c.c,c.n])), limite=+filtros.limDiario||150;
   let td=0,th=0, cuerpo='';
-  lista.forEach(p=>{
+  lista.forEach(p=>p.lineas.forEach(l=>{ td+=(+l.debe||0); th+=(+l.haber||0); }));
+  lista.slice(0,limite).forEach(p=>{
     cuerpo+=`<tr class="grupo-cta"><td colspan="4">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
         <span>Partida No. ${p.numero} — ${fFecha(p.fecha)} — ${esc(p.concepto)}</span>
         <button class="btn mini sec" data-accion="editarPartida" data-id="${p.id}">Editar</button>
       </div></td></tr>`;
     p.lineas.forEach(l=>{
-      td+=(+l.debe||0); th+=(+l.haber||0);
-      const c=e.cuentas.find(x=>x.c===l.cta);
+      const n=nombreCta[l.cta];
       cuerpo+=`<tr><td class="num" style="text-align:left">${l.cta}</td>
-        <td>${esc(c?c.n:'?')}${l.desc?` <span style="color:var(--tinta-suave)">· ${esc(l.desc)}</span>`:''}</td>
+        <td>${esc(n!==undefined?n:'?')}${l.desc?` <span style="color:var(--tinta-suave)">· ${esc(l.desc)}</span>`:''}</td>
         <td class="num d">${l.debe?Q(l.debe):''}</td><td class="num h">${l.haber?Q(l.haber):''}</td></tr>`;
     });
   });
@@ -208,9 +217,14 @@ VISTAS.diario=()=>{
     + rangoFechas(d,h)
     + (lista.length? `<table><thead><tr><th>Cuenta</th><th>Descripción</th><th class="num">Debe</th><th class="num">Haber</th></tr></thead>
        <tbody>${cuerpo}</tbody><tfoot><tr class="total"><td colspan="2">Sumas iguales</td>
-       <td class="num d">${Q(td)}</td><td class="num h">${Q(th)}</td></tr></tfoot></table>`
+       <td class="num d">${Q(td)}</td><td class="num h">${Q(th)}</td></tr></tfoot></table>${botonMostrarMas(lista.length,limite,'limDiario',150,'partidas')}`
       : `<div class="vacio">Sin operaciones en el rango seleccionado.</div>`);
 };
+/* «Mostrar más»: las listas largas se dibujan por partes para que la pantalla siga respondiendo rápido. */
+function botonMostrarMas(total,limite,filtro,paso,que){
+  if(total<=limite) return '';
+  return `<p class="mostrar-mas">Mostrando ${limite} de ${total} ${que}. <button type="button" class="btn sec mini" data-mas="${filtro}" data-paso="${paso}">Mostrar ${Math.min(paso,total-limite)} más</button> <button type="button" class="btn sec mini" data-mas="${filtro}" data-paso="${total}">Mostrar todas</button></p>`;
+}
 
 VISTAS.mayor=()=>{
   const e=emp();

@@ -1,6 +1,9 @@
 /* ============ UTILIDADES ============ */
 const uid=()=>crypto.randomUUID();
-const Q=n=>(n||0).toLocaleString('es-GT',{minimumFractionDigits:2,maximumFractionDigits:2});
+/* Un solo formateador para todos los montos: toLocaleString arma uno nuevo en cada llamada y, con miles de
+   cifras por pantalla (el Diario), eso era lo que más tardaba. El resultado es idéntico. */
+const FORMATO_Q=new Intl.NumberFormat('es-GT',{minimumFractionDigits:2,maximumFractionDigits:2});
+const Q=n=>FORMATO_Q.format(n||0);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 /* Fecha LOCAL (Guatemala, UTC−6). toISOString() devuelve la fecha en UTC, que
    después de las 18:00 ya es "mañana" — por eso no se usa. */

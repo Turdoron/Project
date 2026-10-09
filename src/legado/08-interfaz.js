@@ -432,9 +432,13 @@ function pintar(){
   nodo.querySelectorAll('[data-accion]').forEach(b=>b.onclick=()=>{
     const acc=ACCIONES[b.dataset.accion]; if(!acc) return;
     if(b.dataset.accion==='deshacer'){ acc(b.dataset); return; }
+    /* Las que solo consultan (ver, ir a otra pantalla, PDF) no cambian nada: no hace falta copiar la empresa
+       para «Deshacer», y con muchos datos esa copia era lo que más demoraba la respuesta del botón. */
+    if(/^(ver[A-Z]|ir[A-Z]|pdf|abrir[A-Z]|calendarioICS$|descargar)/.test(b.dataset.accion)){ acc(b.dataset); return; }
     conSnapshot(b.textContent.trim()||b.dataset.accion,()=>acc(b.dataset));
   });
   nodo.querySelectorAll('[data-app]').forEach(b=>b.onclick=()=>abrirApp(b.dataset.app));
+  nodo.querySelectorAll('[data-mas]').forEach(b=>b.onclick=()=>{ const k=b.dataset.mas; const base=k==='limDiario'?150:200; filtros[k]=(+filtros[k]||base)+(+b.dataset.paso||0); pintar(); });
   nodo.querySelectorAll('[data-atajo]').forEach(b=>b.onclick=()=>{ const n=document.querySelector(`nav [data-v="${b.dataset.atajo}"]`); if(n) n.click(); });
   nodo.querySelectorAll('[data-filtro]').forEach(i=>{
     i.oninput=i.onchange=()=>{filtros[i.dataset.filtro]=i.value;pintar()};
