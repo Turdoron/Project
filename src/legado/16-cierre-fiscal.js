@@ -93,9 +93,11 @@ function pasosCierreFiscal(e,c){
   const iso=calcularISO(e);
   if(iso.aplica){
     const trims=R.anual?[1,2,3,4]:[R.t];
-    const falta=trims.filter(t=>!(e.pagosISO||[]).some(p=>p.anio===e.ejercicio&&p.trimestre===t));
+    const exentos=trims.filter(t=>isoExentoTrimestre(e,e.ejercicio,t));
+    const falta=trims.filter(t=>!exentos.includes(t)&&!(e.pagosISO||[]).some(p=>p.anio===e.ejercicio&&p.trimestre===t));
     paso('Impuesto de Solidaridad (ISO)',falta.length?'pend':'ok',
-      falta.length?`Falta pagar el ISO del trimestre ${listaNombres(falta.map(String))} (Q${Q(iso.isoTrimestral)} por trimestre).`:'ISO del período pagado.',
+      (falta.length?`Falta pagar el ISO del trimestre ${listaNombres(falta.map(String))} (Q${Q(iso.isoTrimestral)} por trimestre).`:exentos.length===trims.length?'Exento: primeros cuatro trimestres de operación (Art. 4).':'ISO del período pagado.')
+        +(exentos.length&&exentos.length<trims.length?` El trimestre ${listaNombres(exentos.map(String))} está exento por inicio de operaciones.`:''),
       falta.length?btn('pagarISO','Pagar ISO','',false):'');
   }
 

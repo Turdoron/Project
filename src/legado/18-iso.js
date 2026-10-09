@@ -16,6 +16,29 @@ function isoOpcionEn(e,fecha){
   return h.length?h[h.length-1].opcion:null;
 }
 const isoOpcionDelAnio=(e,anio)=>isoOpcionEn(e,`${anio}-12-31`);
+/* Art. 4, Dto. 73-2008: quien inicia actividades está exento durante sus primeros cuatro trimestres de
+   operación. Se cuentan desde el trimestre en que empezó (inclusive). Solo se aplica si la fecha de inicio
+   está registrada a propósito: una empresa con años de operación que recién empieza a usar el sistema
+   no es nueva, y su primera partida no dice cuándo empezó a operar. */
+function trimestresExentosISO(e){
+  if(!e.inicioOperaciones) return [];
+  let anio=+e.inicioOperaciones.slice(0,4), t=Math.ceil(+e.inicioOperaciones.slice(5,7)/3);
+  const out=[];
+  for(let i=0;i<4;i++){ out.push({anio,t}); t++; if(t>4){ t=1; anio++; } }
+  return out;
+}
+const isoExentoTrimestre=(e,anio,t)=>trimestresExentosISO(e).some(x=>x.anio===anio&&x.t===t);
+const NOMBRE_TRIM=['Ene–Mar','Abr–Jun','Jul–Sep','Oct–Dic'];
+ACCIONES.inicioOperacionesISO=()=>{
+  const e=emp(), primera=(e.partidas||[]).map(p=>p.fecha).filter(Boolean).sort()[0]||'';
+  abrirModal('Inicio de operaciones',
+    `<p style="margin:0 0 12px;font-size:13px;color:var(--tinta-suave)">Quien <strong>inicia actividades</strong> está exento del ISO durante sus <strong>primeros cuatro trimestres de operación</strong> (Art. 4, Dto. 73-2008). Escribí la fecha en que la empresa empezó a operar.
+      Si la empresa ya operaba antes de usar este sistema, poné la fecha real de inicio (aunque sea de años atrás) o dejala vacía: así no se le aplica una exención que no le corresponde.</p>
+    <div class="rej"><div class="campo"><label>Inicio de operaciones</label><input name="fecha" type="date" value="${esc(e.inicioOperaciones||'')}"></div></div>
+    ${primera&&!e.inicioOperaciones?`<p class="ayuda-campo">La primera partida registrada es del ${fFecha(primera)}.</p>`:''}`,
+    d=>{ e.inicioOperaciones=d.fecha||'';
+      registrarLog('Registró el inicio de operaciones',`${e.nombre} — ${d.fecha?fFecha(d.fecha):'sin fecha'}`); guardar(); pintar(); },'Guardar');
+};
 const restanteCreditoISO=c=>r2(c.monto-(c.usado||0)-(c.vencido||0));
 
 /* Opción a): créditos de ISO. Un ISO pagado en el año Y se puede aplicar en Y+1, Y+2 y Y+3. */
@@ -141,8 +164,7 @@ ACCIONES.pagarISO=()=>{
       <strong>ISO trimestral: Q${Q(iso.isoTrimestral)}.</strong> Forma de acreditar: <strong>${esc(ISO_OPCIONES[opcion].corto)}</strong>.</p>
     <div class="rej">
       <div class="campo"><label>Trimestre</label><select name="trimestre">
-        <option value="1">Ene–Mar</option><option value="2">Abr–Jun</option>
-        <option value="3">Jul–Sep</option><option value="4">Oct–Dic</option>
+        ${[1,2,3,4].map(t=>`<option value="${t}">${NOMBRE_TRIM[t-1]}${isoExentoTrimestre(e,e.ejercicio,t)?' (exento: inicio de operaciones)':''}</option>`).join('')}
       </select></div>
       <div class="campo"><label>Monto del ISO</label><input name="monto" type="number" step="0.01" min="0" value="${iso.isoTrimestral}"></div>
       <div class="campo"><label>Se paga desde</label><select name="cuenta">
@@ -169,6 +191,7 @@ ACCIONES.pagarISO=()=>{
       : 'Se paga con los pagos trimestrales de ISR del mismo año, hasta donde alcancen. Lo que se use así ya no cuenta como ISR pagado, y el ISO no se recupera más adelante: se registra como gasto no deducible.'}</div>`,
     d=>{
       const t=+d.trimestre, monto=r2(+d.monto);
+      if(isoExentoTrimestre(e,e.ejercicio,t)){avisar(`El trimestre ${NOMBRE_TRIM[t-1]} de ${e.ejercicio} está exento: es uno de los primeros cuatro trimestres de operación de la empresa (inició el ${fFecha(e.inicioOperaciones)}, Art. 4 del Dto. 73-2008). No se paga ISO.`);return false}
       /* No todas las empresas pagan IUSI: se pregunta cada vez, cuando aplica. */
       if(iso.criterio==='activo neto'&&!d.pagaIUSI){avisar('Indicá si la empresa paga IUSI: el IUSI pagado se resta del ISO cuando la base es el activo neto.');return false}
       if(!(monto>0)){avisar('Escribí el monto del ISO.');return false}
@@ -269,6 +292,10 @@ function htmlTarjetaISO(e){
       Tarifa del 1% trimestral sobre la mayor entre 1/4 del activo neto y 1/4 de los ingresos brutos,
       ambos del ejercicio ${iso.ejercicioAnterior} completo (Dto. 73-2008).
       ${op?`Forma de acreditar: <strong>${esc(ISO_OPCIONES[op].nombre)}</strong>. <button class="btn mini sec" data-accion="cambiarISO">Cambiar</button>`:''}</p>
+    <p style="margin:0 0 12px;font-size:13px;color:var(--tinta-suave)">${(()=>{ const ex=trimestresExentosISO(e), ini=e.inicioOperaciones;
+      const txt=!ini?'Inicio de operaciones sin registrar (si la empresa es nueva, sus primeros cuatro trimestres están exentos).'
+        :`Inició operaciones el ${fFecha(ini)}: exenta del ISO en ${ex.map(x=>`${NOMBRE_TRIM[x.t-1]} ${x.anio}`).join(', ')} (Art. 4).`;
+      return esc(txt)+` <button class="btn mini sec" data-accion="inicioOperacionesISO">${ini?'Cambiar':'Registrar'}</button>`; })()}</p>
     <div class="cifras">
       <div class="cifra"><span>Activo neto ${iso.ejercicioAnterior}</span><strong>${Q(iso.activoNetoAnt)}</strong></div>
       <div class="cifra"><span>Ingresos brutos ${iso.ejercicioAnterior}</span><strong>${Q(iso.ingresosAnt)}</strong></div>
