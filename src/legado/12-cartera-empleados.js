@@ -247,6 +247,9 @@ VISTAS.config=()=>cab('Configuración','Ajustes del sistema, no de una empresa e
         ? (claveIA()?'Habilitado por el Superadministrador. Lo encontrás en Partidas contables → Registrar partida.'
                     :'Habilitado por el Superadministrador, pero todavía no guardó la clave de API en este navegador: pedile que la configure en Usuarios.')
         : 'No está habilitado para tu despacho. Lo habilita el Superadministrador, desde Usuarios.'}</p></div>
+    <div class="tarjeta"><h3>Respaldos diarios en la nube</h3>
+     <p>Cada día en que se modifica una empresa, la nube guarda sola cómo estaba al empezar el día, y una copia si se elimina. Se conservan 30 días y se pueden restaurar desde acá.</p>
+     <button class="btn sec" data-accion="verRespaldos">Ver y restaurar respaldos de esta empresa</button></div>
     <div class="tarjeta"><h3>Exportar</h3>
      <p>Descarga un archivo con todas las empresas, catálogos y partidas. Guardalo en la nube o en una USB.</p>
      <button class="btn" data-accion="exportar">Descargar respaldo</button></div>
