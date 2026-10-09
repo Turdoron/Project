@@ -341,7 +341,7 @@ VISTAS.home=()=>{
         <span class="app-nombre">${esc(a.nombre)}</span><span class="app-desc">${esc(a.desc)}</span></button>`).join('')}</div>`
     :'<div class="vacio">Tu cargo todavía no tiene aplicaciones asignadas. Consultá con el administrador.</div>';
   return cab(`${saludo}${nombre?', '+esc(nombre):''}`,`${esc(e.nombre)} · ejercicio ${e.ejercicio} · ${esc(REGIMENES[e.regimen]||'—')}. Elegí con qué vas a trabajar.`)
-    + lanzador + accesosDirectos();
+    + (puedeVer('vencimientos')?htmlAvisosVencimientos(e,15):'') + lanzador + accesosDirectos();
 };
 /* Accesos directos del inicio: las pantallas que tienen atajo de teclado (Alt + número),
    solo las que el cargo de la persona y la empresa en uso tienen disponibles. */

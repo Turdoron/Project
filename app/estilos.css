@@ -370,6 +370,11 @@ nav .sub-cuerpo .app-sec:first-child{margin-top:6px}
 /* Antigüedad de saldos */
 .ant-tit{margin:30px 0 10px}
 td.ant-venc{color:var(--advertencia);font-weight:600} td.ant-grave{color:var(--peligro)}
+/* Vencimientos */
+.avisos-venc ul{margin:6px 0 10px;padding-left:18px} .avisos-venc li{margin:2px 0}
+.venc-mes{margin:24px 0 8px;text-transform:capitalize}
+.venc-tipo{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.04em;padding:2px 7px;border-radius:999px;background:var(--fondo-suave);color:var(--tinta-suave);margin-right:4px}
+.venc-ok{color:var(--exito);font-weight:600} .venc-mal{color:var(--peligro);font-weight:700} .venc-prox{color:var(--advertencia);font-weight:600} .venc-pasado{color:var(--tinta-suave)}
 /* Libro de Salarios */
 .ls-trab{margin:0 0 30px}
 .ls-trab h3{margin:0 0 10px}
