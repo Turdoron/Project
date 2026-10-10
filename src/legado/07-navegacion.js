@@ -60,7 +60,7 @@ const APPS=[
   {id:'contabilidad',nombre:'Contabilidad',desc:'Libros, impuestos, estados financieros, inventario y activos fijos'},
   {id:'rrhh',nombre:'Recursos Humanos',desc:'Empleados, planillas y prestaciones'},
   {id:'compras',nombre:'Compras',desc:'Cotizaciones, órdenes de compra y proveedores'},
-  {id:'ventas',nombre:'Ventas',desc:'Ventas, consignaciones y clientes'},
+  {id:'ventas',nombre:'Ventas',desc:'Cotizaciones, pedidos, entregas y clientes'},
   {id:'produccion',nombre:'Producción',desc:'Órdenes, recetas y costos de producción'},
   {id:'empresa',nombre:'Empresa',desc:'Datos de las empresas y aumentos de capital'},
 ];

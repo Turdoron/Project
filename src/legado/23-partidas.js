@@ -239,6 +239,8 @@ function limpiarDependenciasPartida(e,p){
     const ids=new Set(docs.map(d=>d.id));
     e.documentos=e.documentos.filter(d=>!mismaPartida(d));
     e.salidasInventario=(e.salidasInventario||[]).filter(s=>!(s.documentoId&&ids.has(s.documentoId)));
+    /* Las entregas de pedidos que esa factura cubría vuelven a quedar «entregadas sin facturar». */
+    (e.pedidosVenta||[]).forEach(p=>{ if((p.facturas||[]).some(f=>ids.has(f.documentoId))) p.facturas=p.facturas.filter(f=>!ids.has(f.documentoId)); });
     notas.push(`${docs.length} documento(s) cargado(s) desde facturas (libros de IVA, cartera e inventario)`);
   }
   const np=(e.pagos||[]).filter(mismaPartida).length, nc=(e.cobros||[]).filter(mismaPartida).length;
@@ -418,7 +420,7 @@ ACCIONES.borrarTodo=()=>{
         partidasCapital.forEach((p,i)=>p.numero=i+1);
         e.partidas=partidasCapital;
         e.documentos=[]; e.pagos=[]; e.cobros=[];
-        e.consignaciones=[]; e.salidasInventario=[]; e.entradasInventario=[];
+        e.consignaciones=[]; e.salidasInventario=[]; e.entradasInventario=[]; e.pedidosVenta=[]; e.cotizacionesVenta=[];
         e.aumentosCapital=[]; e.cierresParciales=[]; e.devolucionesIVA=[];
         e.empleados=[]; e.planillas=[]; e.pagosPrestaciones=[];
         e.inventarioFinal={};

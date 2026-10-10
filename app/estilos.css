@@ -622,3 +622,4 @@ dialog::backdrop{background:var(--backdrop);backdrop-filter:blur(3px)}
 /* Texto que se toca para editar (p. ej. el nombre de un producto en Existencias). */
 .btn-enlace{background:none;border:0;padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer;border-bottom:1px dashed transparent}
 .btn-enlace:hover,.btn-enlace:focus-visible{border-bottom-color:currentColor}
+dialog:has(#tbVentaItems){max-width:min(900px,94vw)}

@@ -24,6 +24,9 @@ function renombrarProducto(e,viejo,nuevo){
   (e.entradasInventario||[]).forEach(cambiar);
   (e.consignaciones||[]).forEach(cambiar);
   (e.ordenesProduccion||[]).forEach(o=>{ cambiar(o); (o.productosConjuntos||[]).forEach(cambiar); (o.materiales||[]).forEach(cambiar); });
+  [...(e.pedidosVenta||[]),...(e.cotizacionesVenta||[])].forEach(x=>{ (x.items||[]).forEach(cambiar);
+    (x.entregas||[]).forEach(en=>en.items.forEach(cambiar)); (x.facturas||[]).forEach(cambiar); });
+  if(e.preciosVenta&&e.preciosVenta[viejo]){ if(!e.preciosVenta[nuevo]) e.preciosVenta[nuevo]=e.preciosVenta[viejo]; delete e.preciosVenta[viejo]; }
   (e.recetas||[]).forEach(r=>{ cambiar(r); if(r.materiaBase===viejo) r.materiaBase=nuevo;
     (r.lineas||[]).forEach(l=>{ if(l.material===viejo) l.material=nuevo; }); });
 }

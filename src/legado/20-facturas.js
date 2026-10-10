@@ -921,7 +921,12 @@ function continuarGenerarPartidas(e,activos,excluidas,modo){
         if(!producto) return;   // se dejó en "Omitir" — no es un producto de inventario
         const item=lista.find(p=>p.producto===producto);
         const disponible=item?item.cantidad:0;
-        const cantidad=r2((d.signo||1)*it.cantidad);
+        /* Lo que este cliente ya recibió con una entrega de pedido (Ventas) queda cubierto por esta factura
+           y no se descuenta otra vez: solo sale lo que no estaba entregado. */
+        const guardado=docGuardado.get(d);
+        const cubierto=cubrirConEntregas(e,{id:guardado.id,nit:guardado.nit||d.nit,fecha:d.fecha,serie:d.serie,dte:d.dte},producto,r2((d.signo||1)*it.cantidad));
+        const cantidad=r2((d.signo||1)*it.cantidad-cubierto);
+        if(!cantidad) return;
         const {costoUnitario,costoTotal}=costoSalidaInventario(e,producto,cantidad);
         if(cantidad>disponible) avisosInventario.push(`${producto}: se vendieron ${cantidad}, pero solo había ${disponible} en existencia (factura ${d.serie?d.serie+'-':''}${d.dte}, ${fFecha(d.fecha)})`);
         e.salidasInventario.push({id:uid(),fecha:d.fecha,producto,cantidad,

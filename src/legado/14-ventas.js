@@ -4,13 +4,13 @@
    mercadería sigue siendo del negocio, solo cambió de lugar. Cuando el
    consignatario de verdad la vende, ahí sí se carga el precio, ligado a una
    factura, y recién ahí se reconoce el ingreso, el costo y la comisión. */
-VISTAS.ventas=()=>{
+function cuerpoVentasDirectas(){
   const e=emp();
   e.consignaciones=e.consignaciones||[];
   e.salidasInventario=e.salidasInventario||[];
   const enConsig=e.consignaciones.filter(c=>c.estado==='en_consignacion');
   const vendidas=[...e.consignaciones.filter(c=>c.estado==='vendido')].sort((a,b)=>(b.fechaVenta||'').localeCompare(a.fechaVenta||''));
-  const ventasDirectas=[...e.salidasInventario.filter(s=>s.motivo==='venta'&&!s.ajuste)].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const ventasDirectas=[...e.salidasInventario.filter(s=>s.motivo==='venta'&&!s.ajuste&&!s.pedidoId)].sort((a,b)=>b.fecha.localeCompare(a.fecha));
   const filaEnConsig=c=>`<tr><td>${fFecha(c.fecha)}</td><td>${esc(c.producto)}</td>
     <td>${esc(c.nombreConsignatario||'—')}${c.nitConsignatario?`<br><span style="font-size:12px;color:var(--tinta-suave)">NIT ${esc(c.nitConsignatario)}</span>`:''}</td>
     <td class="num">${c.cantidad||'—'}</td><td class="num">${Q(c.costoTotal)}</td>
@@ -22,11 +22,8 @@ VISTAS.ventas=()=>{
   const filaVentaDirecta=s=>`<tr><td>${fFecha(s.fecha)}</td><td>${esc(s.producto)}</td>
     <td class="num">${s.cantidad}</td><td class="num">${Q(s.costoUnitario)}</td><td class="num">${Q(s.costoTotal)}</td>
     <td class="num"><button class="btn mini sec" data-accion="editarVentaDirecta" data-id="${s.id}">Editar</button></td></tr>`;
-  return cab('Ventas','Venta directa (solo descuenta inventario) o consignación (genera su propia partida).',
-    `<button class="btn" data-accion="nuevaVentaDirecta">Nueva venta</button>
-     <button class="btn sec" data-accion="nuevaConsignacion">Nueva consignación</button>`)
-  + `<h3 style="color:var(--verde);margin:0 0 8px">Ventas directas</h3>
-    <div class="aviso">Esto solo lleva el control de inventario por cantidad. El ingreso, el IVA y el costo de
+  return `<h3 style="color:var(--verde);margin:0 0 8px">Ventas directas</h3>
+    <div class="aviso">Para descontar del inventario una venta rápida sin pedido. El ingreso, el IVA y el costo de
       cada venta se registran, como siempre, en "Cargar facturas".</div>
     ${ventasDirectas.length? `<table><thead><tr><th>Fecha</th><th>Producto</th><th class="num">Cantidad</th>
       <th class="num">Costo unitario</th><th class="num">Costo total</th><th></th></tr></thead>
