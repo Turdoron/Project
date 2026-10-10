@@ -191,7 +191,7 @@ function tarjetaAtajos(){
   const sel=t=>`<select id="atajo${t}" data-tecla-atajo="${t}"><option value="">— Sin atajo —</option>${grupos.map(g=>`<optgroup label="${esc(g.nombre)}">${g.ops.map(o=>`<option value="${o.v}"${m[t]===o.v?' selected':''}>${esc(o.n)}</option>`).join('')}</optgroup>`).join('')}</select>`;
   return `<div class="tarjeta"><h3>Accesos directos</h3>
     <p>Elegí qué pantalla abre cada atajo de teclado (mantené <kbd>Alt</kbd> y tocá el número). Se muestran en el inicio y en el menú.
-      <kbd>Alt+0</kbd> siempre vuelve al inicio. Se guardan para tu usuario en esta computadora.</p>
+      <kbd>Alt+0</kbd> siempre vuelve al inicio y <kbd>Alt+V</kbd> abre una venta directa. Se guardan para tu usuario en esta computadora.</p>
     <div class="atajos-config">${TECLAS_ATAJO.map(t=>`<div class="campo"><label for="atajo${t}">Alt+${t}</label>${sel(t)}</div>`).join('')}</div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
       <button class="btn sec" data-accion="guardarAtajos">Guardar accesos directos</button>

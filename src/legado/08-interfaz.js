@@ -185,10 +185,19 @@ function etiquetarAtajos(){
   });
 }
 etiquetarAtajos();
+/* Alt+V: abre una venta directa desde cualquier pantalla (lleva a Ventas y abre el formulario). */
+const puedeVentaDirecta=()=>{ const b=document.querySelector('nav [data-v="ventas"]'); return !!(emp()&&b&&b.style.display!=='none'&&puedeVer('ventas')); };
+function abrirVentaDirecta(){
+  if(!puedeVentaDirecta()) return false;
+  document.querySelector('nav [data-v="ventas"]').click();
+  ventasTab='directas'; pintar();
+  conSnapshot('Nueva venta directa',()=>ACCIONES.nuevaVentaDirecta());
+  return true;
+}
 function ayudaAtajos(){
   const nombre=v=>{ const b=document.querySelector(`nav [data-v="${v}"]`); return b?textoBoton(b):v; };
   const m=atajosVista();
-  avisar(TECLAS_ATAJO.concat('0').filter(t=>m[t]).map(t=>`Alt+${t}  —  ${nombre(m[t])}`).join('\n')+'\nAlt+H  —  Esta ayuda\n\nSe cambian en Administración → Configuración.','Atajos de teclado');
+  avisar(TECLAS_ATAJO.concat('0').filter(t=>m[t]).map(t=>`Alt+${t}  —  ${nombre(m[t])}`).join('\n')+(puedeVentaDirecta()?'\nAlt+V  —  Nueva venta directa':'')+'\nAlt+H  —  Esta ayuda\n\nSe cambian en Administración → Configuración.','Atajos de teclado');
 }
 document.addEventListener('keydown',ev=>{
   if(!ev.altKey||ev.ctrlKey||ev.metaKey||ev.shiftKey) return;
@@ -196,6 +205,7 @@ document.addEventListener('keydown',ev=>{
   if(modal.open || document.getElementById('aviso').open) return;   // con una ventana abierta no se navega
   const tecla=(ev.code||'').replace(/^(Digit|Numpad)/,'');
   if(tecla==='KeyH'){ ev.preventDefault(); ayudaAtajos(); return; }
+  if(tecla==='KeyV'){ if(puedeVentaDirecta()){ ev.preventDefault(); abrirVentaDirecta(); } return; }
   const v=atajosVista()[tecla];
   if(!v) return;
   const b=document.querySelector(`nav [data-v="${v}"]`);
@@ -439,7 +449,7 @@ function pintar(){
   });
   nodo.querySelectorAll('[data-app]').forEach(b=>b.onclick=()=>abrirApp(b.dataset.app));
   nodo.querySelectorAll('[data-mas]').forEach(b=>b.onclick=()=>{ const k=b.dataset.mas; const base=k==='limDiario'?150:200; filtros[k]=(+filtros[k]||base)+(+b.dataset.paso||0); pintar(); });
-  nodo.querySelectorAll('[data-atajo]').forEach(b=>b.onclick=()=>{ const n=document.querySelector(`nav [data-v="${b.dataset.atajo}"]`); if(n) n.click(); });
+  nodo.querySelectorAll('[data-atajo]').forEach(b=>b.onclick=()=>{ if(b.dataset.atajo==='ventaDirecta'){ abrirVentaDirecta(); return; } const n=document.querySelector(`nav [data-v="${b.dataset.atajo}"]`); if(n) n.click(); });
   nodo.querySelectorAll('[data-filtro]').forEach(i=>{
     i.oninput=i.onchange=()=>{filtros[i.dataset.filtro]=i.value;pintar()};
   });
