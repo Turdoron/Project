@@ -31,16 +31,26 @@ function deduccionPersonalAnual(anio,e){
 function isrTablaTrabajo(rentaImponible){
   return rentaImponible<=300000 ? r2(rentaImponible*0.05) : r2(300000*0.05+(rentaImponible-300000)*0.07);
 }
-function calcularISRMensual(salarioBaseMensual,anio){
-  const rentaBrutaAnual=r2((salarioBaseMensual+BONIFICACION_INCENTIVO)*12);
-  const igssDeducibleAnual=r2(salarioBaseMensual*12*IGSS_LABORAL);
+/* Fracción del período que el empleado estuvo contratado (días calendario desde su ingreso). */
+function fraccionLaborada(emp,desde,hasta){
+  if(!desde||!hasta||!emp.fechaIngreso||emp.fechaIngreso<=desde) return 1;
+  if(emp.fechaIngreso>hasta) return 0;
+  const dias=(a,b)=>Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/864e5)+1;
+  return dias(emp.fechaIngreso,hasta)/dias(desde,hasta);
+}
+/* ISR de planilla: se proyecta la renta del año. Quien entra a mitad de año solo gana los meses que le quedan, así
+   que se proyectan esos meses (no 12) contra la deducción personal completa, y el impuesto se reparte en ellos. */
+function calcularISRMensual(salarioBaseMensual,anio,fechaIngreso){
+  const meses=fechaIngreso&&fechaIngreso.slice(0,4)===String(anio)?(12-(+fechaIngreso.slice(5,7))+1):12;
+  const rentaBrutaAnual=r2((salarioBaseMensual+BONIFICACION_INCENTIVO)*meses);
+  const igssDeducibleAnual=r2(salarioBaseMensual*meses*IGSS_LABORAL);
   const rentaImponible=Math.max(0,r2(rentaBrutaAnual-igssDeducibleAnual-deduccionPersonalAnual(anio)));
   const isrAnual=isrTablaTrabajo(rentaImponible);
   /* Sin r2() acá: esto se pasa a prorratear(), que todavía lo va a dividir
      entre 30 y multiplicar por 7 o 15 si el período es semanal o quincenal —
      redondear antes de esa cuenta es el mismo error que ya corregimos en
      inventario y en planillas. prorratear() ya redondea el monto final. */
-  return isrAnual/12;
+  return isrAnual/meses;
 }
 
 /* Descuentos y cargos sobre lo que se paga al retirarse un empleado. La indemnización, el aguinaldo y
@@ -121,7 +131,9 @@ function calcularPlanillaEmpleado(emp,periodo,extras,fechasPeriodo){
      Trabajo), se captura a mano sumándolo a "días de falta" — el sistema no
      lo agrega solo, porque no sabe en qué semana cayó cada falta. */
   const descuentoFaltas=r2(salarioDiario*diasFalta);
-  const salarioPeriodo=r2(Math.max(0,prorratear(emp.salarioBase,periodo)-descuentoFaltas));
+  /* Quien entra a mitad del período cobra solo los días desde su ingreso (si entra después del período, nada). */
+  const fraccion=fraccionLaborada(emp,fechasPeriodo.desde,fechasPeriodo.hasta);
+  const salarioPeriodo=r2(Math.max(0,prorratear(emp.salarioBase,periodo)*fraccion-descuentoFaltas));
 
   const horaOrdinaria=salarioDiario/8;
   const montoHorasExtra=r2(horaOrdinaria*RECARGO_HORA_EXTRA*horasExtra);
@@ -142,7 +154,7 @@ function calcularPlanillaEmpleado(emp,periodo,extras,fechasPeriodo){
   const bonifDiaria=BONIFICACION_INCENTIVO/30;
   const bonifHora=bonifDiaria/8;
   const descuentoBonif=r2(bonifDiaria*diasFalta+bonifHora*horasMenos);
-  const bonifPeriodo=r2(Math.max(0,prorratear(BONIFICACION_INCENTIVO,periodo)-descuentoBonif));
+  const bonifPeriodo=r2(Math.max(0,prorratear(BONIFICACION_INCENTIVO,periodo)*fraccion-descuentoBonif));
 
   /* Horas extra (entre semana y domingo) y bonificación adicional SÍ pagan
      IGSS, INTECAP e IRTRA — son salario ordinario y extraordinario. La
@@ -154,7 +166,7 @@ function calcularPlanillaEmpleado(emp,periodo,extras,fechasPeriodo){
   const intecap=r2(baseIGSS*INTECAP_PCT);
   const irtra=r2(baseIGSS*IRTRA_PCT);
 
-  const isr=prorratear(calcularISRMensual(emp.salarioBase,(fechasPeriodo.hasta||hoy()).slice(0,4)),periodo);
+  const isr=r2(prorratear(calcularISRMensual(emp.salarioBase,(fechasPeriodo.hasta||hoy()).slice(0,4),emp.fechaIngreso),periodo)*fraccion);
   const prestaciones=provisionesPrestaciones(emp.salarioBase,periodo,emp.fechaIngreso,fechasPeriodo.desde,fechasPeriodo.hasta);
 
   const liquido=r2(Math.max(0,salarioPeriodo+montoHorasExtra+montoHorasExtraDomingo+bonoAdicional-descuentoHorasMenos+bonifPeriodo-igssLaboral-isr));
@@ -233,7 +245,7 @@ function costoVentasPeriodo(e,desde,hasta,mov){
      Si todavía no hay nada en el kardex —una empresa que recién carga
      facturas sin usar Ventas todavía—, comprasBienes sigue como respaldo,
      mejor una estimación gruesa que ninguna. */
-  const salidasKardex=(e.salidasInventario||[]).filter(s=>s.fecha>=desde&&s.fecha<=hasta&&s.motivo!=='produccion'&&s.motivo!=='merma'&&s.motivo!=='faltante')
+  const salidasKardex=(e.salidasInventario||[]).filter(s=>s.fecha>=desde&&s.fecha<=hasta&&!['produccion','merma','faltante','consignacion'].includes(s.motivo))
     .reduce((sum,s)=>sum+(s.costoTotal||0),0);
   const consignVendidas=(e.consignaciones||[]).filter(c=>c.estado==='vendido'&&c.fechaVenta&&c.fechaVenta>=desde&&c.fechaVenta<=hasta)
     .reduce((sum,c)=>sum+(c.costoTotal||0),0);

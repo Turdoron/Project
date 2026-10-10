@@ -75,10 +75,17 @@ function cubrirConEntregas(e,doc,producto,cantidad){
    no lo vuelve a descontar. Se cubren las ventas directas sin factura, del mismo producto y de fecha igual o anterior. */
 const facturadoVentaDirecta=s=>r2((s.facturas||[]).reduce((a,f)=>a+f.cantidad,0));
 const esVentaDirectaSinFactura=s=>s.motivo==='venta'&&!s.documentoId&&!s.pedidoId&&!s.ajuste&&!s.referenciaId&&r2(s.cantidad-facturadoVentaDirecta(s))>1e-9;
+/* También la mercadería de una consignación ya vendida: salió del inventario al mandarla al consignatario, así que la
+   factura de esa venta no la descuenta otra vez. */
+function consignacionVendidaSinFactura(e,s,fecha){
+  if(s.motivo!=='consignacion'||r2(s.cantidad-facturadoVentaDirecta(s))<=1e-9) return false;
+  const c=(e.consignaciones||[]).find(x=>x.partidaConsignacionId===s.referenciaId);
+  return !!c&&c.estado==='vendido'&&(c.fechaVenta||'')<=fecha;
+}
 function cubrirConVentasDirectas(e,doc,producto,cantidad){
   if(!(cantidad>0)) return 0;
   let resta=cantidad;
-  (e.salidasInventario||[]).filter(s=>s.producto===producto&&(s.fecha||'')<=(doc.fecha||'')&&esVentaDirectaSinFactura(s))
+  (e.salidasInventario||[]).filter(s=>s.producto===producto&&(s.fecha||'')<=(doc.fecha||'')&&(esVentaDirectaSinFactura(s)||consignacionVendidaSinFactura(e,s,doc.fecha||'')))
     .sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||'')).forEach(s=>{
       if(resta<=1e-9) return;
       const t=r2(Math.min(resta,s.cantidad-facturadoVentaDirecta(s)));

@@ -51,7 +51,7 @@ function vencimientosEmpresa(e,anio){
     if(reg==='simplificado') out.push({fin:h,clave:`isrm-${anio}-${m}`,tipo:'ISR',fecha:habilesDespues(h,10),titulo:`ISR de ${MESES_CORTOS[m-1]} ${anio}`,
       detalle:'Régimen opcional simplificado (5% / 7%), si no te lo retuvieron',pagado:pagoISRmes(d,h)});
     if(tieneEmpleados){
-      out.push({fin:h,clave:`igss-${anio}-${m}`,tipo:'IGSS',fecha:corridoAHabil(`${sigA}-${String(sigM).padStart(2,'0')}-20`),titulo:`IGSS de ${MESES_CORTOS[m-1]} ${anio}`,detalle:'Cuotas laboral y patronal (y planilla electrónica)'});
+      out.push({fin:h,clave:`igss-${anio}-${m}`,tipo:'IGSS',fecha:corridoAHabil(`${sigA}-${String(sigM).padStart(2,'0')}-20`),titulo:`IGSS de ${MESES_CORTOS[m-1]} ${anio}`,detalle:'Cuotas laboral y patronal (y planilla electrónica)',pagado:(e.partidas||[]).some(p=>p.pagoIGSS&&p.pagoIGSS.hasta>=h)});
       out.push({fin:h,clave:`retisr-${anio}-${m}`,tipo:'ISR',fecha:habilesDespues(h,10),titulo:`Retenciones de ISR de ${MESES_CORTOS[m-1]} ${anio}`,detalle:'ISR retenido en la planilla'});
     }
   }

@@ -211,7 +211,9 @@ function provisionadoPorEmpleado(e,tipo,desde,hasta){
       acum[f.empleadoId].monto=r2(acum[f.empleadoId].monto+monto);
     });
   });
-  return Object.values(acum).filter(x=>x.monto>0).sort((a,b)=>b.monto-a.monto);
+  /* A quien ya se liquidó, su liquidación le pagó (y canceló) esta prestación: no entra otra vez al pago general. */
+  const liquidados=new Set((e.liquidaciones||[]).filter(l=>l.fechaRetiro>=desde).map(l=>l.empleadoId));
+  return Object.values(acum).filter(x=>x.monto>0&&!liquidados.has(x.empleadoId)).sort((a,b)=>b.monto-a.monto);
 }
 
 VISTAS.pagoPrestaciones=()=>{
@@ -307,11 +309,13 @@ function enlazarFormularioPago(){
    referencia razonable, editable a mano si hace falta. */
 function periodoLegalPrestacion(tipo,fechaRef){
   const d=new Date(fechaRef+'T00:00:00'), anio=d.getFullYear(), mes=d.getMonth()+1;
+  /* El período que se PAGA: el aguinaldo de diciembre cubre del 1/12 del año anterior al 30/11 de este; el Bono 14
+     de julio, del 1/7 del año anterior al 30/6 de este. Antes del mes de pago, el último período ya completo. */
   if(tipo==='aguinaldo'){
-    return mes===12 ? {desde:`${anio}-12-01`,hasta:`${anio+1}-11-30`} : {desde:`${anio-1}-12-01`,hasta:`${anio}-11-30`};
+    return mes===12 ? {desde:`${anio-1}-12-01`,hasta:`${anio}-11-30`} : {desde:`${anio-2}-12-01`,hasta:`${anio-1}-11-30`};
   }
   if(tipo==='bono14'){
-    return mes>=7 ? {desde:`${anio}-07-01`,hasta:`${anio+1}-06-30`} : {desde:`${anio-1}-07-01`,hasta:`${anio}-06-30`};
+    return mes>=7 ? {desde:`${anio-1}-07-01`,hasta:`${anio}-06-30`} : {desde:`${anio-2}-07-01`,hasta:`${anio-1}-06-30`};
   }
   return {desde:`${anio}-01-01`,hasta:`${anio}-12-31`};
 }
@@ -389,7 +393,8 @@ VISTAS.planillas=()=>{
     })()}</td>
   </tr>`).join('');
   return cab('Planillas','Control de pago de salarios, con el IGSS laboral y patronal calculado cada vez.',
-    `<button class="btn" data-accion="nuevaPlanilla">Nueva planilla</button>`)
+    `<button class="btn" data-accion="nuevaPlanilla">Nueva planilla</button>
+     ${lista.some(p=>p.partidaNumero)?'<button class="btn sec" data-accion="pagarIGSS">Pagar IGSS</button>':''}`)
   + (lista.length? `<table><thead><tr><th>Fecha de pago</th><th>Período</th><th>Rango</th>
       <th class="num">Empleados</th><th class="num">Total líquido</th><th class="num"></th></tr></thead>
       <tbody>${filas}</tbody></table>`
@@ -476,8 +481,9 @@ function enlazarFormularioPlanilla(){
   const recalcular=(i)=>{ recalcularFilasPlanilla(i===undefined?undefined:[i]); pintar(); };
   const pPeriodo=document.getElementById('pPeriodo');
   if(pPeriodo) pPeriodo.onchange=()=>{ b.periodo=pPeriodo.value; recalcular(); };
-  const pDesde=document.getElementById('pDesde'); if(pDesde) pDesde.onchange=()=>b.desde=pDesde.value;
-  const pHasta=document.getElementById('pHasta'); if(pHasta) pHasta.onchange=()=>b.hasta=pHasta.value;
+  /* Las fechas cambian lo que se paga (prorrateo de quien entra a mitad, provisiones): se recalcula todo. */
+  const pDesde=document.getElementById('pDesde'); if(pDesde) pDesde.onchange=()=>{ b.desde=pDesde.value; recalcular(); };
+  const pHasta=document.getElementById('pHasta'); if(pHasta) pHasta.onchange=()=>{ b.hasta=pHasta.value; recalcular(); };
   const pFechaPago=document.getElementById('pFechaPago'); if(pFechaPago) pFechaPago.onchange=()=>b.fechaPago=pFechaPago.value;
   const pCuenta=document.getElementById('pCuenta'); if(pCuenta) pCuenta.onchange=()=>b.cuentaPago=pCuenta.value;
   document.querySelectorAll('[data-incluir]').forEach(ch=>{
@@ -864,3 +870,35 @@ ACCIONES.pdfFiniquito=async d=>{
 /* ---- Accesos rápidos de Inicio, Visibilidad y Configuración ---- */
 ACCIONES.irTablero=()=>{VISTA='tablero';filtros={};pintar()};
 
+
+/* Pago de las cuotas del IGSS (laboral retenida y patronal, con IRTRA e INTECAP) del mes: cancela lo que las planillas
+   dejaron por pagar en 2.1.07 y 2.1.08 hasta el fin de ese mes. */
+ACCIONES.pagarIGSS=()=>{
+  const e=emp(), cajaBanco=cuentasCajaBanco(e);
+  if(!cajaBanco.length){avisar('El catálogo no tiene ninguna cuenta de Caja o Bancos.');return}
+  const {hasta:hastaDef}=mesAnteriorRango();
+  const saldos=h=>{ const m=movimientos(null,h); return {lab:r2(Math.max(0,saldoNatural('2.1.07',m))),pat:r2(Math.max(0,saldoNatural('2.1.08',m)))}; };
+  abrirModal('Pagar IGSS',
+    `<p style="margin:0 0 12px;font-size:13px;color:var(--tinta-suave)">Paga las cuotas que las planillas dejaron por pagar hasta la fecha de corte: la laboral (retenida a los empleados) y la patronal con IRTRA e INTECAP.</p>
+    <div class="rej">
+      <div class="campo"><label>Cuotas hasta (fin del mes)</label><input name="hasta" type="date" value="${hastaDef}"></div>
+      <div class="campo"><label>Fecha de pago</label><input name="fecha" type="date" value="${hoy()}"></div>
+      <div class="campo full"><label>Se paga desde</label><select name="cuenta">${cajaBanco.map(c=>`<option value="${c.c}">${c.c} — ${esc(c.n)}</option>`).join('')}</select></div>
+    </div><p id="igssResumen" class="ayuda-campo" aria-live="polite"></p>`,
+    f=>{
+      if(!f.hasta||!f.fecha){avisar('Escribí las fechas.');return false}
+      if(f.fecha<f.hasta){avisar('La fecha de pago no puede ser anterior al corte.');return false}
+      if(anioCerrado(e,f.fecha.slice(0,4))){avisar(`El ejercicio ${f.fecha.slice(0,4)} ya tiene cierre de libros.`);return false}
+      const s=saldos(f.hasta), total=r2(s.lab+s.pat);
+      if(!(total>0)){avisar('No hay cuotas del IGSS pendientes hasta esa fecha.');return false}
+      const p={id:uid(),numero:e.correlativo++,fecha:f.fecha,concepto:`Pago de cuotas IGSS, IRTRA e INTECAP hasta el ${fFecha(f.hasta)}`,docTipo:'',docSerie:'',docNum:'',nit:'',contraparte:'IGSS',
+        lineas:[{cta:'2.1.07',desc:'Cuota laboral',debe:s.lab,haber:0},{cta:'2.1.08',desc:'Cuota patronal, IRTRA e INTECAP',debe:s.pat,haber:0},{cta:f.cuenta,desc:'',debe:0,haber:total}].filter(l=>l.debe||l.haber),pagoIGSS:{hasta:f.hasta}};
+      e.partidas.push(p);
+      registrarLog('Pagó cuotas del IGSS',`Hasta ${fFecha(f.hasta)} — Q${Q(total)}`);
+      guardar(); pintar();
+      avisar(`Pago del IGSS registrado en la partida No. ${p.numero}: Q${Q(total)}.`,'Listo');
+    },'Registrar pago');
+  const h=mForm.querySelector('[name="hasta"]'), res=document.getElementById('igssResumen');
+  const ver=()=>{ const s=saldos(h.value); res.textContent=`Cuota laboral Q${Q(s.lab)} + patronal, IRTRA e INTECAP Q${Q(s.pat)} = Q${Q(r2(s.lab+s.pat))}`; };
+  h.addEventListener('change',ver); ver();
+};

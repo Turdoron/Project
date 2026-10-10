@@ -95,6 +95,13 @@ function clasificar(d){
     if(!d.ivaReportado) d.iva=r2(d.total-d.total/1.12);
     d.noAcred=0; d.base=r2(d.total-d.iva);
   }
+  /* Una nota de crédito rebaja la cuenta por cobrar (o por pagar) solo si esa contraparte tiene saldo pendiente;
+     si la venta o la compra fue de contado, la devolución es en efectivo. */
+  if(d.tipoDte==='NCRE'&&!d.ctaPago){
+    const nit=d.tipo==='compra'?d.nitEmisor:d.nitReceptor, cart=d.tipo==='compra'?carteraProveedores(e):carteraClientes(e);
+    const c=cart.find(x=>soloNit(x.nit)===soloNit(nit));
+    d.alCredito=!!(c&&c.saldo>0.005);
+  }
   /* Cambiaria = operación al crédito: va a cuentas por pagar o por cobrar.
      El resto se asume de contado. */
   if(!d.ctaPago){
@@ -855,6 +862,12 @@ function continuarGenerarPartidas(e,activos,excluidas,modo){
       return p;
     };
 
+    /* ISR Simplificado (5% hasta Q30,000 del mes y 7% sobre el excedente): el tramo es del MES completo. Cada partida
+       registra lo que su venta agrega al impuesto del mes, sobre todo lo ya registrado de ese mes —en lotes
+       anteriores (de cualquier fecha) y en lo que va de este lote—. Así la suma da siempre el impuesto del total
+       del mes, se carguen las facturas en el orden que sea. */
+    const idsLote=new Set(enOrden.map(d=>docGuardado.get(d).id)), acumLoteISR={};
+    const previoMesISR=mes=>r2((e.documentos||[]).filter(x=>x.tipo==='venta'&&x.fecha&&x.fecha.slice(0,7)===mes&&!idsLote.has(x.id)).reduce((s,x)=>s+(x.signo||1)*x.base,0)+(acumLoteISR[mes]||0));
     if(grupos){
       grupos.forEach(g=>{
         const lineas=lineasDeGrupo(g);
@@ -864,10 +877,9 @@ function continuarGenerarPartidas(e,activos,excluidas,modo){
         p.n=(p.n||0)+g.n;
         enOrden.filter(d=>fechaGrupo(d)===g.fecha).forEach(d=>{ docGuardado.get(d).partidaId=p.id; });
         if(regimenEn(e,g.fecha)==='simplificado'){
-          const ventas=ventasDelGrupo(enOrden,g,modo);
-          const corte = modo==='dia' ? g.fecha : g.fecha.slice(0,7)+'-01';
-          const previo=previoVentasAntesDe(e,corte);
-          const isr=isrIncrementalPorTramo(previo,ventas);
+          const ventas=ventasDelGrupo(enOrden,g,modo), mes=g.fecha.slice(0,7);
+          const isr=isrIncrementalPorTramo(previoMesISR(mes),ventas);
+          acumLoteISR[mes]=r2((acumLoteISR[mes]||0)+ventas);
           if(isr){
             asegurarCuenta(e,'6.2.15','ISR Régimen Opcional Simplificado','gasto');
             sumarMovimiento(p,'6.2.15',isr>0?isr:0,isr<0?-isr:0);
@@ -880,7 +892,6 @@ function continuarGenerarPartidas(e,activos,excluidas,modo){
       /* En este modo cada documento es su propia partida, pero el tramo del
          5%/7% sigue siendo mensual: se lleva un acumulado del día para no
          recalcular mal cuando hay varios documentos en la misma fecha. */
-      let diaISR=null, acumHoyISR=0;
       enOrden.forEach(d=>{
         const ref=`${d.serie?d.serie+'-':''}${d.dte}`;
         const nombreDoc = d.signo===-1?'nota de crédito':(d.tipoDte==='NDEB'?'nota de débito':'factura');
@@ -890,11 +901,9 @@ function continuarGenerarPartidas(e,activos,excluidas,modo){
            nit:d.tipo==='compra'?d.nitEmisor:d.nitReceptor});
         docGuardado.get(d).partidaId=p.id;
         if(regimenEn(e,d.fecha)==='simplificado' && d.tipo==='venta'){
-          if(d.fecha!==diaISR){ diaISR=d.fecha; acumHoyISR=0; }
-          const venta=r2((d.signo||1)*d.base);
-          const previo=r2(previoVentasAntesDe(e,d.fecha)+acumHoyISR);
-          const isr=isrIncrementalPorTramo(previo,venta);
-          acumHoyISR=r2(acumHoyISR+venta);
+          const venta=r2((d.signo||1)*d.base), mes=d.fecha.slice(0,7);
+          const isr=isrIncrementalPorTramo(previoMesISR(mes),venta);
+          acumLoteISR[mes]=r2((acumLoteISR[mes]||0)+venta);
           if(isr){
             asegurarCuenta(e,'6.2.15','ISR Régimen Opcional Simplificado','gasto');
             p.lineas.push({cta:'6.2.15',desc:'',debe:isr>0?isr:0,haber:isr<0?-isr:0});
