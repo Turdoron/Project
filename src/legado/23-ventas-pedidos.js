@@ -137,7 +137,7 @@ function cuerpoPreciosVenta(e){
       <td class="num">${pr.precio>0?Q(pr.precio):'—'}</td><td class="num">${pr.precioMayor>0?`${Q(pr.precioMayor)}<br><span style="font-size:12px;color:var(--tinta-suave)">desde ${pr.minMayor} u.</span>`:'—'}</td>
       <td class="num"${margen!==null&&margen<0?' style="color:var(--alerta)"':''}>${margen===null?'—':margen+' %'}</td>
       <td class="num"><button class="btn mini sec" data-accion="editarPrecioVenta" data-producto="${esc(n)}">Precio</button></td></tr>`; }).join('');
-  return `<div class="aviso">Precios de venta con IVA incluido. Al armar una cotización o un pedido, el precio se llena solo
+  return `<div class="aviso">Precios de venta con IVA incluido. En "Precio" también se le liga el código de barras a cada producto. Al armar una cotización o un pedido, el precio se llena solo
       (el de mayoreo si la cantidad llega al mínimo). El margen se calcula sobre el precio sin IVA contra el costo del inventario.</div>
     <table><thead><tr><th>Producto</th><th class="num">Existencia</th><th class="num">Costo unitario</th><th class="num">Precio</th>
       <th class="num">Precio por mayor</th><th class="num">Margen</th><th class="num"></th></tr></thead><tbody>${filas}</tbody></table>`;
@@ -149,10 +149,12 @@ ACCIONES.editarPrecioVenta=d=>{
     <div class="rej"><div class="campo"><label>Precio unitario</label><input name="precio" type="number" min="0" step="0.01" value="${pr.precio||''}"></div>
       <div class="campo"><label>Precio por mayor (opcional)</label><input name="precioMayor" type="number" min="0" step="0.01" value="${pr.precioMayor||''}"></div>
       <div class="campo"><label>Por mayor desde (unidades)</label><input name="minMayor" type="number" min="0" step="1" value="${pr.minMayor||''}"></div></div>
-    <p class="ayuda-campo" id="pvMargen" aria-live="polite"></p>`,
+    <p class="ayuda-campo" id="pvMargen" aria-live="polite"></p>
+    ${htmlCampoCodigos(e,n)}`,
     f=>{
       const precio=+f.precio||0, precioMayor=+f.precioMayor||0, minMayor=+f.minMayor||0;
       if(precioMayor>0&&!(minMayor>0)){avisar('Escribí desde cuántas unidades aplica el precio por mayor.');return false}
+      const choca=guardarCodigos(e,n,f.codigos); if(choca){avisar(choca);return false}
       e.preciosVenta=e.preciosVenta||{};
       if(!precio&&!precioMayor) delete e.preciosVenta[n]; else e.preciosVenta[n]={precio,precioMayor,minMayor:precioMayor>0?minMayor:0};
       registrarLog('Cambió un precio de venta',`${n} — Q${Q(precio)}`); guardar(); pintar();
@@ -182,7 +184,8 @@ function formDocVenta(e,tipo,x){
         :`<div class="campo"><label>Entrega comprometida (opcional)</label><input name="fechaEntrega" type="date" value="${x?x.fechaEntrega||'':''}"></div>`}
       <div class="campo full"><label>Condiciones de pago</label><input name="condiciones" value="${esc(x?x.condiciones||'':'Contado')}" placeholder="Contado, crédito 30 días…"></div>
     </div>
-    <table style="font-size:13px;margin-top:12px"><thead><tr><th>Producto o servicio</th><th class="num">Cantidad</th><th class="num">Precio (con IVA)</th><th class="num">Desc. %</th><th class="num">Subtotal</th><th></th></tr></thead>
+    <div style="margin-top:12px">${htmlEscaner()}</div>
+    <table style="font-size:13px;margin-top:10px"><thead><tr><th>Producto o servicio</th><th class="num">Cantidad</th><th class="num">Precio (con IVA)</th><th class="num">Desc. %</th><th class="num">Subtotal</th><th></th></tr></thead>
       <tbody id="tbVentaItems">${(x&&x.items.length?x.items:[{}]).map(filaItemVenta).join('')}</tbody></table>
     <button type="button" class="btn mini sec" id="btnAddItemVenta" style="margin-top:6px">+ Agregar renglón</button>
     <p id="totVenta" style="margin:10px 0 4px;font-size:14px"></p><p class="ayuda-campo" id="avisoVenta" aria-live="polite" style="margin:0"></p>
@@ -225,6 +228,19 @@ function enlazarFormDocVenta(e,tipo){
     ev.target.closest('[data-iv]').remove(); if(!tb.querySelector('[data-iv]')) tb.insertAdjacentHTML('beforeend',filaItemVenta({})); recalcular(); });
   mForm.querySelector('#btnAddItemVenta').onclick=()=>{ tb.insertAdjacentHTML('beforeend',filaItemVenta({})); tb.querySelector('[data-iv]:last-child [data-c="prod"]').focus(); recalcular(); };
   mForm.querySelector('[name="fecha"]').addEventListener('change',recalcular);
+  /* Lector de código de barras: suma 1 al renglón de ese producto (con su precio, el de mayoreo si llega) o lo agrega. */
+  const prods=[...new Set([...lista.map(p=>p.producto),...Object.keys(e.preciosVenta||{})])].sort((a,b)=>a.localeCompare(b,'es'));
+  enlazarEscaner(e,prod=>{
+    let tr=[...tb.querySelectorAll('[data-iv]')].find(x=>x.querySelector('[data-c="prod"]').value.trim()===prod);
+    if(!tr) tr=[...tb.querySelectorAll('[data-iv]')].find(x=>!x.querySelector('[data-c="prod"]').value.trim());
+    if(!tr){ tb.insertAdjacentHTML('beforeend',filaItemVenta({})); tr=tb.querySelector('[data-iv]:last-child'); }
+    const pr=tr.querySelector('[data-c="prod"]'), c=tr.querySelector('[data-c="cant"]'), precio=tr.querySelector('[data-c="precio"]');
+    if(pr.value.trim()===prod) c.value=r2((+c.value||0)+1); else { pr.value=prod; c.value=1; }
+    const sug=precioSugerido(e,prod,+c.value);
+    if(sug!==''&&(precio.value===''||tr.dataset.auto)){ precio.value=sug; tr.dataset.auto='1'; }
+    recalcular();
+    return `Agregado: ${prod} (${c.value})`;
+  },prods);
   recalcular();
 }
 /* Valida y arma los datos comunes. Devuelve null (y avisa) si falta algo. */

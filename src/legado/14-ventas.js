@@ -57,44 +57,79 @@ function opsProductoInventario(e,seleccionado){
     ${esc(p.producto)} — ${p.cantidad} disp. · ${peps?'próxima unidad':'costo prom.'} Q${Q(cu)}/u</option>`;}).join('');
 }
 
+/* Venta directa: uno o varios productos, a mano o con el lector de código de barras. Solo descuenta el
+   inventario (una salida por producto); la contabilidad sale de la factura. */
 ACCIONES.nuevaVentaDirecta=()=>{
   const e=emp();
-  const ops=opsProductoInventario(e);
-  if(!ops){avisar('No hay productos con existencia en el inventario todavía. Cargá compras de bienes primero.');return}
-  abrirModal('Nueva venta',
-    `<p style="margin:0 0 14px;font-size:13px;color:var(--tinta-suave)">Esto solo descuenta la cantidad del
-      inventario — no genera ninguna partida. El ingreso, el IVA y el costo de esta venta ya se registran,
-      como siempre, cuando cargás la factura en "Cargar facturas".</p>
-    <div class="rej">
-      <div class="campo full"><label>Producto</label><select name="producto">${ops}</select></div>
-      <div class="campo"><label>Cantidad vendida</label><input name="cantidad" type="number" step="0.01" min="0"></div>
-      <div class="campo"><label>Fecha</label><input name="fecha" type="date" value="${hoy()}"></div>
-    </div>
-    <p id="previewVenta" style="margin:10px 0 0;font-size:13px;color:var(--tinta-suave)"></p>`,
+  const {lista}=inventarioDetalle(e), disp=lista.filter(p=>p.cantidad>0.0001);
+  if(!disp.length){avisar('No hay productos con existencia en el inventario todavía. Cargá compras de bienes primero.');return}
+  const opciones=sel=>`<option value="">Elegí el producto</option>`+disp.map(p=>`<option value="${esc(p.producto)}"${p.producto===sel?' selected':''}>${esc(p.producto)} — ${Q(p.cantidad).replace(/\.00$/,'')} disp.</option>`).join('');
+  const fila=(prod='',cant='')=>`<tr data-vd><td><select data-c="prod" aria-label="Producto" style="width:100%;min-width:160px">${opciones(prod)}</select></td>
+    <td><input data-c="cant" type="number" step="0.01" min="0" value="${cant}" style="width:80px;text-align:right" aria-label="Cantidad vendida"></td>
+    <td class="num" data-costo></td><td><button type="button" class="btn mini peligro" data-quitar aria-label="Quitar renglón">×</button></td></tr>`;
+  abrirModal('Nueva venta directa',
+    `<p style="margin:0 0 12px;font-size:13px;color:var(--tinta-suave)">Descuenta del inventario lo vendido, uno o varios productos. No genera partida: el ingreso, el IVA y el costo se registran, como siempre, al cargar la factura.</p>
+    ${htmlEscaner()}
+    <table style="font-size:13px;margin-top:10px" id="tbVentaDirecta"><thead><tr><th>Producto</th><th class="num">Cantidad</th><th class="num">Costo que sale</th><th></th></tr></thead>
+      <tbody id="tbVD">${fila()}</tbody></table>
+    <button type="button" class="btn mini sec" id="btnAddVD" style="margin-top:6px">+ Agregar producto</button>
+    <div class="rej" style="margin-top:12px"><div class="campo"><label>Fecha</label><input name="fecha" type="date" value="${hoy()}"></div></div>
+    <p id="previewVenta" style="margin:8px 0 0;font-size:13px;color:var(--tinta-suave)" aria-live="polite"></p>`,
     d=>{
-      const cantidad=r2(+d.cantidad);
-      const sel=mForm.querySelector('[name="producto"]');
-      const opt=sel.options[sel.selectedIndex];
-      const disponible=+opt.dataset.disponible;
-      if(!cantidad||cantidad<=0){avisar('Escribí cuánto se vendió.');return false}
-      if(cantidad>disponible){avisar(`Solo hay ${disponible} en existencia de ese producto.`);return false}
-      const {costoUnitario,costoTotal}=costoSalidaInventario(e,d.producto,cantidad);
+      const filas=[...mForm.querySelectorAll('[data-vd]')].map(tr=>({producto:tr.querySelector('[data-c="prod"]').value,cantidad:r2(+tr.querySelector('[data-c="cant"]').value||0)}))
+        .filter(x=>x.producto||x.cantidad);
+      if(!filas.length){avisar('Agregá al menos un producto.');return false}
+      if(filas.some(x=>!x.producto)){avisar('Hay un renglón sin producto.');return false}
+      if(filas.some(x=>!(x.cantidad>0))){avisar('Escribí cuánto se vendió de cada producto.');return false}
+      if(!d.fecha){avisar('Elegí la fecha.');return false}
+      if(anioCerrado(e,d.fecha.slice(0,4))){avisar(`El ejercicio ${d.fecha.slice(0,4)} ya tiene cierre de libros.`);return false}
+      /* El mismo producto escaneado en dos renglones se junta en una sola salida. */
+      const total={}; filas.forEach(x=>total[x.producto]=r2((total[x.producto]||0)+x.cantidad));
+      const falta=Object.entries(total).find(([p,c])=>c>(disp.find(y=>y.producto===p)||{cantidad:0}).cantidad+1e-9);
+      if(falta){avisar(`Solo hay ${Q(disp.find(y=>y.producto===falta[0]).cantidad).replace(/\.00$/,'')} de ${falta[0]} en existencia.`);return false}
       e.salidasInventario=e.salidasInventario||[];
-      e.salidasInventario.push({id:uid(),fecha:d.fecha||hoy(),producto:d.producto,cantidad,
-        costoUnitario,costoTotal,motivo:'venta'});
-      registrarLog('Registró salida de inventario por venta',`${d.producto} — ${cantidad} u.`);
-      guardar();
-      avisar(`Inventario actualizado: salieron ${cantidad} u. de ${d.producto}.`,'Listo');
+      let costo=0;
+      Object.entries(total).forEach(([producto,cantidad])=>{
+        const c=costoSalidaInventario(e,producto,cantidad); costo=r2(costo+c.costoTotal);
+        e.salidasInventario.push({id:uid(),fecha:d.fecha,producto,cantidad,costoUnitario:c.costoUnitario,costoTotal:c.costoTotal,motivo:'venta'});
+      });
+      const n=Object.keys(total).length;
+      registrarLog('Registró salida de inventario por venta',Object.entries(total).map(([p,c])=>`${p} — ${c} u.`).join('; '));
+      guardar(); pintar();
+      avisar(n===1?`Inventario actualizado: salieron ${Object.values(total)[0]} u. de ${Object.keys(total)[0]}.`:`Inventario actualizado: salieron ${n} productos (costo Q${Q(costo)}).`,'Listo');
     },'Registrar venta');
-  const actualizarPreview=()=>{
-    const sel=mForm.querySelector('[name="producto"]'), opt=sel.options[sel.selectedIndex];
-    const cantidad=+mForm.querySelector('[name="cantidad"]').value||0;
-    document.getElementById('previewVenta').innerHTML=
-      `Disponible: ${opt.dataset.disponible} u. · Costo que sale del inventario (${METODOS_COSTEO[metodoCosteo(e)]}): Q${Q(costoSalidaInventario(e,sel.value,cantidad).costoTotal)}`;
+  const tb=mForm.querySelector('#tbVD');
+  const recalcular=()=>{
+    const total={};
+    tb.querySelectorAll('[data-vd]').forEach(tr=>{
+      const p=tr.querySelector('[data-c="prod"]').value, c=+tr.querySelector('[data-c="cant"]').value||0;
+      const k=disp.find(y=>y.producto===p), antes=total[p]||0; total[p]=antes+c;
+      /* El costo de este renglón: lo que cuesta sacar lo acumulado menos lo que ya salió en renglones anteriores. */
+      tr.querySelector('[data-costo]').textContent=k&&c?Q(r2(costoSalidaInventario(e,p,antes+c).costoTotal-costoSalidaInventario(e,p,antes).costoTotal)):'';
+    });
+    const exceso=Object.entries(total).filter(([p,c])=>{ const k=disp.find(y=>y.producto===p); return k&&c>k.cantidad+1e-9; }).map(([p])=>p);
+    const costo=Object.entries(total).reduce((s,[p,c])=>s+(p&&c?costoSalidaInventario(e,p,c).costoTotal:0),0);
+    document.getElementById('previewVenta').innerHTML=`Costo total que sale del inventario (${METODOS_COSTEO[metodoCosteo(e)]}): <strong>Q${Q(costo)}</strong>`
+      +(exceso.length?`<br><span style="color:var(--alerta)">Más de lo que hay en existencia: ${exceso.map(esc).join(', ')}.</span>`:'');
   };
-  mForm.querySelector('[name="producto"]').onchange=actualizarPreview;
-  mForm.querySelector('[name="cantidad"]').oninput=actualizarPreview;
-  actualizarPreview();
+  /* El escáner suma 1 al renglón de ese producto, o lo agrega. */
+  const agregar=prod=>{
+    if(!disp.some(y=>y.producto===prod)) return `${prod} no tiene existencia en el inventario.`;
+    const tr=[...tb.querySelectorAll('[data-vd]')].find(x=>x.querySelector('[data-c="prod"]').value===prod);
+    if(tr){ const c=tr.querySelector('[data-c="cant"]'); c.value=r2((+c.value||0)+1); }
+    else{ const vacia=[...tb.querySelectorAll('[data-vd]')].find(x=>!x.querySelector('[data-c="prod"]').value);
+      if(vacia){ vacia.querySelector('[data-c="prod"]').value=prod; vacia.querySelector('[data-c="cant"]').value=1; }
+      else tb.insertAdjacentHTML('beforeend',fila(prod,1)); }
+    recalcular();
+    const t=[...tb.querySelectorAll('[data-vd]')].find(x=>x.querySelector('[data-c="prod"]').value===prod);
+    return `Agregado: ${prod} (${t.querySelector('[data-c="cant"]').value})`;
+  };
+  enlazarEscaner(e,agregar,disp.map(p=>p.producto));
+  tb.addEventListener('input',recalcular); tb.addEventListener('change',recalcular);
+  tb.addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();ev.stopPropagation();}});
+  tb.addEventListener('click',ev=>{ if(!ev.target.matches('[data-quitar]')) return; ev.target.closest('[data-vd]').remove(); if(!tb.querySelector('[data-vd]')) tb.insertAdjacentHTML('beforeend',fila()); recalcular(); });
+  mForm.querySelector('#btnAddVD').onclick=()=>{ tb.insertAdjacentHTML('beforeend',fila()); recalcular(); };
+  recalcular(); mForm.querySelector('#escCodigo').focus();
 };
 
 ACCIONES.editarVentaDirecta=d=>{
