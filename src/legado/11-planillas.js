@@ -36,6 +36,9 @@ function fraccionLaborada(emp,desde,hasta){
   if(!desde||!hasta||!emp.fechaIngreso||emp.fechaIngreso<=desde) return 1;
   if(emp.fechaIngreso>hasta) return 0;
   const dias=(a,b)=>Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/864e5)+1;
+  /* Planilla de un mes completo: mes comercial de 30 días (quien entra el 15 cobra 16 días, en cualquier mes). */
+  if(desde.slice(8)==='01'&&desde.slice(0,7)===hasta.slice(0,7)&&+hasta.slice(8)===new Date(+hasta.slice(0,4),+hasta.slice(5,7),0).getDate())
+    return Math.min(1,Math.max(0,31-(+emp.fechaIngreso.slice(8)))/30);
   return dias(emp.fechaIngreso,hasta)/dias(desde,hasta);
 }
 /* ISR de planilla: se proyecta la renta del año. Quien entra a mitad de año solo gana los meses que le quedan, así
@@ -820,7 +823,7 @@ VISTAS.tablero=()=>{
 
   return pestanasResumen('tablero')+cab('Tablero fiscal',`${esc(e.nombre)} · ejercicio ${e.ejercicio} · régimen actual: ${esc(REGIMENES[e.regimen]||e.regimen)}`,
     `${e.regimen==='general'||e.regimen==='simplificado'?'<button class="btn sec" data-accion="pagarIVA">Pagar IVA</button>':''}
-     ${(()=>{ const r=regimenEn(e,mesAnteriorRango().hasta); return r!=='general'&&r!=='simplificado'?`<button class="btn sec" data-accion="pagarISR">Pagar impuesto (${r==='pequeno'?'5%':'1.5%'})</button>`:r==='simplificado'?'<button class="btn sec" data-accion="pagarISR">Pagar ISR</button>':''; })()}
+     ${(()=>{ const mp=mesImpuestoMensualPendiente(e), r=mp?regimenEn(e,mp.hasta):'general'; return r!=='general'&&r!=='simplificado'?`<button class="btn sec" data-accion="pagarISR">Pagar impuesto (${r==='pequeno'?'5%':'1.5%'})</button>`:r==='simplificado'?'<button class="btn sec" data-accion="pagarISR">Pagar ISR</button>':''; })()}
      ${e.regimen==='general'?'<button class="btn" data-accion="irCierreFiscal">Cierre fiscal paso a paso</button>':''}
      ${e.regimen==='general'?'<button class="btn sec" data-accion="pagarISO">Pagar ISO</button>':''}
      <button class="btn sec" data-accion="cambiarRegimen">Cambiar régimen</button>`)

@@ -21,6 +21,21 @@ function provisionPendienteEmpleado(e,empleadoId,tipo){
    · Vacaciones: (sueldo ÷ 2) × días del año de servicio en curso ÷ días de ese año, contado desde
      el aniversario de ingreso. Se pagan cada año y no se acumulan: lo de años anteriores solo se
      suma si se indica expresamente (aniosVacPendientes). */
+/* Base de la indemnización (Art. 82, Código de Trabajo): el promedio de los salarios ordinarios y extraordinarios
+   devengados en los últimos seis meses (o en los que trabajó, si son menos), sin la bonificación incentivo. Sale de
+   las planillas ya contabilizadas; si no hay, se usa el salario base. El ×14/12 de la fórmula agrega el aguinaldo y
+   el Bono 14 (Dto. 76-78 y 42-92). */
+function promedioSalarioSeisMeses(e,emp,fechaRetiro){
+  const d=new Date(fechaRetiro+'T00:00:00'); d.setMonth(d.getMonth()-6); const desde=d.toISOString().slice(0,10);
+  const dias=(a,b)=>Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/864e5)+1;
+  let monto=0, meses=0;
+  (e.planillas||[]).filter(p=>p.partidaNumero&&p.hasta>desde&&p.desde<=fechaRetiro).forEach(p=>{
+    const f=p.detalle.find(x=>x.empleadoId===emp.id&&!x.excluido); if(!f) return;
+    monto+=(f.salarioPeriodo||0)+(f.montoHorasExtra||0)+(f.montoHorasExtraDomingo||0)+(f.bonoAdicional||0);
+    meses+=Math.min(1,dias(p.desde,p.hasta)/30)*fraccionLaborada(emp,p.desde,p.hasta);
+  });
+  return meses>=0.5?r2(monto/meses):0;
+}
 function calcularLiquidacion(emp,fechaRetiro,aniosVacPendientes){
   const ing=emp.fechaIngreso, sal=emp.salarioBase, anio=+fechaRetiro.slice(0,4);
   const mayor=(a,b)=>a>b?a:b;
@@ -53,7 +68,7 @@ function calcularLiquidacion(emp,fechaRetiro,aniosVacPendientes){
     diasAg:ag.trabajados,diasPeriodoAg:ag.delPeriodo,iniAg:ag.ini,iniB14:b14.ini,
     diasB14:b14.trabajados,diasPeriodoB14:b14.delPeriodo,
     diasVac,diasAnioVac,aniosVacPendientes:anteriores,
-    indemnizacion:r2(sal*14/12*aniosServicio),
+    indemnizacion:r2((emp.salarioIndemnizacion||sal)*14/12*aniosServicio),
     aguinaldo:r2(sal*ag.trabajados/ag.delPeriodo),
     bono14:r2(sal*b14.trabajados/b14.delPeriodo),
     vacaciones:r2(sal/2*diasVac/diasAnioVac+anteriores*sal/2)};
@@ -148,7 +163,7 @@ ACCIONES.liquidarEmpleado=d=>{
   const dibujar=(reiniciar)=>{
     const fecha=mForm.querySelector('[name="fechaRetiro"]').value, motivo=mForm.querySelector('[name="motivo"]').value;
     if(!fecha||fecha<x.fechaIngreso){document.getElementById('tbLiq').innerHTML='<tr><td colspan="4">Elegí una fecha de retiro posterior al ingreso.</td></tr>';return}
-    const c=calcularLiquidacion(x,fecha,mForm.querySelector('[name="aniosVac"]').value);
+    const c=calcularLiquidacion({...x,salarioIndemnizacion:promedioSalarioSeisMeses(e,x,fecha)},fecha,mForm.querySelector('[name="aniosVac"]').value);
     /* Si ya se pagó (por adelantado) parte del Aguinaldo o del Bono 14 del período en
        curso, se descuenta: no se paga dos veces la misma prestación. */
     const yaPagado=k=>{
@@ -213,7 +228,17 @@ function provisionadoPorEmpleado(e,tipo,desde,hasta){
   });
   /* A quien ya se liquidó, su liquidación le pagó (y canceló) esta prestación: no entra otra vez al pago general. */
   const liquidados=new Set((e.liquidaciones||[]).filter(l=>l.fechaRetiro>=desde).map(l=>l.empleadoId));
-  return Object.values(acum).filter(x=>x.monto>0&&!liquidados.has(x.empleadoId)).sort((a,b)=>b.monto-a.monto);
+  /* Lo que se PAGA es el monto legal, proporcional a los días trabajados en el período (Dto. 76-78 y 42-92): un
+     salario completo si trabajó todo el período. Las planillas provisionaron 1/12 por mes; la diferencia entre lo
+     provisionado y lo legal se ajusta contra el gasto al pagar. */
+  const dias=(a,b)=>Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/864e5)+1;
+  return Object.values(acum).filter(x=>x.monto>0&&!liquidados.has(x.empleadoId)).map(x=>{
+    const em=(e.empleados||[]).find(y=>y.id===x.empleadoId);
+    if(!em||(tipo!=='aguinaldo'&&tipo!=='bono14')) return {...x,provision:x.monto};
+    const ini=em.fechaIngreso&&em.fechaIngreso>desde?em.fechaIngreso:desde;
+    const legal=ini>hasta?0:r2(em.salarioBase*dias(ini,hasta)/dias(desde,hasta));
+    return {...x,provision:x.monto,monto:legal};
+  }).sort((a,b)=>b.monto-a.monto);
 }
 
 VISTAS.pagoPrestaciones=()=>{
@@ -343,10 +368,15 @@ ACCIONES.confirmarPagoPrestacion=()=>{
     const nombresCuenta={aguinaldo:'Aguinaldo por pagar',bono14:'Bono 14 por pagar',
       vacaciones:'Vacaciones por pagar',indemnizacion:'Indemnización por pagar (provisión)'};
     asegurarCuenta(e,info.ctaPasivo,nombresCuenta[b.tipo],'pasivo');
+    /* La provisión acumulada se cancela; si lo legal pagado es distinto, la diferencia va al gasto de la prestación. */
+    const prov=r2(incluidos.reduce((s,f)=>s+(f.provision!==undefined?f.provision:f.monto),0)), ajuste=r2(total-prov);
+    const ctaGastoPrest={aguinaldo:'6.2.18',bono14:'6.2.19',vacaciones:'6.2.20',indemnizacion:'6.2.21'}[b.tipo];
     const p={id:uid(),numero:e.correlativo++,fecha:b.fechaPago,
       concepto:`Pago de ${info.nombre} del ${fFecha(b.desde)} al ${fFecha(b.hasta)} — ${incluidos.length} empleado${incluidos.length===1?'':'s'}`,
       docTipo:'',docSerie:'',docNum:'',nit:'',contraparte:'',
-      lineas:[{cta:info.ctaPasivo,desc:'',debe:total,haber:0},{cta:b.cuentaPago,desc:'',debe:0,haber:total}]};
+      lineas:[{cta:info.ctaPasivo,desc:'',debe:prov,haber:0},
+        ...(ajuste?[{cta:ctaGastoPrest,desc:ajuste>0?'Diferencia entre lo legal y lo provisionado':'Provisión mayor que lo legal',debe:ajuste>0?ajuste:0,haber:ajuste<0?-ajuste:0}]:[]),
+        {cta:b.cuentaPago,desc:'',debe:0,haber:total}]};
     e.partidas.push(p);
     e.pagosPrestaciones=e.pagosPrestaciones||[];
     e.pagosPrestaciones.push({id:uid(),tipo:b.tipo,desde:b.desde,hasta:b.hasta,fechaPago:b.fechaPago,

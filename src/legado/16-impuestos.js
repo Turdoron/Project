@@ -400,18 +400,34 @@ ACCIONES.pagarIVA=(d0={})=>{
   actualizarPreview(false);
 };
 
+/* El mes de impuesto mensual que toca pagar: el anterior si es de un régimen mensual; si no (la empresa ya pasó a
+   General), el último mes de régimen mensual que quedó sin pagar —p. ej. el 5% de junio, que vence en julio—. */
+function mesImpuestoMensualPendiente(e){
+  const ant=mesAnteriorRango();
+  if(regimenEn(e,ant.hasta)!=='general') return ant;
+  let [a,m]=ant.desde.split('-').map(Number);
+  for(let i=0;i<12;i++){
+    m--; if(m<1){m=12;a--;}
+    const desde=`${a}-${String(m).padStart(2,'0')}-01`, hasta=finDeMes(a,m), r=regimenEn(e,hasta);
+    if(r==='general') continue;
+    if(!(e.partidas||[]).some(p=>p.liqISR&&p.liqISR.desde<=hasta&&p.liqISR.hasta>=desde)) return {desde,hasta};
+    break;
+  }
+  return null;
+}
 ACCIONES.pagarISR=()=>{
   const e=emp();
-  /* El régimen que manda es el del mes que se paga (el anterior), no el de hoy: el 5% de junio se paga en julio
-     aunque desde julio la empresa ya esté en régimen General. */
-  const regimenPago=regimenEn(e,mesAnteriorRango().hasta);
+  /* El régimen que manda es el del mes que se paga, no el de hoy: el 5% de junio se paga en julio aunque desde
+     julio la empresa ya esté en régimen General. */
+  const mesPago=mesImpuestoMensualPendiente(e)||mesAnteriorRango();
+  const regimenPago=regimenEn(e,mesPago.hasta);
   if(regimenPago==='general'){
     avisar('El régimen General paga ISR trimestral, no mensual — usá "Cierre fiscal parcial" o "Cierre fiscal total" en el Tablero fiscal, no esta opción.');
     return;
   }
   const cajaBanco=cuentasCajaBanco(e);
   if(!cajaBanco.length){avisar('El catálogo no tiene ninguna cuenta de Caja o Bancos.');return}
-  const {desde:desdeDefault,hasta:hastaDefault}=mesAnteriorRango();
+  const {desde:desdeDefault,hasta:hastaDefault}=mesPago;
   const yaPagado=(desde,hasta)=>(e.partidas||[]).find(p=>p.liqISR&&p.liqISR.desde<=hasta&&p.liqISR.hasta>=desde);
 
   if(regimenPago==='simplificado'){
