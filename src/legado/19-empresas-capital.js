@@ -628,6 +628,7 @@ ACCIONES.registrarPago=d=>{
       const forma = dat.forma==='cheque' ? `cheque${dat.numCheque?' No. '+dat.numCheque.trim():''}`
         : dat.forma==='transferencia' ? `transferencia${dat.numCheque?' — ref. '+dat.numCheque.trim():''}`
         : 'efectivo';
+      if(dat.fecha&&anioCerrado(e,dat.fecha.slice(0,4))){avisar(`El ejercicio ${dat.fecha.slice(0,4)} ya tiene cierre de libros: no se le pueden agregar movimientos.`);return false}
       /* Se une a la partida del día, junto con cualquier otra operación de esa fecha. */
       const p=partidaDelDia(e,dat.fecha);
       sumarMovimiento(p,'2.1.01',monto,0);
@@ -685,6 +686,7 @@ ACCIONES.registrarCobro=d=>{
       const forma = dat.forma==='cheque' ? `cheque${dat.numCheque?' No. '+dat.numCheque.trim():''}`
         : dat.forma==='transferencia' ? `transferencia${dat.numCheque?' — ref. '+dat.numCheque.trim():''}`
         : 'efectivo';
+      if(dat.fecha&&anioCerrado(e,dat.fecha.slice(0,4))){avisar(`El ejercicio ${dat.fecha.slice(0,4)} ya tiene cierre de libros: no se le pueden agregar movimientos.`);return false}
       /* Se une a la partida del día, junto con cualquier otra operación de esa fecha. */
       const p=partidaDelDia(e,dat.fecha);
       sumarMovimiento(p,dat.cuenta,monto,0);

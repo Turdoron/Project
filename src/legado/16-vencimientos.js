@@ -37,7 +37,7 @@ function vencimientosEmpresa(e,anio){
   /* Nada de antes de que la empresa empezara a operar (o a registrarse en el sistema). */
   const inicio=e.inicioOperaciones||(e.partidas||[]).map(p=>p.fecha).filter(Boolean).sort()[0]||`${anio}-01-01`;
   const out={push:(...vs)=>vs.forEach(v=>{ if((v.fin||v.fecha)>=inicio) lista.push(v); })};
-  const pagoIVA=(d,h)=>(e.partidas||[]).some(p=>p.liqIVA&&p.liqIVA.desde<=h&&p.liqIVA.hasta>=d);
+  const pagoIVA=(d,h)=>(e.partidas||[]).some(p=>p.liqIVA&&p.liqIVA.desde<=h&&p.liqIVA.hasta>=d)||(e.ivaDeclarado||[]).some(x=>x.desde<=h&&x.hasta>=d);
   const pagoISRmes=(d,h)=>(e.partidas||[]).some(p=>p.liqISR&&p.liqISR.desde<=h&&p.liqISR.hasta>=d);
   for(let m=1;m<=12;m++){
     const d=`${anio}-${String(m).padStart(2,'0')}-01`, h=finDeMes(anio,m), sigA=m===12?anio+1:anio, sigM=m===12?1:m+1, reg=regimenEn(e,h);
@@ -51,7 +51,7 @@ function vencimientosEmpresa(e,anio){
     if(reg==='simplificado') out.push({fin:h,clave:`isrm-${anio}-${m}`,tipo:'ISR',fecha:habilesDespues(h,10),titulo:`ISR de ${MESES_CORTOS[m-1]} ${anio}`,
       detalle:'Régimen opcional simplificado (5% / 7%), si no te lo retuvieron',pagado:pagoISRmes(d,h)});
     if(tieneEmpleados){
-      out.push({fin:h,clave:`igss-${anio}-${m}`,tipo:'IGSS',fecha:corridoAHabil(`${sigA}-${String(sigM).padStart(2,'0')}-20`),titulo:`IGSS de ${MESES_CORTOS[m-1]} ${anio}`,detalle:'Cuotas laboral y patronal (y planilla electrónica)',pagado:(e.partidas||[]).some(p=>p.pagoIGSS&&p.pagoIGSS.hasta>=h)});
+      out.push({fin:h,clave:`igss-${anio}-${m}`,tipo:'IGSS',fecha:corridoAHabil(`${sigA}-${String(sigM).padStart(2,'0')}-20`),titulo:`IGSS de ${MESES_CORTOS[m-1]} ${anio}`,detalle:'Cuotas laboral y patronal (y planilla electrónica)',...((e.partidas||[]).some(p=>p.pagoIGSS)?{pagado:(e.partidas||[]).some(p=>p.pagoIGSS&&p.pagoIGSS.hasta>=h)}:{})});
       out.push({fin:h,clave:`retisr-${anio}-${m}`,tipo:'ISR',fecha:habilesDespues(h,10),titulo:`Retenciones de ISR de ${MESES_CORTOS[m-1]} ${anio}`,detalle:'ISR retenido en la planilla'});
     }
   }

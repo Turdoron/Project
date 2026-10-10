@@ -672,7 +672,7 @@ VISTAS.resultados=()=>{
     + rangoFechas(d,h)
     + (!R.tieneFinal && (R.invInicial||R.comprasBienes) ? `<div class="aviso malo">
         Falta el inventario final al ${fFecha(h)} para que el costo de ventas sea correcto.
-        Se está calculando con Q0.00 mientras tanto, lo que infla el costo de ventas.
+        Mientras tanto el costo de ventas es una estimación${R.costoVentas?` (Q${Q(R.costoVentas)}, según lo que salió del kardex)`:''}.
         Ingresalo abajo, con el valor de un conteo físico real.</div>` : '')
     + (R.excesoViaticos ? `<div class="aviso malo">Los viáticos del período (Q${Q(R.viaticos)}) superan el 3% de la renta
         bruta permitido por ley (Q${Q(R.limiteViaticos)}, Art. 21 Dto. 10-2012). El exceso, Q${Q(R.excesoViaticos)},
@@ -771,12 +771,16 @@ VISTAS.balance=()=>{
   const e=emp();
   const h=filtros.hasta||`${e.ejercicio}-12-31`;
   const mov=movimientos(null,h);
+  /* Capital suscrito que los socios todavía no pagan (1.1.12): la NIIF para PYMES (22.7 a) lo presenta restando del
+     patrimonio, no como un activo. */
+  const noPagado=saldoNatural('1.1.12',mov);
   const bloque=(titulo,tipo)=>{
     let s=0,f='';
-    e.cuentas.filter(c=>c.d&&c.t===tipo).forEach(c=>{
+    e.cuentas.filter(c=>c.d&&c.t===tipo&&!(tipo==='activo'&&c.c==='1.1.12')).forEach(c=>{
       const v=saldoNatural(c.c,mov); if(!v) return; s+=v;
       f+=`<tr><td style="padding-left:26px">${esc(c.n)}</td><td class="num">${Q(v)}</td></tr>`;
     });
+    if(tipo==='patrimonio'&&noPagado){ s-=noPagado; f+=`<tr><td style="padding-left:26px">(−) Capital suscrito no pagado</td><td class="num">${Q(-noPagado)}</td></tr>`; }
     return {html:`<tr class="grupo-cta"><td colspan="2">${titulo}</td></tr>${f||'<tr><td style="padding-left:26px;color:var(--tinta-suave)">Sin saldos</td><td></td></tr>'}`,total:r2(s)};
   };
   const a=bloque('Activo','activo'), p=bloque('Pasivo','pasivo'), pt=bloque('Patrimonio','patrimonio');

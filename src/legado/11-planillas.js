@@ -467,6 +467,13 @@ const inventarioDetalleAl=(e,hasta)=>inventarioDetalle(empresaAlCorte(e,hasta));
    no se valúa con la compra del 10/02, aunque esa compra se haya cargado antes—. Sin fecha, se usa todo. */
 function costoSalidaInventario(e,producto,cantidad,fecha){
   if(fecha) e=empresaAlCorte(e,fecha);
+  /* Devolución de un cliente (cantidad negativa): vuelve al inventario al costo con que salió, el de la última
+     venta de ese producto (NIC 2: el costo de lo devuelto es el que se le cargó al costo de ventas). */
+  if(cantidad<0){
+    const ult=(e.salidasInventario||[]).filter(s=>s.producto===producto&&s.cantidad>0&&s.motivo==='venta').sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||'')).pop();
+    const cu=ult?(ult.costoUnitario||(ult.costoTotal/ult.cantidad)):((inventarioDetalle(e).lista.find(x=>x.producto===producto)||{}).costoUnitario||0);
+    return {costoTotal:r2(cantidad*cu),costoUnitario:cu};
+  }
   if(metodoCosteo(e)==='peps'){
     const capas=capasDeCompra(e,producto);
     let saltar=(e.salidasInventario||[]).filter(x=>x.producto===producto).reduce((a,x)=>a+x.cantidad,0);

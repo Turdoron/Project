@@ -9,6 +9,14 @@ function renumerarPartidas(e){
       p.numero=porAno[ano];
     });
   e.correlativo=(porAno[String(e.ejercicio)]||0)+1;
+  /* Los registros que muestran el número de su partida (planillas, pagos de prestaciones, cierres de CIF,
+     liquidaciones…) se actualizan con el número nuevo. */
+  const num=new Map(e.partidas.map(p=>[p.id,p.numero]));
+  const recorrer=(x,prof)=>{ if(!x||typeof x!=='object'||prof>4) return;
+    if(Array.isArray(x)){ x.forEach(y=>recorrer(y,prof+1)); return; }
+    if(x.partidaId&&'partidaNumero' in x&&num.has(x.partidaId)) x.partidaNumero=num.get(x.partidaId);
+    Object.keys(x).forEach(k=>{ if(k!=='partidas'&&typeof x[k]==='object') recorrer(x[k],prof+1); }); };
+  Object.keys(e).forEach(k=>{ if(k!=='partidas'&&k!=='cuentas'&&Array.isArray(e[k])) recorrer(e[k],0); });
 }
 ACCIONES.renumerar=()=>{
   const e=emp();
@@ -87,6 +95,13 @@ ACCIONES.guardarPartida=()=>{
   const lineas=b.lineas.filter(l=>l.cta&&((+l.debe||0)||(+l.haber||0)))
     .map(l=>({cta:l.cta,desc:l.desc||'',debe:r2(+l.debe||0),haber:r2(+l.haber||0)}));
   if(!b.concepto.trim()){avisar('Escribí el concepto de la partida.');return}
+  if(lineas.some(l=>l.debe<0||l.haber<0)){avisar('Los montos no pueden ser negativos: para restar, poné el monto del lado contrario (debe ↔ haber).');return}
+  if(b.fecha&&!fechaValida(b.fecha)){avisar(`La fecha ${b.fecha} no existe en el calendario.`);return}
+  /* «Cierre de libros» es el concepto con que el sistema marca el cierre de un ejercicio: una partida manual no
+     puede usarlo, porque dejaría el año como cerrado. */
+  const editada=b.editando&&e.partidas.find(x=>x.id===b.editando);
+  if((b.concepto||'').trim().startsWith(PREFIJO_CIERRE_LIBROS.trim())&&!(editada&&(editada.concepto||'').startsWith(PREFIJO_CIERRE_LIBROS))){avisar('El concepto «Cierre de libros…» lo reserva el sistema para el cierre del ejercicio. Usá otro texto (p. ej. «Ajuste de cierre…»).');return}
+  if(editada&&anioCerrado(e,editada.fecha.slice(0,4))&&!(editada.concepto||'').startsWith(PREFIJO_CIERRE_LIBROS)){avisar(`Esa partida es del ejercicio ${editada.fecha.slice(0,4)}, que ya tiene cierre de libros: no se puede modificar ni mover a otra fecha.`);return}
   if(lineas.length<2){avisar('Necesitás al menos dos líneas con cuenta y monto.');return}
   const mixta=lineas.find(l=>l.debe&&l.haber);
   if(mixta){avisar(`La línea de la cuenta ${mixta.cta} tiene monto en el debe y en el haber. Dejá solo uno.`);return}
@@ -273,8 +288,19 @@ function limpiarDependenciasPartida(e,p){
   if(e.liquidaciones) e.liquidaciones=e.liquidaciones.filter(l=>!esLiq(l));
 
   /* Cierres fiscales parciales */
-  const nCierres=(e.cierresParciales||[]).filter(c=>c.partidaId===id).length;
-  if(nCierres){ e.cierresParciales=e.cierresParciales.filter(c=>c.partidaId!==id); notas.push('el registro del cierre fiscal parcial (el trimestre vuelve a quedar pendiente)'); }
+  /* Cierre fiscal parcial: son hasta tres partidas (costo de ventas, ISR y pago). Borrar cualquiera deshace el
+     cierre completo —las otras partidas y el inventario final guardado—, para que el trimestre se pueda rehacer
+     sin pagar dos veces ni quedar sin su costo. */
+  const delCierre=(e.cierresParciales||[]).filter(c=>c.partidaId===id||(c.partidasIds||[]).includes(id));
+  if(delCierre.length){
+    const otras=new Set(delCierre.flatMap(c=>c.partidasIds||[]));
+    e.partidas=e.partidas.filter(x=>!otras.has(x.id));
+    delCierre.forEach(c=>{ if(c.hasta&&e.inventarioFinal) delete e.inventarioFinal[c.hasta]; });
+    e.cierresParciales=e.cierresParciales.filter(c=>!delCierre.includes(c));
+    notas.push('el cierre fiscal parcial completo (sus partidas de costo, ISR y pago, y el inventario final guardado); el trimestre vuelve a quedar pendiente');
+  }
+  /* Cierre de costo de ventas suelto: el inventario final guardado de esa fecha deja de valer. */
+  if(conc.startsWith(PREFIJO_CIERRE_COSTO)&&e.inventarioFinal&&Object.prototype.hasOwnProperty.call(e.inventarioFinal,p.fecha)){ delete e.inventarioFinal[p.fecha]; notas.push('el inventario final guardado de esa fecha'); }
 
   /* ISO: créditos, pagos, usos y vencimientos */
   (e.creditosISO||[]).forEach(c=>{
@@ -354,6 +380,21 @@ ACCIONES.borrarPartida=d=>{
   if(!puedeEliminar()){avisar('Tu rol no tiene permiso para eliminar partidas. Pedile a tu gerente que lo haga.');return}
   const e=emp(), p=e.partidas.find(x=>x.id===d.id);
   if(!p){avisar('No se encontró esa partida.');return}
+  /* Un ejercicio con cierre de libros ya no se toca: solo se pueden quitar sus propias partidas de cierre (para
+     reabrirlo). */
+  if(anioCerrado(e,p.fecha.slice(0,4))&&!(p.concepto||'').startsWith(PREFIJO_CIERRE_LIBROS)){avisar(`El ejercicio ${p.fecha.slice(0,4)} ya tiene cierre de libros: sus partidas no se pueden eliminar. Si de verdad hay que corregirlo, primero eliminá las partidas de «Cierre de libros ${p.fecha.slice(0,4)}» para reabrirlo.`);return}
+  /* Lo que se borra no puede dejar a alguien con saldo al revés: una factura al crédito que ya se pagó (o cobró),
+     o una suscripción de capital que ya tiene pagos. Primero hay que borrar el pago. */
+  const sin={...e,partidas:e.partidas.filter(x=>x.id!==p.id),documentos:(e.documentos||[]).filter(d=>d.partidaId!==p.id),pagos:(e.pagos||[]).filter(x=>x.partidaId!==p.id),cobros:(e.cobros||[]).filter(x=>x.partidaId!==p.id)};
+  const docsCred=(e.documentos||[]).filter(d=>d.partidaId===p.id&&d.alCredito&&(d.signo||1)>0);
+  for(const d of docsCred){
+    const cart=d.tipo==='compra'?carteraProveedores(sin):carteraClientes(sin), c=cart.find(x=>x.nit===(d.nit||'—'));
+    if(c&&c.saldo<-0.005){avisar(`No se puede eliminar: ${d.tipo==='compra'?'a':'de'} ${c.nombre||c.nit} ya se le ${d.tipo==='compra'?'pagó':'cobró'} esa factura y quedaría con un saldo al revés de Q${Q(Math.abs(c.saldo))}. Eliminá primero el ${d.tipo==='compra'?'pago':'cobro'}.`);return}
+  }
+  if(p.lineas.some(l=>l.cta==='1.1.12'&&l.debe)){
+    const mal=estadoCapitalSociedad(sin).socios.find(s=>s.pendiente<-0.004);
+    if(mal){avisar(`No se puede eliminar: ${mal.nombre} ya pagó parte de esa suscripción. Eliminá primero la partida de su pago.`);return}
+  }
   confirmar(`Se eliminará la partida No. ${p.numero} del ${fFecha(p.fecha)}.\n${p.concepto}\n\nTambién se deshace lo que dependa de ella en otros módulos (documentos, cartera, planillas, cierres, activos, ISO, etc.).`,()=>{
     e.partidas=e.partidas.filter(x=>x.id!==d.id);
     const notas=limpiarDependenciasPartida(e,p);
@@ -423,7 +464,7 @@ ACCIONES.borrarTodo=()=>{
         partidasCapital.forEach((p,i)=>p.numero=i+1);
         e.partidas=partidasCapital;
         e.documentos=[]; e.pagos=[]; e.cobros=[];
-        e.consignaciones=[]; e.salidasInventario=[]; e.entradasInventario=[]; e.pedidosVenta=[]; e.cotizacionesVenta=[];
+        e.consignaciones=[]; e.salidasInventario=[]; e.entradasInventario=[]; e.ivaDeclarado=[]; e.pedidosVenta=[]; e.cotizacionesVenta=[];
         e.aumentosCapital=[]; e.cierresParciales=[]; e.devolucionesIVA=[];
         e.empleados=[]; e.planillas=[]; e.pagosPrestaciones=[];
         e.inventarioFinal={};

@@ -324,8 +324,11 @@ ACCIONES.cierreDeLibros=()=>{
   e.cuentas.filter(c=>c.d&&['ingreso','costo','gasto'].includes(c.t)).forEach(c=>{
     const saldo=saldoNatural(c.c,mov);
     if(!saldo) return;
-    if(c.t==='ingreso'){ lineas.push({cta:c.c,desc:'',debe:saldo,haber:0}); totalIngresos=r2(totalIngresos+saldo); }
-    else{ lineas.push({cta:c.c,desc:'',debe:0,haber:saldo}); totalCostosGastos=r2(totalCostosGastos+saldo); }
+    /* Una cuenta con saldo contrario a su naturaleza (p. ej. Devoluciones sobre compras, acreedora) se cierra del
+       lado opuesto con monto positivo, nunca con un monto negativo. */
+    const lado=(debe,monto)=>monto>=0?{cta:c.c,desc:'',debe:debe?monto:0,haber:debe?0:monto}:{cta:c.c,desc:'',debe:debe?0:-monto,haber:debe?-monto:0};
+    if(c.t==='ingreso'){ lineas.push(lado(true,saldo)); totalIngresos=r2(totalIngresos+saldo); }
+    else{ lineas.push(lado(false,saldo)); totalCostosGastos=r2(totalCostosGastos+saldo); }
     detalle.push({cuenta:c.c,nombre:c.n,tipo:c.t,saldo});
   });
   if(!lineas.length){avisar(`No hay movimiento de ingresos, costos ni gastos en el ejercicio ${e.ejercicio} para cerrar.`);return}
@@ -469,6 +472,7 @@ ACCIONES.cerrarCostoVentas=d=>{
      fecha de fin de año mientras se estaba trabajando un corte anterior,
      si el filtro de la pantalla había quedado en el 31 de diciembre. */
   if(d.hasta>hoy()){avisar(`${fFecha(d.hasta)} todavía no llegó — no se puede cerrar el costo de ventas de una fecha futura. Si querés cerrar el trimestre o el año en curso, cambiá el filtro de arriba a la fecha de corte real.`);return}
+  if(anioCerrado(e,d.hasta.slice(0,4))){avisar(`El ejercicio ${d.hasta.slice(0,4)} ya tiene cierre de libros: no se puede volver a cerrar su costo de ventas.`);return}
   const invFinal=e.inventarioFinal?.[d.hasta];
   if(invFinal===undefined){avisar('Primero guardá el inventario final de esa fecha de corte.');return}
   const saldoActual=saldoNatural('1.1.08',movimientos(null,d.hasta));

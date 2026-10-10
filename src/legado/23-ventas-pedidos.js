@@ -167,7 +167,9 @@ function cuerpoPreciosVenta(e){
       <th class="num">Precio por mayor</th><th class="num">Margen</th><th class="num"></th></tr></thead><tbody>${filas}</tbody></table>`;
 }
 ACCIONES.editarPrecioVenta=d=>{
-  const e=emp(), n=d.producto, pr=(e.preciosVenta||{})[n]||{}, k=inventarioDetalle(e).lista.find(p=>p.producto===n);
+  const e=emp(), n=d.producto, pr=(e.preciosVenta||{})[n]||{}, k0=inventarioDetalle(e).lista.find(p=>p.producto===n);
+  /* En PEPS el margen se mide contra el costo de la próxima unidad que sale, no contra el promedio. */
+  const k=k0&&metodoCosteo(e)==='peps'?{...k0,costoUnitario:costoSalidaInventario(e,n,1).costoUnitario}:k0;
   abrirModal(`Precio de venta — ${esc(n)}`,
     `<p style="margin:0 0 12px;font-size:13px;color:var(--tinta-suave)">${k?`Costo unitario en inventario: Q${Q(k.costoUnitario)}. `:''}Los precios llevan el IVA incluido.</p>
     <div class="rej"><div class="campo"><label>Precio unitario</label><input name="precio" type="number" min="0" step="0.01" value="${pr.precio||''}"></div>

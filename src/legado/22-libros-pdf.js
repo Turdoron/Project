@@ -395,22 +395,29 @@ const ESTADOS_SOLO={resultados:'Estado-de-Resultados',balance:'Balance-General',
 function datosEstadosFinancieros(e,d,h){
   const R=calcularResultados(e,d,h);
   const movBal=movimientos(null,h);
+  const noPagado=saldoNatural('1.1.12',movBal);   // capital suscrito no pagado: resta del patrimonio (NIIF PYMES 22.7 a)
   const bloqueB=tipo=>{
     let s=0,f=[];
-    e.cuentas.filter(c=>c.d&&c.t===tipo).forEach(c=>{
+    e.cuentas.filter(c=>c.d&&c.t===tipo&&!(tipo==='activo'&&c.c==='1.1.12')).forEach(c=>{
       const v=saldoNatural(c.c,movBal); if(!v) return; s+=v;
       f.push([c.n,Q(v)]);
     });
+    if(tipo==='patrimonio'&&noPagado){ s-=noPagado; f.push(['(−) Capital suscrito no pagado',Q(-noPagado)]); }
     return {filas:f,total:r2(s)};
   };
   const act=bloqueB('activo'), pas=bloqueB('pasivo'), patr=bloqueB('patrimonio');
   const utilAcum=utilidadPatrimonioSinDuplicar(e,h);
   const f=flujoEfectivo(e,d,h);
-  const patrInicial=r2(e.cuentas.filter(c=>c.d&&c.t==='patrimonio').reduce((s,c)=>s+saldoCuentaAntesDe(e,c.c,d),0));
+  /* Patrimonio al inicio: las cuentas de patrimonio más los resultados todavía sin cierre de libros (de ejercicios
+     anteriores o de la parte del año antes del período), igual que en el Balance (NIIF PYMES secc. 6). */
+  const diaAntes=(()=>{ const x=new Date(d+'T00:00:00Z'); x.setUTCDate(x.getUTCDate()-1); return x.toISOString().slice(0,10); })();
+  const patrInicial=r2(e.cuentas.filter(c=>c.d&&c.t==='patrimonio').reduce((s,c)=>s+saldoCuentaAntesDe(e,c.c,d),0)+utilidadPatrimonioSinDuplicar(e,diaAntes));
   const aumentosPeriodo=r2(e.cuentas.filter(c=>c.d&&c.t==='patrimonio')
     .reduce((s,c)=>{const m=R.mov[c.c]||{debe:0,haber:0};return s+((m.haber||0)-(m.debe||0));},0));
-  const patrFinal=r2(patrInicial+aumentosPeriodo+R.netaReal);
-  return {d,h,R,act,pas,patr,utilAcum,f,patrInicial,aumentosPeriodo,patrFinal};
+  /* El capital suscrito no pagado resta del patrimonio también aquí, igual que en el Balance. */
+  const m112=R.mov['1.1.12']||{debe:0,haber:0}, np0=saldoCuentaAntesDe(e,'1.1.12',d), np1=r2((m112.debe||0)-(m112.haber||0));
+  const patrFinal=r2(patrInicial-np0+aumentosPeriodo-np1+R.netaReal);
+  return {d,h,R,act,pas,patr,utilAcum,f,patrInicial:r2(patrInicial-np0),aumentosPeriodo:r2(aumentosPeriodo-np1),patrFinal};
 }
 ACCIONES.pdfEstadosFinancieros=async(arg)=>{
   const solo=arg&&ESTADOS_SOLO[arg.solo]?arg.solo:'';

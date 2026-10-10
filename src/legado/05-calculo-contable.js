@@ -45,6 +45,8 @@ function movimientoCuentaSinCierreCosto(e,cta,desde,hasta){
    suman los resultados de TODOS los ejercicios hasta la fecha de corte que
    todavía no tienen cierre de libros, separando el del año del corte de los
    anteriores. */
+/* La fecha existe de verdad en el calendario (descarta un 29/02 de un año no bisiesto o un 31/04). */
+const fechaValida=f=>{ if(!/^\d{4}-\d{2}-\d{2}$/.test(f||'')) return false; const d=new Date(f+'T00:00:00Z'); return !isNaN(d)&&d.toISOString().slice(0,10)===f; };
 function anioCerrado(e,anio){
   return (e.partidas||[]).some(p=>(p.concepto||'').startsWith(`${PREFIJO_CIERRE_LIBROS}${anio}`));
 }

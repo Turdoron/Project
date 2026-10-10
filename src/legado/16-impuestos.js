@@ -349,7 +349,16 @@ ACCIONES.pagarIVA=(d0={})=>{
       const {debito,credito}=iva;
       const neto=r2(debito-credito-remanente);
       let aplicarRet=0;
-      if(!debito && !credito){avisar('No hay movimiento de IVA registrado en ese rango de fechas.');return false}
+      /* Mes sin débito fiscal (sin ventas, o solo con compras): la declaración igual se presenta, en cero o con el
+         crédito como remanente. No lleva partida, pero queda registrada para que el mes no figure como pendiente. */
+      if(!debito){
+        if((e.ivaDeclarado||[]).some(x=>x.desde<=d.hasta&&x.hasta>=d.desde)){avisar('Ese período ya tiene la declaración registrada.');return false}
+        (e.ivaDeclarado=e.ivaDeclarado||[]).push({id:uid(),desde:d.desde,hasta:d.hasta,fecha:d.fechaPago,credito,remanente});
+        registrarLog('Registró una declaración de IVA sin pago',`${fFecha(d.desde)} al ${fFecha(d.hasta)} — crédito Q${Q(credito)}`);
+        guardar(); pintar();
+        avisar(credito||remanente?`Declaración registrada sin pago: no hubo débito fiscal; el crédito (Q${Q(r2(credito+remanente))}) queda como remanente para el mes siguiente.`:'Declaración en cero registrada: no hubo movimiento de IVA en ese período.','Listo');
+        return;
+      }
       const lineas=[];
       if(neto>0){
         /* Débito mayor: se cancelan el débito del período, el crédito del
@@ -757,7 +766,8 @@ function postearCierreFiscalParcial(e,t,x,d){
   e.cierresParciales=e.cierresParciales||[];
   /* Se registra siempre —aunque el ISR del trimestre sea cero por pérdida—, para que
      el trimestre quede cerrado y el método del año quede fijado. */
-  e.cierresParciales.push({trimestre:t,ejercicio:e.ejercicio,metodo:d.metodo,monto,partidaId:(pIsr||partidasNuevas[0]).id});
+  e.cierresParciales.push({trimestre:t,ejercicio:e.ejercicio,metodo:d.metodo,monto,partidaId:(pIsr||partidasNuevas[0]).id,
+    partidasIds:partidasNuevas.map(p=>p.id),hasta:x.hasta});
   if(credISO>0){
     const pCred=partidasNuevas.find(p=>p.lineas.some(l=>l.cta==='1.1.16'));
     aplicarCreditosISO(e,credISO,d.fechaPago,`ISR del trimestre ${t} de ${e.ejercicio}`,pCred?pCred.id:'');

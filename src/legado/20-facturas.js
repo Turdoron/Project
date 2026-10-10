@@ -95,13 +95,6 @@ function clasificar(d){
     if(!d.ivaReportado) d.iva=r2(d.total-d.total/1.12);
     d.noAcred=0; d.base=r2(d.total-d.iva);
   }
-  /* Una nota de crédito rebaja la cuenta por cobrar (o por pagar) solo si esa contraparte tiene saldo pendiente;
-     si la venta o la compra fue de contado, la devolución es en efectivo. */
-  if(d.tipoDte==='NCRE'&&!d.ctaPago){
-    const nit=d.tipo==='compra'?d.nitEmisor:d.nitReceptor, cart=d.tipo==='compra'?carteraProveedores(e):carteraClientes(e);
-    const c=cart.find(x=>soloNit(x.nit)===soloNit(nit));
-    d.alCredito=!!(c&&c.saldo>0.005);
-  }
   /* Cambiaria = operación al crédito: va a cuentas por pagar o por cobrar.
      El resto se asume de contado. */
   if(!d.ctaPago){
@@ -288,6 +281,15 @@ function finalizarCarga(docs,anuladas,tipoArchivo,prog){
     avisar(`Dijiste que el archivo es de ${tipoArchivo==='compra'?'compras':'ventas'}, pero en los ${docs.length} documentos el NIT ${nitEmp} aparece del lado contrario.\n\nEse archivo parece ser de ${tipoArchivo==='compra'?'ventas':'compras'}. No se cargó nada.`,'El archivo no coincide');
     return;
   }
+  /* Una nota de crédito rebaja la cuenta por cobrar (o por pagar) solo si esa contraparte tiene saldo pendiente o
+     una factura al crédito en este mismo lote; si la operación fue de contado, la devolución es en efectivo. */
+  const todos=lote.concat(docs), cuentaDe=(x,cred)=>cred?(x.tipo==='compra'?'2.1.01':'1.1.04'):'1.1.01';
+  const nitDe=x=>soloNit(x.tipo==='compra'?x.nitEmisor:x.nitReceptor);
+  docs.filter(d=>d.tipoDte==='NCRE').forEach(d=>{
+    const c=(d.tipo==='compra'?carteraProveedores(e):carteraClientes(e)).find(x=>soloNit(x.nit)===nitDe(d));
+    const cred=!!(c&&c.saldo>0.005)||todos.some(x=>x!==d&&x.tipo===d.tipo&&x.alCredito&&x.tipoDte!=='NCRE'&&nitDe(x)===nitDe(d));
+    if(cred!==!!d.alCredito&&d.ctaPago===cuentaDe(d,!!d.alCredito)){ d.alCredito=cred; d.ctaPago=cuentaDe(d,cred); }
+  });
   lote=lote.concat(docs);
   pintar();
   let msg=`Se cargaron ${docs.length} documentos como ${tipoArchivo==='compra'?'compras':'ventas'}.`;
@@ -726,6 +728,10 @@ ACCIONES.generarPartidas=()=>{
   const activos=lote.filter(d=>!d.anuladaManual);
   const excluidas=lote.length-activos.length;
   if(!activos.length){avisar('Todos los documentos están marcados como anulados. No hay nada que generar.');return}
+  const malas=activos.filter(d=>!fechaValida(d.fecha));
+  if(malas.length){avisar(`${malas.length} documento(s) tienen una fecha que no existe (${malas.slice(0,3).map(d=>d.fecha||'sin fecha').join(', ')}). Corregí o quitá esos documentos.`);return}
+  const cerrados=[...new Set(activos.map(d=>(d.fecha||'').slice(0,4)).filter(a=>a&&anioCerrado(e,a)))];
+  if(cerrados.length){avisar(`Hay documentos del ejercicio ${cerrados.join(', ')}, que ya tiene cierre de libros: no se le pueden agregar movimientos. Quitalos del lote (o, si de verdad faltaban, reabrí ese ejercicio eliminando sus partidas de cierre de libros).`);return}
   const sinCuenta=activos.filter(d=>!d.cta||!d.ctaPago||!d.total);
   if(sinCuenta.length){avisar(`${sinCuenta.length} documento(s) no tienen cuenta o monto. Completalos antes de generar.`);return}
 

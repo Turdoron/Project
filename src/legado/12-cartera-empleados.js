@@ -39,7 +39,8 @@ function carteraClientes(e,hasta){
     .sort((a,b)=>b.saldo-a.saldo);
 }
 /* Cuentas de caja y bancos, para elegir de dónde sale o a dónde entra el dinero. */
-const cuentasCajaBanco=e=>e.cuentas.filter(c=>c.d && /caja|banco/i.test(c.n));
+/* Efectivo: cuentas de ACTIVO de caja o bancos (una cuenta de gasto «Embalaje y cajas» no es efectivo). */
+const cuentasCajaBanco=e=>e.cuentas.filter(c=>c.d && c.t==='activo' && /caja|banco/i.test(c.n) && !/por cobrar|por pagar/i.test(c.n));
 
 /* Movimientos cronológicos de un proveedor o cliente: las facturas suman al
    saldo (cargo) y los pagos o cobros restan (abono). Para el estado de cuenta. */
