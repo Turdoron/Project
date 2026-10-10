@@ -71,6 +71,23 @@ function cubrirConEntregas(e,doc,producto,cantidad){
   return r2(cantidad-resta);
 }
 
+/* Lo mismo con las ventas directas: si ya se descontó el producto con "Nueva venta directa", la factura de esa venta
+   no lo vuelve a descontar. Se cubren las ventas directas sin factura, del mismo producto y de fecha igual o anterior. */
+const facturadoVentaDirecta=s=>r2((s.facturas||[]).reduce((a,f)=>a+f.cantidad,0));
+const esVentaDirectaSinFactura=s=>s.motivo==='venta'&&!s.documentoId&&!s.pedidoId&&!s.ajuste&&!s.referenciaId&&r2(s.cantidad-facturadoVentaDirecta(s))>1e-9;
+function cubrirConVentasDirectas(e,doc,producto,cantidad){
+  if(!(cantidad>0)) return 0;
+  let resta=cantidad;
+  (e.salidasInventario||[]).filter(s=>s.producto===producto&&(s.fecha||'')<=(doc.fecha||'')&&esVentaDirectaSinFactura(s))
+    .sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||'')).forEach(s=>{
+      if(resta<=1e-9) return;
+      const t=r2(Math.min(resta,s.cantidad-facturadoVentaDirecta(s)));
+      (s.facturas=s.facturas||[]).push({documentoId:doc.id,cantidad:t,ref:`${doc.serie?doc.serie+'-':''}${doc.dte||''}`});
+      resta=r2(resta-t);
+    });
+  return r2(cantidad-resta);
+}
+
 /* ---- pestañas ---- */
 ACCIONES.verVentasTab=d=>{ ventasTab=d.tab; pintar(); };
 VISTAS.ventas=()=>{

@@ -21,12 +21,13 @@ function cuerpoVentasDirectas(){
     <td class="num"><button class="btn mini" data-accion="verPartida" data-id="${c.partidaVentaId}">Ver partida</button></td></tr>`;
   const filaVentaDirecta=s=>`<tr><td>${fFecha(s.fecha)}</td><td>${esc(s.producto)}</td>
     <td class="num">${s.cantidad}</td><td class="num">${Q(s.costoUnitario)}</td><td class="num">${Q(s.costoTotal)}</td>
-    <td class="num"><button class="btn mini sec" data-accion="editarVentaDirecta" data-id="${s.id}">Editar</button></td></tr>`;
+    <td>${s.documentoId?'Desde la factura':(s.facturas||[]).length?`Facturada${facturadoVentaDirecta(s)<s.cantidad-1e-9?' en parte':''} (${esc(s.facturas.map(f=>f.ref).join(', '))})`:'<span style="color:var(--tinta-suave)">Sin factura cargada</span>'}</td>
+    <td class="num">${(s.facturas||[]).length||s.documentoId?'':`<button class="btn mini sec" data-accion="editarVentaDirecta" data-id="${s.id}">Editar</button>`}</td></tr>`;
   return `<h3 style="color:var(--verde);margin:0 0 8px">Ventas directas</h3>
     <div class="aviso">Para descontar del inventario una venta rápida sin pedido. El ingreso, el IVA y el costo de
       cada venta se registran, como siempre, en "Cargar facturas".</div>
     ${ventasDirectas.length? `<table><thead><tr><th>Fecha</th><th>Producto</th><th class="num">Cantidad</th>
-      <th class="num">Costo unitario</th><th class="num">Costo total</th><th></th></tr></thead>
+      <th class="num">Costo unitario</th><th class="num">Costo total</th><th>Factura</th><th></th></tr></thead>
       <tbody>${ventasDirectas.map(filaVentaDirecta).join('')}</tbody></table>`
      : `<div class="vacio">Todavía no se ha registrado ninguna venta directa.</div>`}
     <h3 style="color:var(--verde);margin:22px 0 8px">En consignación</h3>
@@ -68,7 +69,7 @@ ACCIONES.nuevaVentaDirecta=()=>{
     <td><input data-c="cant" type="number" step="0.01" min="0" value="${cant}" style="width:80px;text-align:right" aria-label="Cantidad vendida"></td>
     <td class="num" data-costo></td><td><button type="button" class="btn mini peligro" data-quitar aria-label="Quitar renglón">×</button></td></tr>`;
   abrirModal('Nueva venta directa',
-    `<p style="margin:0 0 12px;font-size:13px;color:var(--tinta-suave)">Descuenta del inventario lo vendido, uno o varios productos. No genera partida: el ingreso, el IVA y el costo se registran, como siempre, al cargar la factura.</p>
+    `<p style="margin:0 0 12px;font-size:13px;color:var(--tinta-suave)">Descuenta del inventario lo vendido, uno o varios productos. No genera partida: el ingreso, el IVA y el costo se registran, como siempre, al cargar la factura, y esa factura ya no vuelve a descontar lo que salió acá.</p>
     ${htmlEscaner()}
     <table style="font-size:13px;margin-top:10px" id="tbVentaDirecta"><thead><tr><th>Producto</th><th class="num">Cantidad</th><th class="num">Costo que sale</th><th></th></tr></thead>
       <tbody id="tbVD">${fila()}</tbody></table>

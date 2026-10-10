@@ -41,8 +41,13 @@ function vencimientosEmpresa(e,anio){
   const pagoISRmes=(d,h)=>(e.partidas||[]).some(p=>p.liqISR&&p.liqISR.desde<=h&&p.liqISR.hasta>=d);
   for(let m=1;m<=12;m++){
     const d=`${anio}-${String(m).padStart(2,'0')}-01`, h=finDeMes(anio,m), sigA=m===12?anio+1:anio, sigM=m===12?1:m+1, reg=regimenEn(e,h);
-    out.push({fin:h,clave:`iva-${anio}-${m}`,tipo:'IVA',fecha:ultimoHabilDelMes(sigA,sigM),titulo:`IVA de ${MESES_CORTOS[m-1]} ${anio}`,
-      detalle:reg==='pequeno'?'Pequeño Contribuyente, formulario SAT-2046':'Formulario SAT-2237',pagado:pagoIVA(d,h)});
+    /* Pequeño Contribuyente paga su 5% y los regímenes primario/pecuario su impuesto único con "Pagar impuesto"
+       (liquidación tipo ISR); los demás, el IVA normal (SAT-2237). */
+    if(reg==='pequeno'||reg==='primario'||reg==='pecuario') out.push({fin:h,clave:`iva-${anio}-${m}`,tipo:reg==='pequeno'?'IVA':'Impuesto',fecha:ultimoHabilDelMes(sigA,sigM),
+      titulo:reg==='pequeno'?`IVA de ${MESES_CORTOS[m-1]} ${anio}`:`Impuesto único de ${MESES_CORTOS[m-1]} ${anio}`,
+      detalle:reg==='pequeno'?'Pequeño Contribuyente (5%), formulario SAT-2046':'Impuesto único (1.5% sobre ventas brutas), Dto. 31-2024',pagado:pagoISRmes(d,h)});
+    else out.push({fin:h,clave:`iva-${anio}-${m}`,tipo:'IVA',fecha:ultimoHabilDelMes(sigA,sigM),titulo:`IVA de ${MESES_CORTOS[m-1]} ${anio}`,
+      detalle:'Formulario SAT-2237',pagado:pagoIVA(d,h)});
     if(reg==='simplificado') out.push({fin:h,clave:`isrm-${anio}-${m}`,tipo:'ISR',fecha:habilesDespues(h,10),titulo:`ISR de ${MESES_CORTOS[m-1]} ${anio}`,
       detalle:'Régimen opcional simplificado (5% / 7%), si no te lo retuvieron',pagado:pagoISRmes(d,h)});
     if(tieneEmpleados){

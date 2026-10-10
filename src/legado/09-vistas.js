@@ -436,6 +436,10 @@ function calcularResultados(e,desde,hasta){
      Pequeño/Primario — ahí siempre es un gasto operativo normal, la
      exclusión es solo para régimen General. */
   const excluirDeGastos = regimenPeriodo==='general' ? ['6.2.22'] : [];
+  /* Año con cambio de régimen: lo que se pagó en 6.2.22 ANTES de pasar a General (el 5% de Pequeño, el impuesto del
+     Simplificado o del Primario) es un gasto operativo de esos meses, no ISR sobre utilidades. */
+  const desdeISR=regimenPeriodo==='general'?inicioRegimenEn(e,desde,hasta):desde;
+  const impuestoAntesDelCambio=desdeISR>desde?saldoNatural('6.2.22',movimientos(desde,(()=>{ const d=new Date(desdeISR+'T00:00:00'); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10); })(),true)):0;
   /* El ISO que se paga con pagos de ISR (opción b del Art. 11, Dto. 73-2008)
      no se puede recuperar contra el ISR más adelante, y la ley solo declara
      deducible el remanente no acreditado de la opción a). Se trata por eso,
@@ -462,7 +466,7 @@ function calcularResultados(e,desde,hasta){
      separado ayuda a explicar de dónde sale cada peso, en vez de fundirlo
      con "Gastos no deducibles" sin distinción. */
   const ivaNoDeducible=saldoNatural('6.2.27',mov);
-  const gv=porTipo(['gasto'],'6.1',excluirDeGastos), ga=porTipo(['gasto'],'6.2',excluirDeGastos), gf=porTipo(['gasto'],'6.3',excluirDeGastos);
+  const gv=porTipo(['gasto'],'6.1',excluirDeGastos), ga=r2(porTipo(['gasto'],'6.2',excluirDeGastos)+impuestoAntesDelCambio), gf=porTipo(['gasto'],'6.3',excluirDeGastos);
   const bruta=r2(ingresos-costoTotal);
   const gastos=r2(gv+ga+gf);
   const antesISR=r2(bruta-gastos);
@@ -478,12 +482,13 @@ function calcularResultados(e,desde,hasta){
      de ISR ya la tiene adentro y hay que dejarla ahí; si todavía no existe,
      tampoco debe restarse acá aunque el Estado de Resultados sí la
      muestre como gasto del período completo. */
-  const gastosConIsrReal=r2(gv+ga+gf+(regimenPeriodo==='general'?saldoNatural('6.2.22',mov):0));
+  const isrPosteado=regimenPeriodo==='general'?r2(saldoNatural('6.2.22',mov)-impuestoAntesDelCambio):0;
+  const gastosConIsrReal=r2(gv+ga+gf+isrPosteado);
   /* Corrección: el costo de ventas de "bruta" puede ser una ESTIMACIÓN (sin
      inventario final cerrado), pero el Balance necesita solo lo posteado en el
      mayor — si no, la mercadería se resta como costo y a la vez sigue en
      Inventarios, y el Balance descuadra por ese monto. */
-  const netaReal=r2(ingresos-porTipo(['costo'])-r2(gv+ga+gf)-(regimenPeriodo==='general'?saldoNatural('6.2.22',mov):0));
+  const netaReal=r2(ingresos-porTipo(['costo'])-r2(gv+ga+gf)-isrPosteado);
   const viaticos=saldoNatural('6.2.23',mov);
   const limiteViaticos=r2(ingresos*0.03);
   const excesoViaticos=r2(Math.max(0,viaticos-limiteViaticos));
@@ -492,12 +497,14 @@ function calcularResultados(e,desde,hasta){
   const excesoDonaciones=r2(Math.max(0,donaciones-limiteDonaciones));
   const excesoNoDeducible=r2(excesoViaticos+excesoDonaciones);
 
-  const baseImponibleISR=r2(antesISR+excesoNoDeducible+noDeducible+ivaNoDeducible+gastosRentasCapital-rentasOtrasCategorias);
+  /* Con cambio de régimen en el período, la renta imponible es solo la de los meses en General. */
+  const baseImponibleISR=desdeISR>desde?calcularResultados(e,desdeISR,hasta).baseImponibleISR
+    :r2(antesISR+excesoNoDeducible+noDeducible+ivaNoDeducible+gastosRentasCapital-rentasOtrasCategorias);
   const isrYaCerrado=cierreTotalHecho;
   let isr=0;
   if(regimenPeriodo==='general'){
     if(cierreTotalHecho){
-      isr=saldoNatural('6.2.22',mov);
+      isr=isrPosteado;
     }else{
       /* Los gastos no deducibles bajan la utilidad contable de arriba, porque
          son un gasto real de la empresa — pero para el ISR la ley no permite

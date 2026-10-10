@@ -304,8 +304,7 @@ ACCIONES.nuevoAumentoCapital=()=>{
       if(d.origen==='Otro' && !origenDetalle){avisar('Especificá de dónde proviene el dinero.');return false}
       const cuenta = d.tipoAportacion==='dineraria' ? d.cuentaDineraria : d.cuentaNoDineraria;
 
-      asegurarCuenta(e,'3.1.05','Capital Autorizado','patrimonio');
-      asegurarCuenta(e,'3.1.07','Capital Suscrito','patrimonio');
+      if(esSociedad){ asegurarCuenta(e,'3.1.05','Capital Autorizado','patrimonio'); asegurarCuenta(e,'3.1.07','Capital Suscrito','patrimonio'); }
       const ctaCapital = esSociedad ? '3.1.07' : '3.1.01';
       const quien = esSociedad ? socio : (e.representante||'el propietario');
       const lineas=[

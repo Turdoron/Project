@@ -241,6 +241,7 @@ function limpiarDependenciasPartida(e,p){
     e.salidasInventario=(e.salidasInventario||[]).filter(s=>!(s.documentoId&&ids.has(s.documentoId)));
     /* Las entregas de pedidos que esa factura cubría vuelven a quedar «entregadas sin facturar». */
     (e.pedidosVenta||[]).forEach(p=>{ if((p.facturas||[]).some(f=>ids.has(f.documentoId))) p.facturas=p.facturas.filter(f=>!ids.has(f.documentoId)); });
+    (e.salidasInventario||[]).forEach(s=>{ if((s.facturas||[]).some(f=>ids.has(f.documentoId))) s.facturas=s.facturas.filter(f=>!ids.has(f.documentoId)); });
     notas.push(`${docs.length} documento(s) cargado(s) desde facturas (libros de IVA, cartera e inventario)`);
   }
   const np=(e.pagos||[]).filter(mismaPartida).length, nc=(e.cobros||[]).filter(mismaPartida).length;
@@ -312,6 +313,8 @@ function limpiarDependenciasPartida(e,p){
     e.entradasInventario=(e.entradasInventario||[]).filter(s=>s.partidaId!==id);
     notas.push('el ajuste manual de inventario');
   }
+  /* Pago del impuesto mensual que tenía su devengo aparte (gasto al cierre del mes): se va junto. */
+  if(p.devengoId&&e.partidas.some(x=>x.id===p.devengoId)){ e.partidas=e.partidas.filter(x=>x.id!==p.devengoId); notas.push('el registro del impuesto del período (devengo)'); }
   /* Devoluciones de IVA */
   (e.devolucionesIVA||[]).forEach(s=>{
     if(s.partidaRecibidaId===id){ s.estado='solicitada'; delete s.fechaRecibida; delete s.montoRecibido; delete s.partidaRecibidaId; notas.push('la devolución de IVA vuelve a quedar en trámite'); }

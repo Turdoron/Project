@@ -166,6 +166,10 @@ ACCIONES.registrarConstancia=()=>{
     },'Registrar');
   const n=mForm.querySelector('[name="nit"]'), nom=mForm.querySelector('[name="nombre"]');
   n.onchange=()=>{ const c=clientes.find(x=>x.nit===n.value.trim()); if(c&&!nom.value) nom.value=c.nombre||''; };
+  /* El tipo sugerido sigue el régimen de la fecha de la constancia (una de junio, en Pequeño, es del 5%). */
+  const tipo=mForm.querySelector('[name="tipo"]'), fecha=mForm.querySelector('[name="fecha"]');
+  tipo.addEventListener('change',()=>{ tipo.dataset.tocado='1'; });
+  fecha.addEventListener('change',()=>{ if(!tipo.dataset.tocado&&fecha.value) tipo.value=regimenEn(e,fecha.value)==='pequeno'?'peq':'isr'; });
 };
 ACCIONES.pagarRetenciones=d0=>{
   const e=emp(), tipo=d0.tipo==='iva'?'iva':'isr', t=RETENCIONES_POR_PAGAR[tipo];
@@ -398,7 +402,10 @@ ACCIONES.pagarIVA=(d0={})=>{
 
 ACCIONES.pagarISR=()=>{
   const e=emp();
-  if(e.regimen==='general'){
+  /* El régimen que manda es el del mes que se paga (el anterior), no el de hoy: el 5% de junio se paga en julio
+     aunque desde julio la empresa ya esté en régimen General. */
+  const regimenPago=regimenEn(e,mesAnteriorRango().hasta);
+  if(regimenPago==='general'){
     avisar('El régimen General paga ISR trimestral, no mensual — usá "Cierre fiscal parcial" o "Cierre fiscal total" en el Tablero fiscal, no esta opción.');
     return;
   }
@@ -407,7 +414,7 @@ ACCIONES.pagarISR=()=>{
   const {desde:desdeDefault,hasta:hastaDefault}=mesAnteriorRango();
   const yaPagado=(desde,hasta)=>(e.partidas||[]).find(p=>p.liqISR&&p.liqISR.desde<=hasta&&p.liqISR.hasta>=desde);
 
-  if(e.regimen==='simplificado'){
+  if(regimenPago==='simplificado'){
     /* El ISR se contabilizó como pasivo en cada venta. Al pagarlo se acreditan
        las retenciones que te hicieron tus clientes en ese mismo período
        (cuenta 1.1.10): esa parte ya la enteró el agente de retención. */
@@ -492,11 +499,24 @@ ACCIONES.pagarISR=()=>{
       if(ya){avisar(`Ese período ya tiene un pago registrado (partida No. ${ya.numero}).`);return false}
       const c=calc(d.desde,d.hasta);
       if(!c.impuesto||c.impuesto<=0){avisar('No hay ingresos registrados en ese rango de fechas.');return false}
+      if(regimenEn(e,d.hasta)==='general'||regimenEn(e,d.desde)!==regimenEn(e,d.hasta)){avisar('Ese rango toma meses de otro régimen. Elegí solo meses en los que la empresa estaba en este régimen.');return false}
+      if(!d.fechaPago){avisar('Escribí la fecha de pago.');return false}
       asegurarCuenta(e,'6.2.22','Impuesto definitivo mensual','gasto');
-      const lineas=[{cta:'6.2.22',desc:'',debe:c.impuesto,haber:0}];
+      /* Devengo (NIIF para PYMES 2.36): el impuesto es gasto del mes al que corresponde, aunque se pague en el
+         siguiente. Si se paga después del cierre del período, el gasto queda al último día del período contra un
+         pasivo, y el pago lo cancela en su fecha. */
+      let devengo=null;
+      if(d.fechaPago>d.hasta){
+        asegurarCuenta(e,'2.1.20','Impuesto definitivo mensual por pagar','pasivo');
+        devengo={id:uid(),numero:e.correlativo++,fecha:d.hasta,
+          concepto:`${esPeq(d.hasta)?'Impuesto del período — Régimen de Pequeño Contribuyente (5%)':`Impuesto único del período — ${REGIMENES[regimenEn(e,d.hasta)]||''} (1.5%)`} — del ${fFecha(d.desde)} al ${fFecha(d.hasta)}`,
+          docTipo:'',docSerie:'',docNum:'',nit:'',contraparte:'',lineas:[{cta:'6.2.22',desc:'',debe:c.impuesto,haber:0},{cta:'2.1.20',desc:'',debe:0,haber:c.impuesto}]};
+        e.partidas.push(devengo);
+      }
+      const lineas=[{cta:devengo?'2.1.20':'6.2.22',desc:'',debe:c.impuesto,haber:0}];
       if(c.aplicar>0) lineas.push({cta:'1.1.17',desc:'Retenciones sufridas',debe:0,haber:c.aplicar});
       if(c.efectivo>0) lineas.push({cta:d.cuenta,desc:'',debe:0,haber:c.efectivo});
-      const p={id:uid(),numero:e.correlativo++,fecha:d.fechaPago,
+      const p={id:uid(),numero:e.correlativo++,fecha:d.fechaPago,devengoId:devengo?devengo.id:undefined,
         concepto:`${esPeq(d.hasta)?'Pago de IVA — Régimen de Pequeño Contribuyente (5%, SAT-2046)':`Pago del impuesto único — ${REGIMENES[regimenEn(e,d.hasta)]||''} (1.5%)`} — del ${fFecha(d.desde)} al ${fFecha(d.hasta)}`,
         docTipo:'',docSerie:'',docNum:'',nit:'',contraparte:'',lineas,liqISR:{desde:d.desde,hasta:d.hasta}};
       e.partidas.push(p);
@@ -524,10 +544,15 @@ ACCIONES.pagarISR=()=>{
    arrastrando de uno a otro más de una vez. */
 function trimestresGeneral(e){
   const meses=mesesDelEjercicio();
-  const desdeAno=`${e.ejercicio}-01-01`;
+  /* El ISR trimestral se acumula desde que la empresa está en régimen General: si pasó a General a mitad de año,
+     los trimestres anteriores no llevan ISR sobre utilidades (ya pagaron su propio impuesto). */
+  const desdeAno=inicioRegimenEn(e,`${e.ejercicio}-01-01`,`${e.ejercicio}-12-31`);
   return [1,2,3,4].map(t=>{
     const ms=meses.slice((t-1)*3,t*3);
-    const desde=ms[0].desde, hasta=ms[ms.length-1].hasta;
+    const hasta=ms[ms.length-1].hasta;
+    if(hasta<desdeAno||regimenEn(e,hasta)!=='general') return {t,desde:ms[0].desde,hasta,noAplica:true,regimen:regimenEn(e,hasta),rentas:0,util:0,cierre:0,estimada:0,rentasOtrasAcum:0,costoVentas:0,gastosDeducibles:0,noDeducible:0,
+      rentaBrutaAcum:0,costosGastosAcum:0,noDeduciblesAcum:0,rentaImponibleAcum:0,impuestoAcum:0,impuestoTrimAnterior:0,impuestoEsteTrimestre:0};
+    const desde=ms[0].desde>desdeAno?ms[0].desde:desdeAno;
     /* Dos métodos, y la ley los trata distinto (Art. 38, Dto. 10-2012):
        "Renta imponible estimada" es el 8% de la renta bruta de ESE
        trimestre solo, aislado — por eso Rtrimestre alcanza para calcularla.
@@ -736,7 +761,7 @@ ACCIONES.cierreFiscalParcial=(d0={})=>{
   let trim=trimestresGeneral(e);
   const yaPagados=e.cierresParciales.filter(c=>c.ejercicio===e.ejercicio).map(c=>c.trimestre);
   const metodoFijo=(e.cierresParciales.find(c=>c.ejercicio===e.ejercicio)||{}).metodo||'';
-  const opsTrim=trim.map(x=>`<option value="${x.t}"${yaPagados.includes(x.t)?' disabled':(+d0.trimestre===x.t?' selected':'')}>
+  const opsTrim=trim.map(x=>`<option value="${x.t}"${yaPagados.includes(x.t)||x.noAplica?' disabled':(+d0.trimestre===x.t?' selected':'')}>
     ${['Ene–Mar','Abr–Jun','Jul–Sep','Oct–Dic'][x.t-1]}${yaPagados.includes(x.t)?' (ya pagado)':''}</option>`).join('');
 
   abrirModal('Cierre fiscal parcial (trimestral)',
@@ -974,7 +999,7 @@ function postearIVAAnual(e,debitoIVA,creditoIVA,netoIVA,hastaAno,d){
 /* Todas las cifras del cierre fiscal total, sin dibujar nada ni postear nada:
    sirve igual para mostrar el modal que para probar el cálculo por separado. */
 function calcularCierreAnual(e){
-  const desdeAno=`${e.ejercicio}-01-01`, hastaAno=`${e.ejercicio}-12-31`;
+  const hastaAno=`${e.ejercicio}-12-31`, desdeAno=inicioRegimenEn(e,`${e.ejercicio}-01-01`,hastaAno);
   /* Usa el mismo cálculo central que el Estado de Resultados (con todos sus
      ajustes: gastos no deducibles, IVA no deducible, exceso de viáticos y
      donaciones), para que las dos fórmulas no se desincronicen con el
@@ -1000,7 +1025,15 @@ function calcularCierreAnual(e){
      compensando mes a mes. Pero al cerrar el año conviene dejar limpia la
      cuenta: que no queden débito y crédito acumulados cada uno por su lado,
      para que el año que empieza abra solo con el remanente neto real. */
-  const debitoIVA=saldoNatural('2.1.04',R.mov), creditoIVA=saldoNatural('1.1.09',R.mov);
+  /* Saldos de IVA del ejercicio, contando las liquidaciones de sus meses aunque estén fechadas después del 31/12 (el
+     IVA de diciembre se paga en enero): si no, el cierre volvía a compensar y pagar lo que ya se pagó. */
+  const movIVA={'2.1.04':{debe:0,haber:0},'1.1.09':{debe:0,haber:0}};
+  (e.partidas||[]).forEach(p=>{
+    const delAnio=p.fecha<=hastaAno&&p.fecha>=`${e.ejercicio}-01-01`, liqDelAnio=p.fecha>hastaAno&&p.liqIVA&&p.liqIVA.hasta<=hastaAno;
+    if(!delAnio&&!liqDelAnio) return;
+    p.lineas.forEach(l=>{ if(movIVA[l.cta]){ movIVA[l.cta].debe+=+l.debe||0; movIVA[l.cta].haber+=+l.haber||0; } });
+  });
+  const debitoIVA=r2(movIVA['2.1.04'].haber-movIVA['2.1.04'].debe), creditoIVA=r2(movIVA['1.1.09'].debe-movIVA['1.1.09'].haber);
   const netoIVA=r2(debitoIVA-creditoIVA);
 
   /* El costo de ventas es el paso que más se pasa por alto, porque vive en

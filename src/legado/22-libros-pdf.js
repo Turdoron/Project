@@ -590,7 +590,7 @@ ACCIONES.pdfLibroPequeno=async()=>{
       const finCompras=doc.lastAutoTable.finalY;
 
       doc.autoTable({
-        head:[[{content:`VENTAS — Año: ${anio}`,colSpan:6,styles:{halign:'center',fillColor:VERDE}}],
+        head:[[{content:`VENTAS — Mes: ${nombreMes}`,colSpan:6,styles:{halign:'center',fillColor:VERDE}}],
           ['Día','No. Factura','Serie','NIT','Comprador','Monto']],
         body: ventas.length ? ventas.map(filaVenta).concat([[{content:'Total',colSpan:5,styles:{fontStyle:'bold',textColor:VERDE}},
           {content:Q(totalVentas),styles:{fontStyle:'bold',halign:'right',textColor:VERDE}}]])

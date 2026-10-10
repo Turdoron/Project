@@ -54,8 +54,12 @@ function utilidadPatrimonioDetalle(e,h){
   const primero=fechas.length?+fechas[0].slice(0,4):anioH;
   let actual=0, anteriores=0;
   for(let a=Math.min(primero,anioH);a<=anioH;a++){
-    if(anioCerrado(e,a)) continue;
-    const v=calcularResultados(e,`${a}-01-01`,a===anioH?h:`${a}-12-31`).netaReal;
+    const corte=a===anioH?h:`${a}-12-31`;
+    /* Un año con cierre de libros ya tiene su resultado pasado al patrimonio, pero solo desde la fecha de esa partida:
+       un balance a una fecha ANTERIOR (p. ej. el 30/06 de un año ya cerrado) todavía lleva la utilidad aparte. */
+    const cierre=(e.partidas||[]).find(p=>(p.concepto||'').startsWith(`${PREFIJO_CIERRE_LIBROS}${a}`));
+    if(cierre&&cierre.fecha<=corte) continue;
+    const v=calcularResultados(e,`${a}-01-01`,corte).netaReal;
     if(a===anioH) actual=r2(actual+v); else anteriores=r2(anteriores+v);
   }
   return {actual,anteriores,total:r2(actual+anteriores)};
@@ -159,6 +163,13 @@ function regimenEn(e,fecha){
   if(!historial||!historial.length) return e.regimen;
   const vigentes=historial.filter(h=>h.vigenteDesde<=fecha).sort((a,b)=>b.vigenteDesde.localeCompare(a.vigenteDesde));
   return vigentes.length ? vigentes[0].regimen : historial[0].regimen;
+}
+/* Desde cuándo rige, dentro de [desde, hasta], el régimen vigente en "hasta". Si la empresa cambió de régimen a
+   mitad del período (p. ej. de Pequeño Contribuyente a General el 1 de julio), devuelve la fecha del cambio: el ISR
+   sobre utilidades solo grava lo ganado desde que está inscrita en ese régimen. Si no hubo cambio, devuelve desde. */
+function inicioRegimenEn(e,desde,hasta){
+  const h=(e.historialRegimen||[]).filter(x=>x.vigenteDesde<=hasta).sort((a,b)=>b.vigenteDesde.localeCompare(a.vigenteDesde))[0];
+  return h&&h.vigenteDesde>desde?h.vigenteDesde:desde;
 }
 function sincronizarRegimenActual(e){
   const historial=e.historialRegimen;

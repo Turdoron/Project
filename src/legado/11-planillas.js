@@ -729,8 +729,9 @@ VISTAS.tablero=()=>{
       <table><thead><tr><th>Trimestre</th><th class="num">Rentas brutas</th><th class="num">Utilidad contable</th>
         <th class="num">Por cierre parcial (25%)</th><th class="num">Por renta estimada (8% × 25%)</th></tr></thead>
       <tbody>${trim.map(x=>`<tr><td>${['Ene–Mar','Abr–Jun','Jul–Sep','Oct–Dic'][x.t-1]}</td>
-        <td class="num">${Q(x.rentas)}</td><td class="num">${Q(x.util)}</td>
-        <td class="num">${Q(x.cierre)}</td><td class="num">${Q(x.estimada)}</td></tr>`).join('')}</tbody>
+        ${x.noAplica?`<td colspan="4" style="color:var(--tinta-suave)">No aplica: en ese trimestre la empresa estaba en ${esc(REGIMENES[x.regimen]||x.regimen)}.</td></tr>`
+          :`<td class="num">${Q(x.rentas)}</td><td class="num">${Q(x.util)}</td>
+        <td class="num">${Q(x.cierre)}</td><td class="num">${Q(x.estimada)}</td></tr>`}`).join('')}</tbody>
       <tfoot><tr class="total"><td>Acumulado del ejercicio</td>
         <td class="num">${Q(rentasAno)}</td>
         <td class="num">${Q(utilAno)}</td>
@@ -807,8 +808,7 @@ VISTAS.tablero=()=>{
 
   return pestanasResumen('tablero')+cab('Tablero fiscal',`${esc(e.nombre)} · ejercicio ${e.ejercicio} · régimen actual: ${esc(REGIMENES[e.regimen]||e.regimen)}`,
     `${e.regimen==='general'||e.regimen==='simplificado'?'<button class="btn sec" data-accion="pagarIVA">Pagar IVA</button>':''}
-     ${e.regimen!=='general'&&e.regimen!=='simplificado'?`<button class="btn sec" data-accion="pagarISR">Pagar impuesto (${e.regimen==='pequeno'?'5%':'1.5%'})</button>`:''}
-     ${e.regimen==='simplificado'?'<button class="btn sec" data-accion="pagarISR">Pagar ISR</button>':''}
+     ${(()=>{ const r=regimenEn(e,mesAnteriorRango().hasta); return r!=='general'&&r!=='simplificado'?`<button class="btn sec" data-accion="pagarISR">Pagar impuesto (${r==='pequeno'?'5%':'1.5%'})</button>`:r==='simplificado'?'<button class="btn sec" data-accion="pagarISR">Pagar ISR</button>':''; })()}
      ${e.regimen==='general'?'<button class="btn" data-accion="irCierreFiscal">Cierre fiscal paso a paso</button>':''}
      ${e.regimen==='general'?'<button class="btn sec" data-accion="pagarISO">Pagar ISO</button>':''}
      <button class="btn sec" data-accion="cambiarRegimen">Cambiar régimen</button>`)

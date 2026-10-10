@@ -807,7 +807,9 @@ function continuarGenerarPartidas(e,activos,excluidas,modo){
       nit:d.tipo==='compra'?d.nitEmisor:d.nitReceptor,
       nombre:d.tipo==='compra'?d.emisor:d.receptor,
       bs:d.bs||'B',base:r2(d.base),idp:r2(d.noAcred||0),iva:r2(d.iva),total:r2(d.total),
-      alCredito:!!d.alCredito,cta:d.cta,ctaPago:d.ctaPago,pequeno:!!d.pequeno,
+      /* Al crédito es lo que de verdad queda en la cartera: la contrapartida es Clientes (ventas) o Proveedores
+         (compras). Si una FCAM o una nota de crédito se cambió a Caja, no entra a la cartera. */
+      alCredito:d.tipo==='venta'?d.ctaPago==='1.1.04':d.ctaPago==='2.1.01',cta:d.cta,ctaPago:d.ctaPago,pequeno:!!d.pequeno,
       vencimiento:(d.vencimientos||[]).map(v=>v.fecha).filter(Boolean).sort().pop()||'',   // último abono de la factura cambiaria
       items:d.items||[],   // detalle de producto por línea, solo disponible desde XML
       retencionISR:r2(d.retencionISR||0),retencionIVA:r2(d.retencionIVA||0),retIvaFesp:r2(d.retIvaFesp||0),retIsrFesp:r2(d.retIsrFesp||0),
@@ -926,7 +928,9 @@ function continuarGenerarPartidas(e,activos,excluidas,modo){
            y no se descuenta otra vez: solo sale lo que no estaba entregado. */
         const guardado=docGuardado.get(d);
         const cubierto=cubrirConEntregas(e,{id:guardado.id,nit:guardado.nit||d.nit,fecha:d.fecha,serie:d.serie,dte:d.dte},producto,r2((d.signo||1)*it.cantidad));
-        const cantidad=r2((d.signo||1)*it.cantidad-cubierto);
+        const docRef={id:guardado.id,nit:guardado.nit||d.nit,fecha:d.fecha,serie:d.serie,dte:d.dte};
+        const cubiertoVD=cubrirConVentasDirectas(e,docRef,producto,r2((d.signo||1)*it.cantidad-cubierto));
+        const cantidad=r2((d.signo||1)*it.cantidad-cubierto-cubiertoVD);
         if(!cantidad) return;
         const {costoUnitario,costoTotal}=costoSalidaInventario(e,producto,cantidad,d.fecha);
         if(cantidad>disponible) avisosInventario.push(`${producto}: se vendieron ${cantidad}, pero solo había ${disponible} en existencia (factura ${d.serie?d.serie+'-':''}${d.dte}, ${fFecha(d.fecha)})`);
