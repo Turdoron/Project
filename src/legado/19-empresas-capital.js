@@ -3,7 +3,7 @@
    el superadmin, cuentas de Administrador; cada Administrador, su propio
    personal — nunca el de otro Administrador. */
 /* ============ CAPITAL SOCIAL — al constituir una empresa individual o sociedad ============ */
-const socioVacio=()=>({nombre:'',monto:0,tipo:'dineraria',cuenta:'1.1.01'});
+const socioVacio=()=>({nombre:'',monto:0,pago:null,tipo:'dineraria',cuenta:'1.1.01'});
 /* La partida de capital ya no se fecha siempre con la fecha de hoy: si la
    empresa se crea para un ejercicio pasado, ese ejercicio quedaba sin capital. */
 const fechaConstitucionDefault=e=>hoy().slice(0,4)===String(e.ejercicio)?hoy():`${e.ejercicio}-01-01`;
@@ -14,10 +14,14 @@ VISTAS.capitalSocial=()=>{
   const cajaBanco=cuentasCajaBanco(e);
   const cuentasActivo=e.cuentas.filter(c=>c.d&&c.t==='activo');
   const totalSuscrito=r2(b.socios.reduce((s,x)=>s+(+x.monto||0),0));
+  const pagoDe=x=>x.pago===null||x.pago===undefined?(+x.monto||0):(+x.pago||0);
+  const totalPagado=r2(b.socios.reduce((s,x)=>s+pagoDe(x),0));
   const excede=b.capitalAutorizado && totalSuscrito>b.capitalAutorizado;
+  const pagaDeMas=b.socios.some(x=>pagoDe(x)>(+x.monto||0)+0.001);
   const filas=b.socios.map((s,i)=>`<tr>
     <td><input data-socio="${i}" data-campo="nombre" value="${esc(s.nombre)}" placeholder="Nombre del socio"></td>
-    <td><input data-socio="${i}" data-campo="monto" type="number" step="0.01" min="0" value="${s.monto||''}" style="width:120px"></td>
+    <td><input data-socio="${i}" data-campo="monto" type="number" step="0.01" min="0" value="${s.monto||''}" style="width:120px" aria-label="Monto que suscribe ${esc(s.nombre)}"></td>
+    <td><input data-socio="${i}" data-campo="pago" type="number" step="0.01" min="0" value="${s.pago===null||s.pago===undefined?(s.monto||''):s.pago}" style="width:120px" aria-label="Monto que paga ahora ${esc(s.nombre)}"></td>
     <td><select data-socio="${i}" data-campo="tipo">
       <option value="dineraria"${s.tipo==='dineraria'?' selected':''}>En dinero</option>
       <option value="no_dineraria"${s.tipo==='no_dineraria'?' selected':''}>En especie (bienes)</option>
@@ -35,19 +39,20 @@ VISTAS.capitalSocial=()=>{
       <input id="capAutorizado" type="number" step="0.01" min="0" value="${b.capitalAutorizado||''}"></div>
       <div class="campo" style="max-width:260px;margin-top:10px"><label>Fecha de la escritura / registro</label>
       <input id="capFecha" type="date" value="${b.fecha||fechaConstitucionDefault(e)}"></div></div>
-    <table><thead><tr><th>Socio</th><th>Monto que suscribe</th><th>Forma de aportación</th>
+    <table><thead><tr><th>Socio</th><th>Monto que suscribe</th><th>Paga ahora</th><th>Forma de aportación</th>
       <th>¿A qué cuenta entra?</th><th class="num"></th></tr></thead>
       <tbody>${filas}</tbody>
-      <tfoot><tr class="total"><td colspan="1">Total suscrito</td><td class="num">${Q(totalSuscrito)}</td>
+      <tfoot><tr class="total"><td colspan="1">Totales</td><td class="num">${Q(totalSuscrito)}</td><td class="num">${Q(totalPagado)}</td>
         <td colspan="3"></td></tr></tfoot></table>
     <p style="margin:10px 0"><button class="btn sec mini" data-accion="agregarSocio">Agregar socio</button></p>
     ${excede?`<div class="aviso malo">Lo suscrito (Q${Q(totalSuscrito)}) supera el capital autorizado (Q${Q(b.capitalAutorizado)}).
       No puede ser mayor.</div>`:''}
-    <div class="aviso">Se van a generar dos partidas: primero la que reconoce el capital autorizado y lo que
-      cada socio se compromete a aportar (queda como una cuenta por cobrar a cada socio, identificada con su
-      nombre); y otra que registra el pago real de esa aportación, a la cuenta que elegiste para cada quien.
-      Si algún socio todavía no paga lo que suscribió, dejá su fila en la primera parte y generá el pago después
-      desde una partida manual.</div>`;
+    ${pagaDeMas?`<div class="aviso malo">Un socio no puede pagar más de lo que suscribe.</div>`:''}
+    <div class="aviso">Se generan tres partidas: <strong>1.</strong> el capital autorizado según la escritura;
+      <strong>2.</strong> lo que cada socio suscribe, que queda como cuenta por cobrar a su nombre; y
+      <strong>3.</strong> lo que cada socio paga ahora, a la cuenta elegida (si nadie paga todavía, esta no se genera).
+      Lo autorizado que no se suscribe queda «por suscribir», y lo suscrito que no se paga queda «por cobrar a socios».
+      Las suscripciones y los pagos posteriores se registran en Aumento de capital → Capital de la sociedad.</div>`;
 };
 
 function enlazarCapitalSocial(){
@@ -59,7 +64,7 @@ function enlazarCapitalSocial(){
   document.querySelectorAll('[data-socio]').forEach(campo=>{
     campo.onchange=()=>{
       const i=+campo.dataset.socio, prop=campo.dataset.campo;
-      b.socios[i][prop] = prop==='monto' ? (+campo.value||0) : campo.value;
+      b.socios[i][prop] = prop==='monto' ? (+campo.value||0) : prop==='pago' ? (campo.value===''?0:(+campo.value||0)) : campo.value;
       if(prop==='tipo'){   // cambia el tipo: reiniciar la cuenta al valor por defecto de ese tipo
         b.socios[i].cuenta = campo.value==='dineraria' ? '1.1.01' : (emp().cuentas.find(c=>c.d&&c.t==='activo')||{}).c;
       }
@@ -73,56 +78,159 @@ function enlazarCapitalSocial(){
 ACCIONES.agregarSocio=()=>{ borradorCapital.socios.push(socioVacio()); pintar(); };
 ACCIONES.confirmarCapitalSocial=()=>{
   const e=emp(), b=borradorCapital;
-  const socios=b.socios.filter(s=>s.nombre.trim() && (+s.monto||0)>0);
+  const socios=b.socios.filter(s=>s.nombre.trim() && (+s.monto||0)>0)
+    .map(s=>({...s,nombre:s.nombre.trim(),monto:r2(+s.monto),pago:r2(s.pago===null||s.pago===undefined?+s.monto:+s.pago||0)}));
   if(!socios.length){avisar('Agregá al menos un socio con nombre y monto.');return}
-  const totalSuscrito=r2(socios.reduce((s,x)=>s+(+x.monto||0),0));
+  const totalSuscrito=r2(socios.reduce((s,x)=>s+x.monto,0)), totalPagado=r2(socios.reduce((s,x)=>s+x.pago,0));
   const autorizado=r2(+b.capitalAutorizado||0);
   if(!autorizado){avisar('Escribí el capital autorizado según la escritura.');return}
   if(totalSuscrito>autorizado){avisar('Lo suscrito no puede ser mayor que el capital autorizado.');return}
+  if(socios.some(s=>s.pago>s.monto+0.001)){avisar('Un socio no puede pagar más de lo que suscribe.');return}
+  const fechaCap=b.fecha||fechaConstitucionDefault(e);
 
-  confirmar(`Se registrará un capital autorizado de Q${Q(autorizado)}, con Q${Q(totalSuscrito)} suscrito entre ${socios.length} socio(s), y el pago correspondiente a la cuenta que elegiste para cada uno.`,()=>{
-    asegurarCuenta(e,'1.1.12','Capital suscrito por cobrar a socios','activo');
-    asegurarCuenta(e,'3.1.05','Capital Autorizado','patrimonio');
-    asegurarCuenta(e,'3.1.06','Capital Autorizado No Suscrito','patrimonio');
-    asegurarCuenta(e,'3.1.07','Capital Suscrito','patrimonio');
-
-    /* Partida 1: se reconoce el capital autorizado completo, y de ese total,
-       lo que ya se suscribió queda como una cuenta por cobrar a cada socio,
-       identificada con su nombre. */
-    const noSuscrito=r2(autorizado-totalSuscrito);
-    const lineas1=[];
-    if(noSuscrito) lineas1.push({cta:'3.1.06',desc:'',debe:noSuscrito,haber:0});
-    socios.forEach(s=>lineas1.push({cta:'1.1.12',desc:`Suscripción de ${s.nombre.trim()}`,debe:r2(s.monto),haber:0}));
-    lineas1.push({cta:'3.1.05',desc:'',debe:0,haber:autorizado});
-    const fechaCap=b.fecha||fechaConstitucionDefault(e);
-    const p1={id:uid(),numero:e.correlativo++,fecha:fechaCap,
-      concepto:`Capital autorizado y suscrito de ${e.nombre}`,
-      docTipo:'',docSerie:'',docNum:'',nit:'',contraparte:'',lineas:lineas1};
-    e.partidas.push(p1);
-
-    /* Partida 2: el pago real de lo suscrito, a la cuenta que corresponda
-       según si cada socio aportó en dinero o en especie. */
-    const lineas2=[];
-    socios.forEach(s=>lineas2.push({cta:s.cuenta,desc:`Aportación de ${s.nombre.trim()}`,debe:r2(s.monto),haber:0}));
-    socios.forEach(s=>lineas2.push({cta:'1.1.12',desc:`Pago de ${s.nombre.trim()}`,debe:0,haber:r2(s.monto)}));
-    const p2={id:uid(),numero:e.correlativo++,fecha:fechaCap,
-      concepto:`Pago del capital suscrito de ${e.nombre}`,
-      docTipo:'',docSerie:'',docNum:'',nit:'',contraparte:'',lineas:lineas2};
-    e.partidas.push(p2);
-
-    /* Se guarda la lista de socios aparte de las partidas, para poder elegirlos
-       después en un aumento de capital sin tener que volver a escribir el
-       nombre ni arriesgar que quede distinto por un error de tipeo. */
+  confirmar(`Se registrará: capital autorizado Q${Q(autorizado)}; suscrito Q${Q(totalSuscrito)} entre ${socios.length} socio(s)${totalPagado?`; pagado ahora Q${Q(totalPagado)}`:'; sin pagos todavía'}.${r2(totalSuscrito-totalPagado)>0?` Quedan Q${Q(r2(totalSuscrito-totalPagado))} por cobrar a socios.`:''}`,()=>{
+    asegurarCuentasCapital(e);
+    /* Partida 1: la escritura autoriza el capital; todavía nadie lo suscribió. */
+    const p1=partidaCapital(e,fechaCap,`Capital autorizado de ${e.nombre}`,
+      [{cta:'3.1.06',desc:'Capital autorizado por suscribir',debe:autorizado,haber:0},{cta:'3.1.05',desc:'Según escritura constitutiva',debe:0,haber:autorizado}]);
+    /* Partida 2: lo que cada socio se compromete a aportar (cuenta por cobrar a su nombre). */
+    const p2=registrarSuscripcion(e,fechaCap,socios.map(s=>({socio:s.nombre,monto:s.monto})));
+    /* Partida 3: lo que de verdad se paga ahora, a la cuenta de cada quien. */
+    const pagos=socios.filter(s=>s.pago>0).map(s=>({socio:s.nombre,monto:s.pago,cuenta:s.cuenta}));
+    const p3=pagos.length?registrarPagoCapital(e,fechaCap,pagos):null;
     e.socios=e.socios||[];
-    socios.forEach(s=>{
-      if(!e.socios.some(x=>x.nombre.trim().toLowerCase()===s.nombre.trim().toLowerCase()))
-        e.socios.push({id:uid(),nombre:s.nombre.trim()});
-    });
-
-    registrarLog('Registró el capital social',`${e.nombre} — autorizado Q${Q(autorizado)}, suscrito Q${Q(totalSuscrito)} entre ${socios.length} socios`);
+    socios.forEach(s=>{ if(!e.socios.some(x=>x.nombre.trim().toLowerCase()===s.nombre.toLowerCase())) e.socios.push({id:uid(),nombre:s.nombre}); });
+    registrarLog('Registró el capital social',`${e.nombre} — autorizado Q${Q(autorizado)}, suscrito Q${Q(totalSuscrito)}, pagado Q${Q(totalPagado)}`);
     borradorCapital=null; guardar(); VISTA='empresas'; pintar();
-    avisar(`Capital social registrado en las partidas No. ${p1.numero} y No. ${p2.numero}.`,'Listo');
+    avisar(`Capital social registrado en las partidas No. ${p1.numero} (autorizado), No. ${p2.numero} (suscrito)${p3?` y No. ${p3.numero} (pagado)`:''}.`,'Listo');
   },'Registrar capital');
+};
+
+/* ---- Capital de la sociedad: autorizado, suscrito y pagado ----
+   Cuentas: 3.1.05 Capital autorizado (haber); 3.1.06 Capital autorizado por suscribir (debe, resta del autorizado);
+   1.1.12 Capital suscrito por cobrar a socios (debe, una línea por socio). Así:
+   suscrito = autorizado − por suscribir; pagado = suscrito − por cobrar. Todo sale de las partidas, así que si se
+   borra una, el estado se recalcula solo. Las líneas de 1.1.12 llevan el nombre del socio en el detalle. */
+function asegurarCuentasCapital(e){
+  asegurarCuenta(e,'1.1.12','Capital suscrito por cobrar a socios','activo');
+  asegurarCuenta(e,'3.1.05','Capital Autorizado','patrimonio');
+  asegurarCuenta(e,'3.1.06','Capital Autorizado No Suscrito','patrimonio');
+  asegurarCuenta(e,'3.1.07','Capital Suscrito','patrimonio');
+}
+function partidaCapital(e,fecha,concepto,lineas){
+  const p={id:uid(),numero:e.correlativo++,fecha,concepto,docTipo:'',docSerie:'',docNum:'',nit:'',contraparte:'',lineas:lineas.filter(l=>l.debe||l.haber)};
+  e.partidas.push(p); return p;
+}
+function registrarSuscripcion(e,fecha,items){
+  const total=r2(items.reduce((s,x)=>s+x.monto,0));
+  return partidaCapital(e,fecha,`Suscripción de capital de ${e.nombre}`,
+    [...items.map(x=>({cta:'1.1.12',desc:`Suscripción de ${x.socio}`,debe:r2(x.monto),haber:0})),{cta:'3.1.06',desc:'Capital suscrito',debe:0,haber:total}]);
+}
+function registrarPagoCapital(e,fecha,items){
+  return partidaCapital(e,fecha,`Pago del capital suscrito de ${e.nombre}`,
+    [...items.map(x=>({cta:x.cuenta,desc:`Aportación de ${x.socio}`,debe:r2(x.monto),haber:0})),...items.map(x=>({cta:'1.1.12',desc:`Pago de ${x.socio}`,debe:0,haber:r2(x.monto)}))]);
+}
+function estadoCapitalSociedad(e,hasta){
+  let autorizado=0, porSuscribir=0; const socios={};
+  const socio=n=>socios[n]=socios[n]||{nombre:n,suscrito:0,pagado:0};
+  (e.partidas||[]).filter(p=>!hasta||p.fecha<=hasta).forEach(p=>p.lineas.forEach(l=>{
+    if(l.cta==='3.1.05') autorizado+=(l.haber||0)-(l.debe||0);
+    else if(l.cta==='3.1.06') porSuscribir+=(l.debe||0)-(l.haber||0);
+    else if(l.cta==='1.1.12'){
+      const m=(l.desc||'').match(/^(?:Suscripción|Pago) de (.+)$/), n=m?m[1].trim():'Sin nombre';
+      if(l.debe) socio(n).suscrito+=l.debe; if(l.haber) socio(n).pagado+=l.haber;
+    }
+  }));
+  const lista=Object.values(socios).map(s=>({...s,suscrito:r2(s.suscrito),pagado:r2(s.pagado),pendiente:r2(s.suscrito-s.pagado)}));
+  autorizado=r2(autorizado); porSuscribir=r2(porSuscribir);
+  const suscrito=r2(autorizado-porSuscribir), porCobrar=r2(lista.reduce((s,x)=>s+x.pendiente,0));
+  return {autorizado,porSuscribir,suscrito,porCobrar,pagado:r2(suscrito-porCobrar),socios:lista};
+}
+function htmlCapitalSociedad(e){
+  const c=estadoCapitalSociedad(e);
+  if(!c.autorizado) return `<div class="aviso">Esta sociedad todavía no tiene registrado su capital autorizado.</div>`;
+  return `<h3 style="color:var(--verde);margin:0 0 8px">Capital de la sociedad</h3>
+    <div class="cifras">
+      <div class="cifra"><span>Autorizado</span><strong>${Q(c.autorizado)}</strong></div>
+      <div class="cifra"><span>Suscrito</span><strong>${Q(c.suscrito)}</strong></div>
+      <div class="cifra"><span>Pagado</span><strong>${Q(c.pagado)}</strong></div>
+      <div class="cifra"><span>Por suscribir</span><strong>${Q(c.porSuscribir)}</strong></div>
+      <div class="cifra"><span>Por cobrar a socios</span><strong>${Q(c.porCobrar)}</strong></div></div>
+    ${c.socios.length?`<table><thead><tr><th>Socio</th><th class="num">Suscrito</th><th class="num">Pagado</th><th class="num">Pendiente de pago</th><th class="num"></th></tr></thead><tbody>
+      ${c.socios.map(s=>`<tr><td>${esc(s.nombre)}</td><td class="num">${Q(s.suscrito)}</td><td class="num">${Q(s.pagado)}</td><td class="num">${s.pendiente>0.004?`<strong>${Q(s.pendiente)}</strong>`:'—'}</td>
+        <td class="num">${s.pendiente>0.004?`<button class="btn mini" data-accion="pagoCapitalSuscrito" data-socio="${esc(s.nombre)}">Registrar pago</button>`:''}</td></tr>`).join('')}</tbody>
+      <tfoot><tr class="total"><td>Total</td><td class="num">${Q(c.suscrito)}</td><td class="num">${Q(c.pagado)}</td><td class="num">${Q(c.porCobrar)}</td><td></td></tr></tfoot></table>`:''}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 26px">
+      ${c.porSuscribir>0.004?`<button class="btn sec" data-accion="suscribirCapital">Suscribir capital (quedan Q${Q(c.porSuscribir)})</button>`:''}
+      ${c.porCobrar>0.004?`<button class="btn sec" data-accion="pagoCapitalSuscrito">Registrar pago de un socio</button>`:''}</div>`;
+}
+const opsCuentaAporte=(e,tipo,sel)=>(tipo==='dineraria'?cuentasCajaBanco(e):e.cuentas.filter(c=>c.d&&c.t==='activo'&&c.c!=='1.1.12'))
+  .map(c=>`<option value="${c.c}"${c.c===sel?' selected':''}>${c.c} — ${esc(c.n)}</option>`).join('');
+function enlazarFormaAporte(e){
+  const t=mForm.querySelector('[name="tipoAportacion"]'), c=mForm.querySelector('[name="cuenta"]');
+  t.onchange=()=>{ c.innerHTML=opsCuentaAporte(e,t.value); };
+}
+ACCIONES.suscribirCapital=()=>{
+  const e=emp(), c=estadoCapitalSociedad(e);
+  if(!(c.porSuscribir>0.004)){avisar('Ya se suscribió todo el capital autorizado. Para suscribir más, primero hay que aumentar el capital autorizado (modificación de la escritura).');return}
+  const ops=(e.socios||[]).map(s=>`<option value="${esc(s.nombre)}">${esc(s.nombre)}</option>`).join('')+'<option value="__nuevo__">+ Socio nuevo</option>';
+  abrirModal('Suscribir capital',
+    `<p style="margin:0 0 12px;font-size:13px;color:var(--tinta-suave)">De lo autorizado quedan <strong>Q${Q(c.porSuscribir)}</strong> por suscribir. Lo que el socio suscribe queda como cuenta por cobrar a su nombre hasta que lo pague.</p>
+    <div class="rej">
+      <div class="campo"><label>Socio</label><select name="socio">${ops}</select></div>
+      <div class="campo" id="susNuevo" hidden><label>Nombre del socio nuevo</label><input name="socioNuevo"></div>
+      <div class="campo"><label>Monto que suscribe</label><input name="monto" type="number" step="0.01" min="0"></div>
+      <div class="campo"><label>Fecha</label><input name="fecha" type="date" value="${hoy()}"></div>
+      <div class="campo"><label>Paga ahora (opcional)</label><input name="pago" type="number" step="0.01" min="0" placeholder="0.00"></div>
+      <div class="campo"><label>Forma de aportación</label><select name="tipoAportacion"><option value="dineraria">En dinero</option><option value="no_dineraria">En especie (bienes)</option></select></div>
+      <div class="campo full"><label>¿A qué cuenta entra el pago?</label><select name="cuenta">${opsCuentaAporte(e,'dineraria')}</select></div>
+    </div>`,
+    f=>{
+      const socio=f.socio==='__nuevo__'?(f.socioNuevo||'').trim():f.socio, monto=r2(+f.monto||0), pago=r2(+f.pago||0);
+      if(!socio){avisar('Elegí el socio o escribí el nombre del nuevo.');return false}
+      if(!(monto>0)){avisar('Escribí el monto que suscribe.');return false}
+      if(monto>c.porSuscribir+0.004){avisar(`Solo quedan Q${Q(c.porSuscribir)} de capital autorizado por suscribir.`);return false}
+      if(pago>monto+0.004){avisar('No puede pagar más de lo que suscribe.');return false}
+      if(!f.fecha){avisar('Elegí la fecha.');return false}
+      if(anioCerrado(e,f.fecha.slice(0,4))){avisar(`El ejercicio ${f.fecha.slice(0,4)} ya tiene cierre de libros.`);return false}
+      asegurarCuentasCapital(e);
+      const p2=registrarSuscripcion(e,f.fecha,[{socio,monto}]);
+      const p3=pago>0?registrarPagoCapital(e,f.fecha,[{socio,monto:pago,cuenta:f.cuenta}]):null;
+      e.socios=e.socios||[]; if(!e.socios.some(x=>x.nombre.toLowerCase()===socio.toLowerCase())) e.socios.push({id:uid(),nombre:socio});
+      registrarLog('Registró una suscripción de capital',`${socio} — Q${Q(monto)}${pago?`, pagó Q${Q(pago)}`:''}`);
+      guardar(); pintar();
+      avisar(`Suscripción registrada en la partida No. ${p2.numero}${p3?` y el pago en la No. ${p3.numero}`:''}.`,'Listo');
+    },'Registrar suscripción');
+  const s=mForm.querySelector('[name="socio"]'); s.onchange=()=>{ document.getElementById('susNuevo').hidden=s.value!=='__nuevo__'; }; s.onchange();
+  enlazarFormaAporte(e);
+};
+ACCIONES.pagoCapitalSuscrito=d=>{
+  const e=emp(), c=estadoCapitalSociedad(e), deudores=c.socios.filter(s=>s.pendiente>0.004);
+  if(!deudores.length){avisar('Ningún socio tiene capital suscrito pendiente de pago.');return}
+  const sel=d&&d.socio&&deudores.find(s=>s.nombre===d.socio)?d.socio:deudores[0].nombre;
+  abrirModal('Pago de capital suscrito',
+    `<div class="rej">
+      <div class="campo"><label>Socio</label><select name="socio">${deudores.map(s=>`<option value="${esc(s.nombre)}"${s.nombre===sel?' selected':''}>${esc(s.nombre)} — debe Q${Q(s.pendiente)}</option>`).join('')}</select></div>
+      <div class="campo"><label>Monto que paga</label><input name="monto" type="number" step="0.01" min="0" value="${deudores.find(s=>s.nombre===sel).pendiente}"></div>
+      <div class="campo"><label>Fecha</label><input name="fecha" type="date" value="${hoy()}"></div>
+      <div class="campo"><label>Forma de aportación</label><select name="tipoAportacion"><option value="dineraria">En dinero</option><option value="no_dineraria">En especie (bienes)</option></select></div>
+      <div class="campo full"><label>¿A qué cuenta entra?</label><select name="cuenta">${opsCuentaAporte(e,'dineraria')}</select></div>
+    </div>`,
+    f=>{
+      const s=deudores.find(x=>x.nombre===f.socio), monto=r2(+f.monto||0);
+      if(!s) return false;
+      if(!(monto>0)){avisar('Escribí el monto que paga.');return false}
+      if(monto>s.pendiente+0.004){avisar(`${s.nombre} solo debe Q${Q(s.pendiente)}.`);return false}
+      if(!f.fecha){avisar('Elegí la fecha.');return false}
+      if(anioCerrado(e,f.fecha.slice(0,4))){avisar(`El ejercicio ${f.fecha.slice(0,4)} ya tiene cierre de libros.`);return false}
+      const p=registrarPagoCapital(e,f.fecha,[{socio:s.nombre,monto,cuenta:f.cuenta}]);
+      registrarLog('Registró un pago de capital suscrito',`${s.nombre} — Q${Q(monto)}`);
+      guardar(); pintar();
+      avisar(`Pago registrado en la partida No. ${p.numero}. ${s.nombre} ${r2(s.pendiente-monto)>0?`todavía debe Q${Q(r2(s.pendiente-monto))}`:'ya pagó todo lo que suscribió'}.`,'Listo');
+    },'Registrar pago');
+  const so=mForm.querySelector('[name="socio"]'), mo=mForm.querySelector('[name="monto"]');
+  so.onchange=()=>{ mo.value=deudores.find(s=>s.nombre===so.value).pendiente; };
+  enlazarFormaAporte(e);
 };
 
 /* ---- Aumento de capital: aportaciones posteriores a la constitución, de
@@ -143,6 +251,7 @@ VISTAS.aumentosCapital=()=>{
     <td class="num"><button class="btn mini" data-accion="verPartida" data-id="${a.partidaId}">Ver partida</button></td></tr>`).join('');
   return cab('Aumento de capital','Aportaciones a la empresa después de la constitución, con su origen identificado.',
     `<button class="btn" data-accion="nuevoAumentoCapital">Registrar aumento</button>`)
+  + (e.tipoSociedad==='sociedad'?htmlCapitalSociedad(e)+`<h3 style="color:var(--verde);margin:0 0 8px">Aumentos de capital</h3>`:'')
   + (lista.length? `<table><thead><tr><th>Fecha</th><th>${e.tipoSociedad==='sociedad'?'Socio':'Aportante'}</th>
       <th>Origen del dinero</th><th class="num">Monto</th><th class="num"></th></tr></thead>
       <tbody>${filas}</tbody>

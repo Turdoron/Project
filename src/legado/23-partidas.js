@@ -413,7 +413,7 @@ ACCIONES.borrarTodo=()=>{
          concepto — es el mismo texto fijo que le pone formCapitalIndividual
          y confirmarCapitalSocial, así que no hay riesgo de reconocer la
          partida equivocada. */
-      const prefijosCapital=['Capital inicial de ','Capital autorizado y suscrito de ','Pago del capital suscrito de '];
+      const prefijosCapital=['Capital inicial de ','Capital autorizado y suscrito de ','Capital autorizado de ','Suscripción de capital de ','Pago del capital suscrito de '];
       propias.forEach(e=>{
         const partidasCapital=e.partidas.filter(p=>prefijosCapital.some(pre=>(p.concepto||'').startsWith(pre)))
           .sort((a,b)=>a.numero-b.numero);
