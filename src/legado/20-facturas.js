@@ -919,7 +919,8 @@ function continuarGenerarPartidas(e,activos,excluidas,modo){
         const conocido=lista.find(p=>p.producto===desc);
         const producto=(e.mapeoProducto||{})[desc]||(conocido?desc:'');
         if(!producto) return;   // se dejó en "Omitir" — no es un producto de inventario
-        const item=lista.find(p=>p.producto===producto);
+        /* Lo que había ESE día (una venta del 20/04 no puede usar lo producido el 30/04). */
+        const item=inventarioDetalleAl(e,d.fecha).lista.find(p=>p.producto===producto);
         const disponible=item?item.cantidad:0;
         /* Lo que este cliente ya recibió con una entrega de pedido (Ventas) queda cubierto por esta factura
            y no se descuenta otra vez: solo sale lo que no estaba entregado. */
@@ -927,7 +928,7 @@ function continuarGenerarPartidas(e,activos,excluidas,modo){
         const cubierto=cubrirConEntregas(e,{id:guardado.id,nit:guardado.nit||d.nit,fecha:d.fecha,serie:d.serie,dte:d.dte},producto,r2((d.signo||1)*it.cantidad));
         const cantidad=r2((d.signo||1)*it.cantidad-cubierto);
         if(!cantidad) return;
-        const {costoUnitario,costoTotal}=costoSalidaInventario(e,producto,cantidad);
+        const {costoUnitario,costoTotal}=costoSalidaInventario(e,producto,cantidad,d.fecha);
         if(cantidad>disponible) avisosInventario.push(`${producto}: se vendieron ${cantidad}, pero solo había ${disponible} en existencia (factura ${d.serie?d.serie+'-':''}${d.dte}, ${fFecha(d.fecha)})`);
         e.salidasInventario.push({id:uid(),fecha:d.fecha,producto,cantidad,
           costoUnitario,costoTotal,motivo:'venta',partidaId:docGuardado.get(d).partidaId||'',documentoId:docGuardado.get(d).id});

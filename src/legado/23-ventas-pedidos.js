@@ -387,7 +387,7 @@ ACCIONES.entregarPedidoVenta=d=>{
       e.salidasInventario=e.salidasInventario||[];
       sel.forEach(x=>{
         let salidaId=null, costoTotal=0;
-        if(x.k){ const c=costoSalidaInventario(e,x.it.producto,x.cant); salidaId=uid(); costoTotal=c.costoTotal;
+        if(x.k){ const c=costoSalidaInventario(e,x.it.producto,x.cant,f.fecha); salidaId=uid(); costoTotal=c.costoTotal;
           e.salidasInventario.push({id:salidaId,fecha:f.fecha,producto:x.it.producto,cantidad:x.cant,costoUnitario:c.costoUnitario,costoTotal:c.costoTotal,motivo:'venta',pedidoId:p.id,entregaId:en.id}); }
         en.items.push({idx:x.i,producto:x.it.producto,cantidad:x.cant,salidaId,costoTotal});
       });

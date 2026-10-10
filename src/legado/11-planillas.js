@@ -439,7 +439,19 @@ function capasDeCompra(e,producto){
    · Promedio ponderado: cantidad × (valor total en existencia ÷ unidades en existencia).
    · PEPS: se agotan primero las capas de compra más antiguas; lo que ya salió
      antes (en unidades) se salta, y lo nuevo se valúa con las capas que siguen. */
-function costoSalidaInventario(e,producto,cantidad){
+/* El inventario tal como estaba a una fecha: sin lo que entró ni salió después. */
+function empresaAlCorte(e,hasta){
+  if(!hasta) return e;
+  return {...e,documentos:(e.documentos||[]).filter(d=>(d.fecha||'')<=hasta),
+    ordenesProduccion:(e.ordenesProduccion||[]).map(o=>o.estado==='cerrada'&&(o.fechaCierre||'')>hasta?{...o,estado:'abierta'}:o),
+    salidasInventario:(e.salidasInventario||[]).filter(s=>(s.fecha||'')<=hasta),
+    entradasInventario:(e.entradasInventario||[]).filter(s=>(s.fecha||'')<=hasta)};
+}
+const inventarioDetalleAl=(e,hasta)=>inventarioDetalle(empresaAlCorte(e,hasta));
+/* fecha (opcional): la de la salida. El costo es el que tenía el inventario ese día —una requisición del 20/01
+   no se valúa con la compra del 10/02, aunque esa compra se haya cargado antes—. Sin fecha, se usa todo. */
+function costoSalidaInventario(e,producto,cantidad,fecha){
+  if(fecha) e=empresaAlCorte(e,fecha);
   if(metodoCosteo(e)==='peps'){
     const capas=capasDeCompra(e,producto);
     let saltar=(e.salidasInventario||[]).filter(x=>x.producto===producto).reduce((a,x)=>a+x.cantidad,0);

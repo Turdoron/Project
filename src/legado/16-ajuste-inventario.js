@@ -16,6 +16,12 @@ const MOTIVOS_AJUSTE={
   venta:{nombre:'Venta registrada sin descargar el producto',tipo:'salida',partida:null},
   sobrante:{nombre:'Sobrante en el conteo físico',tipo:'entrada',partida:'ingreso'},
   inicial:{nombre:'Existencia inicial (al empezar a usar el sistema)',tipo:'entrada',partida:'opcional'}};
+/* Último corte con el costo de ventas realmente cerrado (el saldo de Inventarios coincide con el inventario final guardado). */
+function ultimoCorteCosto(e){
+  return Object.keys(e.inventarioFinal||{}).sort().reverse()
+    .find(h=>r2(saldoNaturalEn(e,'1.1.08',movimientosHasta(e,h)))===r2(e.inventarioFinal[h]))||'';
+}
+const movimientosHasta=(e,h)=>{ const m={}; (e.partidas||[]).forEach(p=>{ if(p.fecha>h) return; p.lineas.forEach(l=>{ const x=m[l.cta]=m[l.cta]||{debe:0,haber:0}; x.debe+=+l.debe||0; x.haber+=+l.haber||0; }); }); return m; };
 const ajustesInventario=e=>[...(e.salidasInventario||[]).filter(s=>s.ajuste),...(e.entradasInventario||[])]
   .sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')||(b.creado||'').localeCompare(a.creado||''));
 function htmlAjustesInventario(e){
@@ -59,7 +65,7 @@ ACCIONES.ajusteInventario=()=>{
       if(m.tipo==='entrada'&&!(cu>=0&&f.costoUnitario!=='')){avisar('Escribí el costo unitario.');return false}
       const id=uid(), creado=new Date().toISOString();
       let costoTotal, costoUnitario;
-      if(m.tipo==='salida'){ const c=costoSalidaInventario(e,prod,cant); costoTotal=c.costoTotal; costoUnitario=c.costoUnitario; }
+      if(m.tipo==='salida'){ const c=costoSalidaInventario(e,prod,cant,f.fecha); costoTotal=c.costoTotal; costoUnitario=c.costoUnitario; }
       else{ costoUnitario=cu; costoTotal=r2(cant*cu); }
       /* Partida contable, si corresponde. */
       let partida=null; const desc=`${m.nombre} — ${prod} (${Q(cant).replace(/\.00$/,'')} u.)${f.nota?` — ${f.nota.trim()}`:''}`;
@@ -73,6 +79,10 @@ ACCIONES.ajusteInventario=()=>{
       }else if(m.partida==='opcional'&&f.conPartida==='on'&&costoTotal>0){
         lineas.push({cta:'1.1.08',desc:'',debe:costoTotal,haber:0},{cta:f.contra||'3.1.01',desc:'Existencia inicial de inventario',debe:0,haber:costoTotal});
       }
+      /* Una partida que mueve Inventarios dentro de un período con el costo de ventas ya cerrado descuadra ese
+         cierre: el saldo de 1.1.08 deja de coincidir con el inventario final que se usó. */
+      const corte=ultimoCorteCosto(e);
+      if(lineas.length&&corte&&f.fecha<=corte){avisar(`El costo de ventas ya está cerrado al ${fFecha(corte)}: este ajuste movería Inventarios dentro de ese período. Fechalo después del ${fFecha(corte)}.`);return false}
       if(lineas.length){
         partida={id:uid(),numero:e.correlativo++,fecha:f.fecha,concepto:`Ajuste de inventario: ${desc}`,docTipo:'',docSerie:'',docNum:'',nit:'',contraparte:'',lineas};
         e.partidas.push(partida);

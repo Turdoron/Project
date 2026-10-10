@@ -171,8 +171,12 @@ function revisarFechaOrden(e,o,fecha){
   if(!fecha) return 'Escribí la fecha.';
   if(!enPeriodoOrden(o,fecha)) return `La fecha ${fFecha(fecha)} está fuera del período de la ${o.tipo==='continuo'?'corrida':'orden'} (${fFecha(o.fechaInicio)} al ${o.fechaFin?fFecha(o.fechaFin):'—'}). Corregí la fecha o ampliá el período con "Cambiar fechas".`;
   if(anioCerradoLibros(e,fecha)) return 'Ese ejercicio ya tiene Cierre de libros.';
+  const c=cierreCIFEn(e,fecha);
+  if(c) return `Los CIF del ${fFecha(c.desde)} al ${fFecha(c.hasta)} ya están cerrados (partida No. ${c.partidaNumero}): un costo con fecha ${fFecha(fecha)} quedaría fuera de ese cierre. Usá una fecha posterior, o eliminá primero la partida de ese cierre de CIF.`;
   return '';
 }
+/* Cierre de CIF que cubre una fecha (si hay). */
+const cierreCIFEn=(e,fecha)=>(e.cierresCIF||[]).find(x=>fecha>=x.desde&&fecha<=x.hasta)||null;
 const fechaSugerida=o=>enPeriodoOrden(o,hoy())?hoy():(o.fechaFin&&hoy()>o.fechaFin?o.fechaFin:o.fechaInicio);
 
 /* Registra una partida verificando que cuadre. */
@@ -770,7 +774,7 @@ const centroElegido=(e,o,f)=>f.centroId||centrosDeOrden(e,o)[0].id;
 /* ---- Requisición de materiales ---- */
 function registrarMateriales(e,o,fecha,centroId,items,concepto){
   asegurarCuentasCostos(e);
-  const costeados=items.map(it=>({...it,...costoSalidaInventario(e,it.producto,it.cantidad)}));
+  const costeados=items.map(it=>({...it,...costoSalidaInventario(e,it.producto,it.cantidad,fecha)}));
   const total=r2(costeados.reduce((s,x)=>s+x.costoTotal,0));
   const p=partidaProduccion(e,fecha,concepto,[
     ...costeados.map(x=>({cta:CTA_PEP,desc:`${x.producto} × ${fmtCant(x.cantidad)}`,debe:x.costoTotal,haber:0})),
@@ -1209,6 +1213,10 @@ ACCIONES.cierreCIF=()=>{
 /* ======================= ANULAR Y PDF ======================= */
 ACCIONES.anularOrdenProduccion=d=>{
   const e=emp(), o=ordenAbierta(e,d.id); if(!o) return;
+  /* Si algún costo de la orden ya entró a un cierre de CIF, borrarlo dejaría ese cierre con CIF aplicados que ya no
+     existen (5.1.10 y la variación quedarían descuadradas para siempre). */
+  const enCierre=[...o.materiales,...o.manoObra,...o.cif].map(x=>cierreCIFEn(e,x.fecha)).find(Boolean);
+  if(enCierre){avisar(`No se puede anular: tiene costos en el período de CIF ya cerrado del ${fFecha(enCierre.desde)} al ${fFecha(enCierre.hasta)} (partida No. ${enCierre.partidaNumero}). Eliminá primero esa partida de cierre de CIF y después anulá.`);return}
   confirmar(`Se anulará ${o.tipo==='continuo'?'la corrida':'la orden'} ${o.numero} de ${o.producto}: los materiales vuelven al inventario, la mano de obra vuelve a su cuenta y se reversan los CIF aplicados (se borran las partidas que se hicieron para esta orden).`,()=>{
     const ids=new Set([...o.materiales,...o.manoObra,...o.cif].map(x=>x.partidaId));
     e.partidas=e.partidas.filter(p=>!ids.has(p.id));

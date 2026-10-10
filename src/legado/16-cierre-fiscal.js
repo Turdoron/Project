@@ -20,11 +20,7 @@ function corteSugeridoCF(e){
 }
 /* Existencias según el kardex a una fecha (sin lo que entró o salió después). */
 function valorKardexAl(e,hasta){
-  const copia={...e,documentos:(e.documentos||[]).filter(d=>(d.fecha||'')<=hasta),
-    ordenesProduccion:(e.ordenesProduccion||[]).map(o=>o.estado==='cerrada'&&(o.fechaCierre||'')>hasta?{...o,estado:'abierta'}:o),
-    salidasInventario:(e.salidasInventario||[]).filter(s=>(s.fecha||'')<=hasta),
-    entradasInventario:(e.entradasInventario||[]).filter(s=>(s.fecha||'')<=hasta)};
-  const d=inventarioDetalle(copia);
+  const d=inventarioDetalleAl(e,hasta);
   return r2(d.lista.reduce((s,p)=>s+p.total,0)+d.sinDetalleValor);
 }
 const mesesDelRango=(desde,hasta)=>{ const out=[]; let [a,m]=desde.split('-').map(Number); const [a2,m2]=hasta.split('-').map(Number);

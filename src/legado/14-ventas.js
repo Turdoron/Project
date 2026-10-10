@@ -90,7 +90,7 @@ ACCIONES.nuevaVentaDirecta=()=>{
       e.salidasInventario=e.salidasInventario||[];
       let costo=0;
       Object.entries(total).forEach(([producto,cantidad])=>{
-        const c=costoSalidaInventario(e,producto,cantidad); costo=r2(costo+c.costoTotal);
+        const c=costoSalidaInventario(e,producto,cantidad,d.fecha); costo=r2(costo+c.costoTotal);
         e.salidasInventario.push({id:uid(),fecha:d.fecha,producto,cantidad,costoUnitario:c.costoUnitario,costoTotal:c.costoTotal,motivo:'venta'});
       });
       const n=Object.keys(total).length;
@@ -187,7 +187,7 @@ ACCIONES.nuevaConsignacion=()=>{
       const sel=mForm.querySelector('[name="producto"]');
       const opt=sel.options[sel.selectedIndex];
       const disponible=+opt.dataset.disponible;
-      const {costoUnitario,costoTotal}=costoSalidaInventario(e,d.producto,cantidad);
+      const {costoUnitario,costoTotal}=costoSalidaInventario(e,d.producto,cantidad,d.fecha||hoy());
       if(!cantidad||cantidad<=0){avisar('Escribí cuánto sale a consignación.');return false}
       if(cantidad>disponible){avisar(`Solo hay ${disponible} en existencia de ese producto.`);return false}
       if(!d.nombreConsignatario.trim()){avisar('Escribí a nombre de quién sale la mercadería en consignación.');return false}
