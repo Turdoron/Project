@@ -698,7 +698,7 @@ function itemsVentaSinMapear(e,activos){
      una compra que se está cargando junto pedía vincular igual, como si el
      producto fuera desconocido. */
   activos.filter(d=>d.tipo==='compra'&&d.items&&d.items.length).forEach(d=>{
-    d.items.filter(it=>it.bs==='B'&&it.descripcion).forEach(it=>nombresConocidos.add(it.descripcion.trim()));
+    d.items.filter(it=>it.bs==='B'&&it.descripcion).forEach(it=>{ nombresConocidos.add(it.descripcion.trim()); nombresConocidos.add(productoDe(e,it.descripcion)); });
   });
   const vistos=new Set(), pendientes=[];
   activos.filter(d=>d.tipo==='venta'&&d.items&&d.items.length).forEach(d=>{
@@ -728,7 +728,7 @@ ACCIONES.generarPartidas=()=>{
     const nombresLista=new Set(lista.map(p=>p.producto));
     const nombresLote=new Set();
     activos.filter(x=>x.tipo==='compra'&&x.items&&x.items.length).forEach(x=>
-      x.items.filter(it=>it.bs==='B'&&it.descripcion).forEach(it=>nombresLote.add(it.descripcion.trim())));
+      x.items.filter(it=>it.bs==='B'&&it.descripcion).forEach(it=>nombresLote.add(productoDe(e,it.descripcion))));
     /* Las opciones del desplegable tienen que incluir también los productos
        de las compras del MISMO lote que se está por procesar — todavía no
        están en e.documentos, así que inventarioDetalle() por sí solo no
@@ -917,7 +917,7 @@ function continuarGenerarPartidas(e,activos,excluidas,modo){
         if(!desc||!it.cantidad) return;
         const {lista}=inventarioDetalle(e);
         const conocido=lista.find(p=>p.producto===desc);
-        const producto=conocido?desc:(e.mapeoProducto||{})[desc];
+        const producto=(e.mapeoProducto||{})[desc]||(conocido?desc:'');
         if(!producto) return;   // se dejó en "Omitir" — no es un producto de inventario
         const item=lista.find(p=>p.producto===producto);
         const disponible=item?item.cantidad:0;

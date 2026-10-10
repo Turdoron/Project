@@ -619,3 +619,6 @@ dialog::backdrop{background:var(--backdrop);backdrop-filter:blur(3px)}
   :root[data-theme="dark"]{--papel:#FFFFFF;--panel:#FFFFFF;--tinta:#1B1A17;--tinta-suave:#635F57;--verde:#1B1A17;
     --linea:#ECE8E1;--linea-fuerte:#D9D3C8;--activo:#F0EDE6;--debe:#2C5B43;--haber:#94561A;
     --aviso-bg:#FBF5EA;--malo-bg:#FBEFED;--bien-bg:#EEF3EF;--peligro:#A3312B;--exito:#2C5B43;--advertencia:#7F4D0E;--info:#2A5577;--borde-campo:#8C867B;color-scheme:light}}
+/* Texto que se toca para editar (p. ej. el nombre de un producto en Existencias). */
+.btn-enlace{background:none;border:0;padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer;border-bottom:1px dashed transparent}
+.btn-enlace:hover,.btn-enlace:focus-visible{border-bottom-color:currentColor}

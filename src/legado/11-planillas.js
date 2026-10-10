@@ -410,7 +410,7 @@ function capasDeCompra(e,producto){
   (e.documentos||[]).map((d,i)=>({d,i})).filter(x=>x.d.tipo==='compra'&&x.d.cta==='1.1.08'&&x.d.items&&x.d.items.length)
     .sort((a,b)=>(a.d.fecha<b.d.fecha?-1:a.d.fecha>b.d.fecha?1:a.i-b.i))
     .forEach(({d})=>{
-      d.items.filter(it=>it.bs==='B'&&(it.descripcion||'Sin descripción').trim()===producto).forEach(it=>{
+      d.items.filter(it=>it.bs==='B'&&productoDe(e,it.descripcion||'Sin descripción')===producto).forEach(it=>{
         const s=d.signo||1;
         const neto=netoItemCompra(d,it), cant=it.cantidad||0;
         if(s>0){ if(cant>0) capas.push({cantidad:cant,total:neto,fecha:d.fecha}); }
@@ -474,7 +474,7 @@ function inventarioDetalle(e){
   (e.documentos||[]).filter(d=>d.tipo==='compra' && d.cta==='1.1.08').forEach(d=>{
     if(d.items && d.items.length){
       d.items.filter(it=>it.bs==='B').forEach(it=>{
-        const k=(it.descripcion||'Sin descripción').trim();
+        const k=productoDe(e,it.descripcion||'Sin descripción');
         productos[k]=productos[k]||{producto:k,cantidad:0,total:0,movimientos:0};
         const s=d.signo||1;
         const neto=r2(netoItemCompra(d,it));
@@ -648,7 +648,7 @@ VISTAS.inventario=()=>{
   const {lista, sinDetalle, sinDetalleValor}=inventarioDetalle(e);
   const totalProductos=r2(lista.reduce((s,p)=>s+p.total,0));
   const totalGeneral=r2(totalProductos+sinDetalleValor);
-  const filas=lista.map(p=>`<tr><td>${esc(p.producto)}</td>
+  const filas=lista.map(p=>`<tr><td><button type="button" class="btn-enlace" data-accion="renombrarProducto" data-producto="${esc(p.producto)}" title="Cambiar el nombre">${esc(p.producto)} <span aria-hidden="true" style="opacity:.5">✎</span></button></td>
     <td class="num">${p.cantidad?Q(p.cantidad).replace(/\.00$/,''):'—'}</td>
     <td class="num">${Q(p.costoUnitario)}</td>
     <td class="num">${Q(p.total)}</td></tr>`).join('');
@@ -662,7 +662,8 @@ VISTAS.inventario=()=>{
     </div>
     <div class="aviso">Cada producto muestra lo que entró (compras de bienes y producción terminada) menos lo que
       salió (ventas, consignaciones y materiales usados en producción), valuado con el método de la empresa.
-      Los servicios no generan inventario. Compará contra un conteo físico antes de cerrar el costo de ventas.</div>
+      Los servicios no generan inventario. Compará contra un conteo físico antes de cerrar el costo de ventas.
+      Tocá el nombre de un producto para ponerle uno más fácil de reconocer.</div>
     ${lista.length? `<table><thead><tr><th>Producto</th><th class="num">Existencia</th>
       <th class="num">Costo unitario prom.</th><th class="num">Valor</th></tr></thead>
       <tbody>${filas}</tbody>
