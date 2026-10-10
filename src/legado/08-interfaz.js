@@ -430,7 +430,10 @@ function pintar(){
   if(selEj) selEj.onchange=()=>{
     const nuevo=+selEj.value;
     if(!nuevo||nuevo<2000||nuevo>2100){avisar('Escribí un año válido.');selEj.value=e.ejercicio;return}
-    e.ejercicio=nuevo; guardar(); pintar();
+    e.ejercicio=nuevo;
+    /* El correlativo de partidas es por ejercicio: sigue desde la última partida de ese año (o empieza en 1). */
+    e.correlativo=e.partidas.filter(p=>(p.fecha||'').slice(0,4)===String(nuevo)).reduce((m,p)=>Math.max(m,p.numero||0),0)+1;
+    guardar(); pintar();
   };
   if(!e && VISTA!=='empresas' && VISTA!=='config' && VISTA!=='usuarios' && VISTA!=='capitalSocial' && VISTA!=='bitacora'){ VISTA='empresas'; }
   pintarMenuApps();

@@ -74,7 +74,9 @@ function clasificar(d){
          || e.mapeoCat[d.categoria]
          || MAPEO_BASE[(d.categoria||'').trim()]
          || (d.tipo==='compra'
-              ? (d.signo===-1 && d.bs==='B' ? '5.1.03'   // nota de crédito de bienes: rebaja el costo de compras, no la mercadería en existencia
+              /* Nota de crédito de bienes: si trae los productos con su cantidad es una devolución física (sale de
+                 Inventarios y del kardex); sin detalle, es una rebaja de precio (Devoluciones y rebajas sobre compras). */
+              ? (d.signo===-1 && d.bs==='B' ? ((d.items||[]).some(it=>it.bs==='B'&&it.cantidad>0)?'1.1.08':'5.1.03')
                  : d.bs==='B' ? '1.1.08' : '5.1.02')     // bien -> Inventarios; servicio -> Compras
               : '4.1.01');
   }
@@ -798,7 +800,14 @@ function continuarGenerarPartidas(e,activos,excluidas,modo){
   }
   const vinculos=resumenVinculosOC(e,activos);
   const textoOC=vinculos.length?`\n\nÓrdenes de compra vinculadas:\n${vinculos.map(v=>`• ${v.oc.numero}: Q${Q(v.monto)} de Q${Q(v.rest)} por facturar${v.excede?` — OJO: se pasa por Q${Q(v.dif)}`:v.completa?' — la completa':` — queda por facturar Q${Q(-v.dif)}`}`).join('\n')}`:'';
-  confirmar(`Se crearán ${cuantas} partidas en ${e.nombre}, ${detalle}.${excluidas?`\n\nSe excluyen ${excluidas} documento(s) marcados como anulados.`:''}\n\nSe numeran en orden cronológico, de la fecha más antigua a la más reciente.\n\nRevisá que las cuentas asignadas sean las correctas: después hay que corregirlas una por una.${textoOC}`,()=>{
+  /* Una nota de crédito al crédito mayor que lo que esa contraparte debe deja la cartera al revés: se advierte. */
+  const notasDeMas=activos.filter(d=>d.tipoDte==='NCRE'&&d.ctaPago===(d.tipo==='compra'?'2.1.01':'1.1.04')).map(d=>{
+    const nit=soloNit(d.tipo==='compra'?d.nitEmisor:d.nitReceptor), c=(d.tipo==='compra'?carteraProveedores(e):carteraClientes(e)).find(x=>soloNit(x.nit)===nit);
+    const enLote=activos.filter(x=>x!==d&&x.tipo===d.tipo&&x.tipoDte!=='NCRE'&&x.ctaPago===d.ctaPago&&soloNit(x.tipo==='compra'?x.nitEmisor:x.nitReceptor)===nit).reduce((s,x)=>s+(x.total||0),0);
+    const debe=r2((c?c.saldo:0)+enLote);
+    return d.total>debe+0.005?`• ${d.serie||''}-${d.dte}: nota de crédito por Q${Q(d.total)}, pero ${d.tipo==='compra'?'a ese proveedor se le debe':'ese cliente debe'} Q${Q(debe)}`:null;
+  }).filter(Boolean);
+  confirmar(`${notasDeMas.length?`Revisá estas notas de crédito: son mayores que el saldo pendiente y dejarían la cuenta al revés.\n${notasDeMas.join('\n')}\n\n`:''}Se crearán ${cuantas} partidas en ${e.nombre}, ${detalle}.${excluidas?`\n\nSe excluyen ${excluidas} documento(s) marcados como anulados.`:''}\n\nSe numeran en orden cronológico, de la fecha más antigua a la más reciente.\n\nRevisá que las cuentas asignadas sean las correctas: después hay que corregirlas una por una.${textoOC}`,()=>{
     /* Empresas creadas antes de que existiera esta cuenta no la tienen en su
        propio catálogo, aunque nuevoCatalogo() ya la incluya para las
        nuevas — sin esto, la partida queda apuntando a un código que no
