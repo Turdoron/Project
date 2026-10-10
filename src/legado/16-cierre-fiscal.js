@@ -22,7 +22,8 @@ function corteSugeridoCF(e){
 function valorKardexAl(e,hasta){
   const copia={...e,documentos:(e.documentos||[]).filter(d=>(d.fecha||'')<=hasta),
     ordenesProduccion:(e.ordenesProduccion||[]).map(o=>o.estado==='cerrada'&&(o.fechaCierre||'')>hasta?{...o,estado:'abierta'}:o),
-    salidasInventario:(e.salidasInventario||[]).filter(s=>(s.fecha||'')<=hasta)};
+    salidasInventario:(e.salidasInventario||[]).filter(s=>(s.fecha||'')<=hasta),
+    entradasInventario:(e.entradasInventario||[]).filter(s=>(s.fecha||'')<=hasta)};
   const d=inventarioDetalle(copia);
   return r2(d.lista.reduce((s,p)=>s+p.total,0)+d.sinDetalleValor);
 }

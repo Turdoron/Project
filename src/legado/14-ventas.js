@@ -10,7 +10,7 @@ VISTAS.ventas=()=>{
   e.salidasInventario=e.salidasInventario||[];
   const enConsig=e.consignaciones.filter(c=>c.estado==='en_consignacion');
   const vendidas=[...e.consignaciones.filter(c=>c.estado==='vendido')].sort((a,b)=>(b.fechaVenta||'').localeCompare(a.fechaVenta||''));
-  const ventasDirectas=[...e.salidasInventario.filter(s=>s.motivo==='venta')].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const ventasDirectas=[...e.salidasInventario.filter(s=>s.motivo==='venta'&&!s.ajuste)].sort((a,b)=>b.fecha.localeCompare(a.fecha));
   const filaEnConsig=c=>`<tr><td>${fFecha(c.fecha)}</td><td>${esc(c.producto)}</td>
     <td>${esc(c.nombreConsignatario||'—')}${c.nitConsignatario?`<br><span style="font-size:12px;color:var(--tinta-suave)">NIT ${esc(c.nitConsignatario)}</span>`:''}</td>
     <td class="num">${c.cantidad||'—'}</td><td class="num">${Q(c.costoTotal)}</td>

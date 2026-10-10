@@ -233,7 +233,7 @@ function costoVentasPeriodo(e,desde,hasta,mov){
      Si todavía no hay nada en el kardex —una empresa que recién carga
      facturas sin usar Ventas todavía—, comprasBienes sigue como respaldo,
      mejor una estimación gruesa que ninguna. */
-  const salidasKardex=(e.salidasInventario||[]).filter(s=>s.fecha>=desde&&s.fecha<=hasta&&s.motivo!=='produccion')
+  const salidasKardex=(e.salidasInventario||[]).filter(s=>s.fecha>=desde&&s.fecha<=hasta&&s.motivo!=='produccion'&&s.motivo!=='merma'&&s.motivo!=='faltante')
     .reduce((sum,s)=>sum+(s.costoTotal||0),0);
   const consignVendidas=(e.consignaciones||[]).filter(c=>c.estado==='vendido'&&c.fechaVenta&&c.fechaVenta>=desde&&c.fechaVenta<=hasta)
     .reduce((sum,c)=>sum+(c.costoTotal||0),0);
@@ -426,7 +426,10 @@ function capasDeCompra(e,producto){
   /* Lo producido entra como una capa más, en el orden de su fecha de cierre. */
   (e.ordenesProduccion||[]).flatMap(entradasProduccion).filter(x=>x.producto===producto)
     .forEach(x=>capas.push({cantidad:x.cantidad,total:x.costo,fecha:x.fecha}));
-  if((e.ordenesProduccion||[]).length) capas.sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
+  /* Los ajustes que entran (sobrante, existencia inicial) también son capas, en el orden de su fecha. */
+  (e.entradasInventario||[]).filter(x=>x.producto===producto&&x.cantidad>0)
+    .forEach(x=>capas.push({cantidad:x.cantidad,total:x.costoTotal||0,fecha:x.fecha}));
+  if((e.ordenesProduccion||[]).length||(e.entradasInventario||[]).length) capas.sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
   return capas.filter(c=>c.cantidad>1e-9);
 }
 /* Cuánto cuesta lo que sale. Es LA única fuente para ventas directas,
@@ -494,6 +497,14 @@ function inventarioDetalle(e){
     productos[k]=productos[k]||{producto:k,cantidad:0,total:0,movimientos:0};
     productos[k].cantidad=r2(productos[k].cantidad+x.cantidad);
     productos[k].total=r2(productos[k].total+x.costo);
+    productos[k].movimientos++;
+  });
+  /* Ajustes manuales que entran (sobrante en el conteo, existencia inicial). */
+  (e.entradasInventario||[]).forEach(x=>{
+    const k=x.producto;
+    productos[k]=productos[k]||{producto:k,cantidad:0,total:0,movimientos:0};
+    productos[k].cantidad=r2(productos[k].cantidad+x.cantidad);
+    productos[k].total=r2(productos[k].total+(x.costoTotal||0));
     productos[k].movimientos++;
   });
   (e.salidasInventario||[]).forEach(s=>{
@@ -642,7 +653,8 @@ VISTAS.inventario=()=>{
     <td class="num">${Q(p.costoUnitario)}</td>
     <td class="num">${Q(p.total)}</td></tr>`).join('');
   return cab('Existencias',`Existencia por producto: compras y producción, menos ventas, consignaciones y materiales usados — un kardex de trabajo, no el libro legal. Método de valuación: ${METODOS_COSTEO[metodoCosteo(e)]}.`,
-    `<button class="btn sec" data-accion="revisarItemsInventario">Revisar ítems</button>
+    `<button class="btn sec" data-accion="ajusteInventario">Ajuste manual</button>
+     <button class="btn sec" data-accion="revisarItemsInventario">Revisar ítems</button>
      <button class="btn" data-accion="pdfInventario">Descargar PDF</button>`)
   + `<div class="cifras">
       <div class="cifra"><span>Productos distintos</span><strong>${lista.length}</strong></div>
@@ -660,7 +672,8 @@ VISTAS.inventario=()=>{
     ${sinDetalle? `<div class="aviso" style="margin-top:16px">${sinDetalle} compra${sinDetalle===1?'':'s'} de bienes por Q${Q(sinDetalleValor)}
       se cargaron desde Excel, que no trae detalle de producto por línea. Ese valor está incluido
       en el total general, pero no aparece desglosado por producto arriba. Para verlo desglosado,
-      cargá esas facturas en XML en vez de Excel.</div>` : ''}`;
+      cargá esas facturas en XML en vez de Excel.</div>` : ''}
+    ${htmlAjustesInventario(e)}`;
 };
 
 VISTAS.tablero=()=>{

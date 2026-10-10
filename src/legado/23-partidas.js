@@ -304,6 +304,12 @@ function limpiarDependenciasPartida(e,p){
     e.salidasInventario=(e.salidasInventario||[]).filter(s=>s.referenciaId!==id);
     notas.push('la consignación y su salida de inventario');
   }
+  /* Ajustes manuales de inventario: sin su partida, el ajuste tampoco queda en el kardex. */
+  if([...(e.salidasInventario||[]),...(e.entradasInventario||[])].some(s=>s.ajuste&&s.partidaId===id)){
+    e.salidasInventario=(e.salidasInventario||[]).filter(s=>!(s.ajuste&&s.partidaId===id));
+    e.entradasInventario=(e.entradasInventario||[]).filter(s=>s.partidaId!==id);
+    notas.push('el ajuste manual de inventario');
+  }
   /* Devoluciones de IVA */
   (e.devolucionesIVA||[]).forEach(s=>{
     if(s.partidaRecibidaId===id){ s.estado='solicitada'; delete s.fechaRecibida; delete s.montoRecibido; delete s.partidaRecibidaId; notas.push('la devolución de IVA vuelve a quedar en trámite'); }
@@ -412,7 +418,7 @@ ACCIONES.borrarTodo=()=>{
         partidasCapital.forEach((p,i)=>p.numero=i+1);
         e.partidas=partidasCapital;
         e.documentos=[]; e.pagos=[]; e.cobros=[];
-        e.consignaciones=[]; e.salidasInventario=[];
+        e.consignaciones=[]; e.salidasInventario=[]; e.entradasInventario=[];
         e.aumentosCapital=[]; e.cierresParciales=[]; e.devolucionesIVA=[];
         e.empleados=[]; e.planillas=[]; e.pagosPrestaciones=[];
         e.inventarioFinal={};
