@@ -259,10 +259,10 @@ VISTAS.config=()=>cab('Configuración','Ajustes del sistema, no de una empresa e
      <p>Cada día en que se modifica una empresa, la nube guarda sola cómo estaba al empezar el día, y una copia si se elimina. Se conservan 30 días y se pueden restaurar desde acá.</p>
      <button class="btn sec" data-accion="verRespaldos">Ver y restaurar respaldos de esta empresa</button></div>
     <div class="tarjeta"><h3>Exportar</h3>
-     <p>Descarga un archivo con todas las empresas, catálogos y partidas. Guardalo en la nube o en una USB.</p>
+     <p>Descarga un archivo con las empresas que elijas (una, varias o todas), con su catálogo y sus partidas. Guardalo en la nube o en una USB.</p>
      <button class="btn" data-accion="exportar">Descargar respaldo</button></div>
      <div class="tarjeta"><h3>Importar</h3>
-     <p>Reemplaza todo lo que hay ahora con el contenido del archivo de respaldo.</p>
+     <p>Restaura desde un archivo de respaldo solo las empresas que elijas. Las demás no se tocan.</p>
      <input type="file" id="archivoImp" accept="application/json" style="margin-bottom:10px">
      <button class="btn sec" data-accion="importar">Restaurar desde archivo</button></div>
      <div class="tarjeta"><h3>Borrar los registros contables</h3>

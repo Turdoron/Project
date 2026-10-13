@@ -404,42 +404,68 @@ ACCIONES.borrarPartida=d=>{
   },'Eliminar partida');
 };
 
+/* Respaldo en archivo, por empresa: se eligen las empresas que entran al archivo y, al restaurar, las que se
+   recuperan. Restaurar una empresa reemplaza solo esa (la que tenga el mismo id, o el mismo NIT y nombre); las demás
+   quedan como están. Una empresa del archivo que no existe se agrega como nueva. */
+const listaEmpresasRespaldo=(lista,marcadas,extra)=>`<div style="display:flex;gap:8px;margin:0 0 8px"><button type="button" class="btn mini sec" id="resTodas">Todas</button><button type="button" class="btn mini sec" id="resNinguna">Ninguna</button></div>
+  <div style="max-height:46vh;overflow:auto;display:grid;gap:6px">${lista.map((x,i)=>`<label class="chequeo"><input type="checkbox" name="emp_${i}"${marcadas(x)?' checked':''}><span><strong>${esc(x.nombre||'Sin nombre')}</strong> · NIT ${esc(x.nit||'—')} · ${(x.partidas||[]).length} partidas${extra?extra(x):''}</span></label>`).join('')}</div>`;
+const enlazarTodasNinguna=()=>{ const marcar=v=>mForm.querySelectorAll('[name^="emp_"]').forEach(c=>c.checked=v);
+  mForm.querySelector('#resTodas').onclick=()=>marcar(true); mForm.querySelector('#resNinguna').onclick=()=>marcar(false); };
 ACCIONES.exportar=()=>{
   /* Solo lo que le pertenece a este Administrador — nunca el BD completo,
      porque eso se llevaría también los datos de otros despachos que usen
      el mismo archivo. */
-  const admin=administradorDeSesion();
-  const paquete={
-    version:2, exportadoPor:admin,
-    empresas:empresasVisibles(),
-    usuarios:(BD.usuarios||[]).filter(u=>u.administradorId===admin),
-  };
-  const b=new Blob([JSON.stringify(paquete,null,1)],{type:'application/json'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(b);
-  a.download=`respaldo-contabilidad-${hoy()}.json`;
-  a.click();
+  const admin=administradorDeSesion(), propias=empresasVisibles();
+  if(!propias.length){avisar('No hay empresas para respaldar.');return}
+  abrirModal('Descargar respaldo',
+    `<p style="margin:0 0 10px;font-size:13px;color:var(--tinta-suave)">Elegí qué empresas van en el archivo.</p>${listaEmpresasRespaldo(propias,x=>propias.length===1||x.id===BD.activa)}`,
+    f=>{
+      const elegidas=propias.filter((x,i)=>f['emp_'+i]==='on');
+      if(!elegidas.length){avisar('Elegí al menos una empresa.');return false}
+      const paquete={version:3,exportadoPor:admin,fecha:new Date().toISOString(),empresas:elegidas};
+      const b=new Blob([JSON.stringify(paquete,null,1)],{type:'application/json'});
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(b);
+      a.download=elegidas.length===1?`respaldo-${archivoSeguro(elegidas[0].nombre)}-${hoy()}.json`:`respaldo-contabilidad-${elegidas.length}-empresas-${hoy()}.json`;
+      a.click();
+      registrarLog('Descargó un respaldo',elegidas.map(x=>x.nombre).join(', '));
+    },'Descargar');
+  enlazarTodasNinguna();
 };
 ACCIONES.importar=()=>{
   const f=document.getElementById('archivoImp').files[0];
   if(!f){avisar('Elegí primero el archivo de respaldo.');return}
   const r=new FileReader();
   r.onload=()=>{
-    try{
-      const d=JSON.parse(r.result);
-      if(!d.empresas)throw new Error('El archivo no tiene el formato esperado.');
-      const admin=administradorDeSesion();
-      const n=d.empresas.length;
-      confirmar(`El respaldo trae ${n} empresa${n===1?'':'s'}.\n\nSe reemplazará TU información actual (tus empresas) por lo que trae este archivo. No toca los datos de ningún otro Administrador que use este mismo sistema.`,()=>{
-        /* Se re-marcan como propias, por si el archivo se exportó desde otra
-           sesión o quedó con un id de administrador distinto. */
-        BD.empresas=BD.empresas.filter(e=>e.administradorId!==admin)
-          .concat(d.empresas.map(e=>({...e,id:crypto.randomUUID(),administradorId:admin})));
-        /* Las cuentas de personal no se importan: ahora viven en el servidor y se crean desde Usuarios. */
-        if(!BD.empresas.some(e=>e.id===BD.activa)) BD.activa=empresasVisibles()[0]?empresasVisibles()[0].id:null;
-        guardar();VISTA='empresas';pintar();
-      },'Restaurar');
-    }catch(err){avisar('No se pudo leer el archivo: '+err.message)}
+    let d;
+    try{ d=JSON.parse(r.result); if(!Array.isArray(d.empresas)) throw new Error('El archivo no tiene el formato esperado.'); }
+    catch(err){ avisar('No se pudo leer el archivo: '+err.message); return; }
+    const admin=administradorDeSesion(), propias=empresasVisibles();
+    const nitN=x=>String(x||'').toUpperCase().replace(/[^0-9A-Z]/g,'');
+    /* La empresa actual que corresponde a la del archivo: mismo id, o mismo NIT y nombre. */
+    const pareja=x=>propias.find(y=>y.id===x.id)||propias.find(y=>nitN(y.nit)&&nitN(y.nit)===nitN(x.nit)&&(y.nombre||'').trim().toLowerCase()===(x.nombre||'').trim().toLowerCase());
+    abrirModal('Restaurar desde archivo',
+      `<p style="margin:0 0 10px;font-size:13px;color:var(--tinta-suave)">El archivo trae ${d.empresas.length} empresa${d.empresas.length===1?'':'s'}${d.fecha?`, guardado el ${new Date(d.fecha).toLocaleString('es-GT',{dateStyle:'short',timeStyle:'short'})}`:''}. Elegí cuáles restaurar: cada una reemplaza solo a su empresa actual; las que no elijas, y el resto de tus empresas, no cambian.</p>
+      ${listaEmpresasRespaldo(d.empresas,x=>d.empresas.length===1||x.id===BD.activa,x=>pareja(x)?' — <em>reemplaza la actual</em>':' — <em>se agrega como nueva</em>')}`,
+      g=>{
+        const elegidas=d.empresas.filter((x,i)=>g['emp_'+i]==='on');
+        if(!elegidas.length){avisar('Elegí al menos una empresa.');return false}
+        const reemplaza=elegidas.filter(pareja).length, nuevas=elegidas.length-reemplaza;
+        confirmar(`Se restaurarán ${elegidas.length} empresa${elegidas.length===1?'':'s'}: ${reemplaza?`${reemplaza} reemplaza${reemplaza===1?'':'n'} a la actual (lo registrado después del respaldo en ${reemplaza===1?'esa empresa':'esas empresas'} se pierde)`:''}${reemplaza&&nuevas?' y ':''}${nuevas?`${nuevas} se agrega${nuevas===1?'':'n'} como nueva${nuevas===1?'':'s'}`:''}.\n\n${elegidas.map(x=>'• '+(x.nombre||'Sin nombre')).join('\n')}\n\nPodés deshacerlo con «Deshacer» mientras no cierres la sesión.`,()=>{
+          elegidas.forEach(x=>{
+            const actual=pareja(x);
+            if(actual){ const i=BD.empresas.findIndex(y=>y.id===actual.id); BD.empresas[i]={...x,id:actual.id,administradorId:admin}; }
+            else BD.empresas.push({...x,id:crypto.randomUUID(),administradorId:admin});
+          });
+          /* Las cuentas de personal no se importan: viven en el servidor y se crean desde Usuarios. */
+          if(!BD.empresas.some(e=>e.id===BD.activa)) BD.activa=empresasVisibles()[0]?empresasVisibles()[0].id:null;
+          registrarLog('Restauró empresas desde un archivo',elegidas.map(x=>x.nombre).join(', '));
+          guardar(); cerrarModal(); pintar();
+          avisar(`Listo: ${elegidas.length===1?`${elegidas[0].nombre} quedó restaurada`:`${elegidas.length} empresas restauradas`}.`,'Respaldo restaurado');
+        },'Restaurar');
+        return false;
+      },'Continuar');
+    enlazarTodasNinguna();
   };
   r.readAsText(f);
 };
