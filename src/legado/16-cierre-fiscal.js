@@ -157,7 +157,9 @@ VISTAS.cierreFiscal=()=>{
   const icono={ok:'✓',pend:'',aviso:'!',opcional:'–'};
   return cab('Cierre fiscal (ISR 25 %)',`${esc(e.nombre)} · ejercicio ${e.ejercicio} · del ${fFecha(R.desde)} al ${fFecha(R.hasta)}. Todo lo del cierre en un solo lugar, en orden: cada paso tiene su botón.`,`<button class="btn sec" data-accion="irTablero">Tablero fiscal</button>`)
     +`<div class="barra"><div class="campo ancho"><label for="selCorteCF">Cierre de</label>
-        <select id="selCorteCF" data-filtro="corteCF">${CORTES_CF.map(x=>`<option value="${x.id}"${x.id===id?' selected':''}>${x.nombre}</option>`).join('')}</select></div>
+        <select id="selCorteCF" data-filtro="corteCF">${CORTES_CF.map(x=>{ const hecho=x.t<4?(e.cierresParciales||[]).some(c=>c.ejercicio===e.ejercicio&&c.trimestre===x.t)
+          :(e.partidas||[]).some(p=>(p.concepto||'').startsWith(`Cierre fiscal total ${e.ejercicio}`));
+          return `<option value="${x.id}"${x.id===id?' selected':''}>${hecho?'✔ ':''}${x.nombre}${hecho?' — ya registrado':''}</option>`; }).join('')}</select></div>
       <div class="progreso-cf" aria-live="polite"><strong>${listos} de ${pasos.length}</strong> pasos listos
         <span class="barra-cf"><span style="width:${Math.round(listos/pasos.length*100)}%"></span></span></div></div>
     <ol class="pasos-cf">${pasos.map((p,i)=>`<li class="paso-cf cf-${p.estado}">

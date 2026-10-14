@@ -214,6 +214,21 @@ function ventasDelGrupo(docs,g,modo){
    suelto, el conteo real casi siempre es al cierre del año), se usa como
    estimación razonable lo comprado en ese mismo período — no es exacto,
    pero es muchísimo mejor que no restar nada. */
+/* Si el cierre parcial de un trimestre ya se registró, con qué monto, partida y fecha. El cuarto trimestre no tiene
+   cierre parcial: se paga con la liquidación anual (cierre fiscal total). */
+function estadoCierreTrimestre(e,x){
+  const verde=t=>`<span style="color:var(--ok);font-weight:600">✔ ${t}</span>`, gris=t=>`<span style="color:var(--tinta-suave)">${t}</span>`;
+  if(x.t===4){
+    const p=(e.partidas||[]).find(p=>(p.concepto||'').startsWith(`Cierre fiscal total ${e.ejercicio}`));
+    return p?verde(`Liquidado en el cierre anual (partida No. ${p.numero})`):gris('Se paga con la liquidación anual');
+  }
+  const c=(e.cierresParciales||[]).find(c=>c.ejercicio===e.ejercicio&&c.trimestre===x.t);
+  if(c){
+    const p=c.partidaId&&(e.partidas||[]).find(p=>p.id===c.partidaId);
+    return verde(`Registrado: Q${Q(c.monto)}${c.metodo==='estimada'?' (renta estimada)':''}${p?` · partida No. ${p.numero}, ${fFecha(p.fecha)}`:' · en cero'}`);
+  }
+  return x.hasta<hoy()?'<span style="color:var(--alerta);font-weight:600">Pendiente</span>':gris('Trimestre en curso');
+}
 function costoVentasPeriodo(e,desde,hasta,mov){
   /* Si ya existe un inventario final guardado para esta fecha de corte, Y el
      saldo real de la cuenta de Inventarios YA coincide con ese monto, quiere
@@ -749,15 +764,16 @@ VISTAS.tablero=()=>{
         y podés elegir entre cierre contable parcial o renta imponible estimada en 8% de la renta bruta.
         Formulario SAT-1361, dentro del mes siguiente al cierre del trimestre.</p>
       <table><thead><tr><th>Trimestre</th><th class="num">Rentas brutas</th><th class="num">Utilidad contable</th>
-        <th class="num">Por cierre parcial (25%)</th><th class="num">Por renta estimada (8% × 25%)</th></tr></thead>
+        <th class="num">Por cierre parcial (25%)</th><th class="num">Por renta estimada (8% × 25%)</th><th>Estado</th></tr></thead>
       <tbody>${trim.map(x=>`<tr><td>${['Ene–Mar','Abr–Jun','Jul–Sep','Oct–Dic'][x.t-1]}</td>
-        ${x.noAplica?`<td colspan="4" style="color:var(--tinta-suave)">No aplica: en ese trimestre la empresa estaba en ${esc(REGIMENES[x.regimen]||x.regimen)}.</td></tr>`
+        ${x.noAplica?`<td colspan="5" style="color:var(--tinta-suave)">No aplica: en ese trimestre la empresa estaba en ${esc(REGIMENES[x.regimen]||x.regimen)}.</td></tr>`
           :`<td class="num">${Q(x.rentas)}</td><td class="num">${Q(x.util)}</td>
-        <td class="num">${Q(x.cierre)}</td><td class="num">${Q(x.estimada)}</td></tr>`}`).join('')}</tbody>
+        <td class="num">${Q(x.cierre)}</td><td class="num">${Q(x.estimada)}</td><td>${estadoCierreTrimestre(e,x)}</td></tr>`}`).join('')}</tbody>
       <tfoot><tr class="total"><td>Acumulado del ejercicio</td>
         <td class="num">${Q(rentasAno)}</td>
         <td class="num">${Q(utilAno)}</td>
-        <td class="num">${Q(tc)}</td><td class="num">${Q(te)}</td></tr></tfoot></table>
+        <td class="num">${Q(tc)}</td><td class="num">${Q(te)}</td>
+        <td>${(()=>{ const n=(e.cierresParciales||[]).filter(c=>c.ejercicio===e.ejercicio).length; return `${n} de 3 cierres parciales`; })()}</td></tr></tfoot></table>
       <div class="aviso">El cuarto trimestre no se paga aparte: se liquida junto con la declaración anual,
         a más tardar el 31 de marzo.</div>
       <h3 style="color:var(--verde);margin:22px 0 4px">Costos y gastos por trimestre</h3>
