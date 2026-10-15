@@ -175,16 +175,16 @@ ACCIONES.ventasSinDescargar=()=>{
   const e=emp(), lista=ventasSinDescargar(e);
   if(!lista.length){avisar('Todas las facturas de venta ya salieron del inventario.','Inventario al día');return}
   abrirModal('Ventas que no salieron del inventario',
-    `<p style="margin:0 0 10px;font-size:13px;color:var(--tinta-suave)">Estas facturas de venta tienen productos que no se descontaron del inventario (por ejemplo, se cargaron antes de ligar la descripción, o la factura marcó la caja como «servicio»). Mientras no salgan, el kardex queda alto y el costo de ventas estimado queda bajo, y eso infla el ISR del tablero. Elegí qué hacer con cada una: «Descontar» la saca del inventario con la fecha y el costo de ese día; «Ya salió con venta directa» la liga a la venta directa sin factura (no descuenta otra vez).</p>
-    <div style="max-height:52vh;overflow:auto"><table style="font-size:13px"><thead><tr><th>Fecha</th><th>Factura</th><th>Producto</th><th class="num">Cantidad</th><th>Qué hacer</th></tr></thead><tbody>
+    `<p style="margin:0 0 10px;font-size:13px;color:var(--tinta-suave)">Estas facturas de venta tienen productos que no se descontaron del inventario (por ejemplo, se cargaron antes de ligar la descripción, o la factura marcó la caja como «servicio»). Mientras no salgan, el kardex queda alto y el costo de ventas estimado queda bajo, y eso infla el ISR del tablero. Elegí qué hacer con cada una: «Descontar» la saca del inventario con la fecha y el costo de ese día; «Ya salió» la liga a una venta directa sin factura anterior, porque esa mercadería ya salió (no descuenta otra vez).</p>
+    <div style="max-height:52vh;overflow:auto"><table style="font-size:13px"><thead><tr><th>Factura</th><th>Producto</th><th class="num">Cantidad</th><th>Qué hacer</th></tr></thead><tbody>
     ${lista.map((x,i)=>`<tr${x.cerrado?' style="opacity:.55"':''}>
-      <td>${fFecha(x.doc.fecha)}</td><td>${esc(`${x.doc.serie?x.doc.serie+'-':''}${x.doc.dte||''}`)}<br><span style="font-size:12px;color:var(--tinta-suave)">${esc(x.doc.nombre||'')}</span></td>
-      <td>${esc(x.producto)}${x.ventaDirecta?`<br><span style="font-size:12px;color:var(--haber)">Hay ventas directas sin factura desde el ${fFecha(x.ventaDirecta.fecha)} (${Q(x.ventaDirecta.cantidad).replace(/\.00$/,'')} u.): si esta factura es de esa mercadería, ya salió y no se descuenta otra vez.</span>`:''}${x.cerrado?'<br><span style="font-size:12px">Ejercicio cerrado</span>':''}</td>
+      <td>${fFecha(x.doc.fecha)}<br>${esc(x.doc.dte||'')}<br><span style="font-size:12px;color:var(--tinta-suave)">${esc(x.doc.nombre||'')}</span></td>
+      <td>${esc(x.producto)}${x.ventaDirecta?`<br><span style="font-size:12px;color:var(--haber)">Venta directa sin factura del ${fFecha(x.ventaDirecta.fecha)} (${Q(x.ventaDirecta.cantidad).replace(/\.00$/,'')} u.)</span>`:''}${x.cerrado?'<br><span style="font-size:12px">Ejercicio cerrado</span>':''}</td>
       <td class="num">${Q(x.cantidad).replace(/\.00$/,'')}</td>
-      <td><select style="min-width:190px" name="v_${i}" aria-label="Qué hacer con ${esc(x.producto)}"${x.cerrado?' disabled':''}>
+      <td><select style="width:auto;min-width:0;max-width:115px" name="v_${i}" aria-label="Qué hacer con ${esc(x.producto)}"${x.cerrado?' disabled':''}>
         <option value="descontar"${!x.ventaDirecta?' selected':''}>Descontar</option>
-        ${x.ventaDirecta?'<option value="vd" selected>Ya salió con venta directa</option>':''}
-        <option value="">No hacer nada</option></select></td></tr>`).join('')}</tbody></table></div>`,
+        ${x.ventaDirecta?'<option value="vd" selected>Ya salió</option>':''}
+        <option value="">Nada</option></select></td></tr>`).join('')}</tbody></table></div>`,
     f=>{
       const elegidas=lista.map((x,i)=>({...x,que:f['v_'+i]||''})).filter(x=>x.que&&!x.cerrado);
       if(!elegidas.length){avisar('No elegiste ninguna.');return false}
@@ -192,7 +192,7 @@ ACCIONES.ventasSinDescargar=()=>{
       let costo=0, nDesc=0, nVD=0;
       elegidas.forEach(x=>{
         let cant=x.cantidad;
-        if(x.que==='vd'){ const d=x.doc; cant=r2(cant-cubrirConVentasDirectas(e,{id:d.id,nit:d.nit,fecha:d.fecha,serie:d.serie,dte:d.dte},x.producto,cant)); nVD++; }
+        if(x.que==='vd'){ const d=x.doc; const cub=cubrirConVentasDirectas(e,{id:d.id,nit:d.nit,fecha:d.fecha,serie:d.serie,dte:d.dte},x.producto,cant); cant=r2(cant-cub); if(cub>0) nVD++; }
         if(cant<=1e-9) return;
         const c=costoSalidaInventario(e,x.producto,cant,x.doc.fecha); costo=r2(costo+c.costoTotal); nDesc++;
         e.salidasInventario.push({id:uid(),fecha:x.doc.fecha,producto:x.producto,cantidad:cant,costoUnitario:c.costoUnitario,costoTotal:c.costoTotal,motivo:'venta',partidaId:x.doc.partidaId||'',documentoId:x.doc.id}); });
