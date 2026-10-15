@@ -76,7 +76,7 @@ function clasificar(d){
          || (d.tipo==='compra'
               /* Nota de crédito de bienes: si trae los productos con su cantidad es una devolución física (sale de
                  Inventarios y del kardex); sin detalle, es una rebaja de precio (Devoluciones y rebajas sobre compras). */
-              ? (d.signo===-1 && d.bs==='B' ? ((d.items||[]).some(it=>it.bs==='B'&&it.cantidad>0)?'1.1.08':'5.1.03')
+              ? (d.signo===-1 && d.bs==='B' ? ((d.items||[]).some(it=>it.bs==='B'&&it.cantidad>0&&(e.mapeoProducto||{})[(it.descripcion||'').trim()]!=='')?'1.1.08':'5.1.03')
                  : d.bs==='B' ? '1.1.08' : '5.1.02')     // bien -> Inventarios; servicio -> Compras
               : '4.1.01');
   }
@@ -717,7 +717,7 @@ function itemsVentaSinMapear(e,activos){
       const desc=(it.descripcion||'').trim();
       if(!desc||vistos.has(desc)) return;
       vistos.add(desc);
-      if((e.mapeoProducto||{})[desc]||nombresConocidos.has(desc)) return;
+      if(Object.prototype.hasOwnProperty.call(e.mapeoProducto||{},desc)||nombresConocidos.has(desc)) return;
       pendientes.push(desc);
     });
   });
@@ -938,12 +938,15 @@ function continuarGenerarPartidas(e,activos,excluidas,modo){
     const avisosInventario=[];
     e.salidasInventario=e.salidasInventario||[];
     enOrden.filter(d=>d.tipo==='venta'&&d.items&&d.items.length).forEach(d=>{
-      d.items.filter(it=>it.bs==='B').forEach(it=>{
+      /* También los renglones que la factura marca como servicio, si su descripción es (o está ligada a) un
+         producto del inventario: a veces el emisor marca mal la caja como «servicio». */
+      d.items.forEach(it=>{
         const desc=(it.descripcion||'').trim();
         if(!desc||!it.cantidad) return;
         const {lista}=inventarioDetalle(e);
         const conocido=lista.find(p=>p.producto===desc);
-        const producto=(e.mapeoProducto||{})[desc]||(conocido?desc:'');
+        const mapa=e.mapeoProducto||{};
+        const producto=Object.prototype.hasOwnProperty.call(mapa,desc)?mapa[desc]:(conocido?desc:'');
         if(!producto) return;   // se dejó en "Omitir" — no es un producto de inventario
         /* Lo que había ESE día (una venta del 20/04 no puede usar lo producido el 30/04). */
         const item=inventarioDetalleAl(e,d.fecha).lista.find(p=>p.producto===producto);

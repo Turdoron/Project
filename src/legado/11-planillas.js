@@ -698,6 +698,7 @@ VISTAS.inventario=()=>{
   const {lista, sinDetalle, sinDetalleValor}=inventarioDetalle(e);
   const totalProductos=r2(lista.reduce((s,p)=>s+p.total,0));
   const totalGeneral=r2(totalProductos+sinDetalleValor);
+  const pendientesVenta=typeof ventasSinDescargar==='function'?ventasSinDescargar(e):[];
   const filas=lista.map(p=>`<tr><td><button type="button" class="btn-enlace" data-accion="renombrarProducto" data-producto="${esc(p.producto)}" title="Cambiar el nombre">${esc(p.producto)} <span aria-hidden="true" style="opacity:.5">✎</span></button></td>
     <td class="num">${p.cantidad?Q(p.cantidad).replace(/\.00$/,''):'—'}</td>
     <td class="num">${Q(p.costoUnitario)}</td>
@@ -705,11 +706,15 @@ VISTAS.inventario=()=>{
   return cab('Existencias',`Existencia por producto: compras y producción, menos ventas, consignaciones y materiales usados — un kardex de trabajo, no el libro legal. Método de valuación: ${METODOS_COSTEO[metodoCosteo(e)]}.`,
     `<button class="btn sec" data-accion="ajusteInventario">Ajuste manual</button>
      <button class="btn sec" data-accion="revisarItemsInventario">Revisar ítems</button>
+     <button class="btn sec" data-accion="ligasProductos">Ligas de facturas</button>
      <button class="btn" data-accion="pdfInventario">Descargar PDF</button>`)
   + `<div class="cifras">
       <div class="cifra"><span>Productos distintos</span><strong>${lista.length}</strong></div>
       <div class="cifra"><span>Valor total en inventario</span><strong>${Q(totalGeneral)}</strong></div>
     </div>
+    ${pendientesVenta.length?`<div class="aviso malo" style="margin-bottom:12px">Hay ${pendientesVenta.length} renglón${pendientesVenta.length===1?'':'es'} de facturas de venta
+      que no salieron del inventario, por eso el costo de ventas del tablero fiscal sale más bajo de lo real.
+      <button class="btn sec" data-accion="ventasSinDescargar" style="margin-left:8px">Revisar y descargar</button></div>`:''}
     <div class="aviso">Cada producto muestra lo que entró (compras de bienes y producción terminada) menos lo que
       salió (ventas, consignaciones y materiales usados en producción), valuado con el método de la empresa.
       Los servicios no generan inventario. Compará contra un conteo físico antes de cerrar el costo de ventas.
