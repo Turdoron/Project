@@ -567,6 +567,9 @@ ACCIONES.pagarISR=()=>{
    inventario final si existe), nunca sumando meses ya estimados por
    separado — sumar meses individuales cuenta el inventario que se va
    arrastrando de uno a otro más de una vez. */
+/* Redondeo a centavos como lo hace el formulario de la SAT: sobre el número tal como queda en la computadora y, en un
+   empate exacto, al centavo par (12,108.90 × 25 % = 3,027.225 → 3,027.22, no 3,027.23). */
+function redondeoSAT(x){ const n=x*100, f=Math.floor(n), d=n-f; return (d>0.5?f+1:d<0.5?f:(f%2?f+1:f))/100; }
 function trimestresGeneral(e){
   const meses=mesesDelEjercicio();
   /* El ISR trimestral se acumula desde que la empresa está en régimen General: si pasó a General a mitad de año,
@@ -601,12 +604,23 @@ function trimestresGeneral(e){
        veces — la renta imponible del formulario salía más alta que la del
        Estado de Resultados por exactamente el ISR ya pagado.) */
     const baseImponibleAcum=Racum.baseImponibleISR;
-    const impuestoAcum=r2(Math.max(0,baseImponibleAcum)*0.25);
+    const impuestoAcum=redondeoSAT(Math.max(0,baseImponibleAcum)*0.25);
     /* Con la opción b) del ISO, parte de lo que se pagó de ISR en un trimestre
        se usó para pagar el ISO de ese trimestre: ya no cuenta como ISR pagado,
        así que el ISR del trimestre siguiente tiene que volver a cubrirlo. */
     const pagadoTrimAnteriores=r2(Math.max(0,(e.cierresParciales||[]).filter(c=>c.ejercicio===e.ejercicio&&c.trimestre<t).reduce((s,c)=>s+c.monto,0)-isrConsumidoPorISO(e,e.ejercicio,t)));
-    const cierre=r2(Math.max(0,impuestoAcum-pagadoTrimAnteriores));
+    /* La casilla del formulario es el «Impuesto Sobre la Renta» de la declaración anterior. Si lo registrado en los
+       cierres anteriores difiere de eso solo por el redondeo de centavos (p. ej. 3,027.225 → la SAT pone 3,027.22),
+       manda la cifra de la SAT, para que el impuesto de este trimestre salga igual que en Declaraguate. */
+    let anterior=pagadoTrimAnteriores;
+    if(t>1&&pagadoTrimAnteriores>0){
+      const hastaPrev=meses[(t-1)*3-1].hasta;
+      if(hastaPrev>=desdeAno){
+        const acumPrev=redondeoSAT(Math.max(0,calcularResultados(e,desdeAno,hastaPrev).baseImponibleISR)*0.25);
+        if(Math.abs(acumPrev-pagadoTrimAnteriores)<=0.025) anterior=acumPrev;
+      }
+    }
+    const cierre=r2(Math.max(0,impuestoAcum-anterior));
     return {t,desde,hasta,rentas:Rtrimestre.ingresos,util:Rtrimestre.antesISR,cierre,estimada:r2(Math.max(0,Rtrimestre.ingresos-Rtrimestre.rentasOtrasCategorias)*0.08*0.25),rentasOtrasAcum:Racum.rentasOtrasCategorias,
       costoVentas:Rtrimestre.costoVentas,gastosDeducibles:r2(Rtrimestre.otrosCostos+Rtrimestre.gastos-Rtrimestre.noDeducible-Rtrimestre.ivaNoDeducible),noDeducible:r2(Rtrimestre.noDeducible+Rtrimestre.ivaNoDeducible),
       /* Estos son los que de verdad va a pedir el formulario de la SAT —
@@ -623,7 +637,7 @@ function trimestresGeneral(e){
          acá: calcularResultados() ya lo dejó fuera de "gastos". */
       costosGastosAcum:r2(Racum.costoTotal+Racum.gastos),
       noDeduciblesAcum:r2(Racum.noDeducible+Racum.ivaNoDeducible+Racum.excesoNoDeducible+Racum.gastosRentasCapital),
-      rentaImponibleAcum:baseImponibleAcum,impuestoAcum,impuestoTrimAnterior:pagadoTrimAnteriores,impuestoEsteTrimestre:cierre};
+      rentaImponibleAcum:baseImponibleAcum,impuestoAcum,impuestoTrimAnterior:anterior,impuestoEsteTrimestre:cierre};
   });
 }
 /* El desglose cuenta por cuenta de lo que entra en "Costos y gastos
