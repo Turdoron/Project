@@ -82,10 +82,16 @@ function consignacionVendidaSinFactura(e,s,fecha){
   const c=(e.consignaciones||[]).find(x=>x.partidaConsignacionId===s.referenciaId);
   return !!c&&c.estado==='vendido'&&(c.fechaVenta||'')<=fecha;
 }
+/* Una venta directa solo se toma como la misma mercadería de una factura si la factura llega dentro del mes siguiente:
+   una venta directa vieja que quedó «sin factura» (por ejemplo, porque su factura se cargó por Excel) no puede
+   tragarse facturas nuevas — cada factura es una salida distinta. */
+const DIAS_VENTA_DIRECTA_FACTURA=31;
+function desdeVentaDirecta(fecha){ const x=new Date((fecha||'')+'T00:00:00Z'); if(isNaN(x)) return ''; x.setUTCDate(x.getUTCDate()-DIAS_VENTA_DIRECTA_FACTURA); return x.toISOString().slice(0,10); }
+const ventaDirectaParaFactura=(s,fecha)=>esVentaDirectaSinFactura(s)&&(s.fecha||'')<=(fecha||'')&&(s.fecha||'')>=desdeVentaDirecta(fecha);
 function cubrirConVentasDirectas(e,doc,producto,cantidad){
   if(!(cantidad>0)) return 0;
   let resta=cantidad;
-  (e.salidasInventario||[]).filter(s=>s.producto===producto&&(s.fecha||'')<=(doc.fecha||'')&&(esVentaDirectaSinFactura(s)||consignacionVendidaSinFactura(e,s,doc.fecha||'')))
+  (e.salidasInventario||[]).filter(s=>s.producto===producto&&(s.fecha||'')<=(doc.fecha||'')&&(ventaDirectaParaFactura(s,doc.fecha)||consignacionVendidaSinFactura(e,s,doc.fecha||'')))
     .sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||'')).forEach(s=>{
       if(resta<=1e-9) return;
       const t=r2(Math.min(resta,s.cantidad-facturadoVentaDirecta(s)));

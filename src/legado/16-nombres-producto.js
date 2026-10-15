@@ -148,8 +148,8 @@ function nombresDeInventario(e){
 }
 /* Renglones de facturas de venta cuyo producto no salió (o no salió completo) del inventario. Se compara, por factura
    y producto, lo vendido contra lo descontado (salidas de esa factura, entregas de pedidos y ventas directas que la
-   factura cubre). Si hay ventas directas del mismo producto, anteriores y sin factura, puede que la mercadería
-   ya haya salido con ellas: se señala para no descontarla dos veces. */
+   factura cubre). Si hay una venta directa del mismo producto sin factura, del mes anterior, se señala: puede que la
+   mercadería ya haya salido con ella. Igual se propone descontar: cada factura es una salida distinta. */
 function ventasSinDescargar(e){
   const out=[], sal=e.salidasInventario||[];
   (e.documentos||[]).filter(d=>d.tipo==='venta'&&d.id&&(d.signo||1)>0&&(d.items||[]).length).forEach(d=>{
@@ -163,7 +163,7 @@ function ventasSinDescargar(e){
       if(falta<=1e-9) return;
       /* Ventas directas de ese producto, anteriores a la factura y todavía sin factura: puede que la mercadería ya haya
          salido con ellas. */
-      const vds=sal.filter(s=>s.producto===prod&&(s.fecha||'')<=d.fecha&&esVentaDirectaSinFactura(s));
+      const vds=sal.filter(s=>s.producto===prod&&ventaDirectaParaFactura(s,d.fecha));
       const vdLibre=r2(vds.reduce((a,s)=>a+s.cantidad-facturadoVentaDirecta(s),0));
       const vd=vds.length?{fecha:vds[0].fecha,cantidad:vdLibre}:null;
       out.push({doc:d,producto:prod,cantidad:falta,ventaDirecta:vd||null,cerrado:anioCerrado(e,d.fecha.slice(0,4))});
@@ -175,15 +175,15 @@ ACCIONES.ventasSinDescargar=()=>{
   const e=emp(), lista=ventasSinDescargar(e);
   if(!lista.length){avisar('Todas las facturas de venta ya salieron del inventario.','Inventario al día');return}
   abrirModal('Ventas que no salieron del inventario',
-    `<p style="margin:0 0 10px;font-size:13px;color:var(--tinta-suave)">Estas facturas de venta tienen productos que no se descontaron del inventario (por ejemplo, se cargaron antes de ligar la descripción, o la factura marcó la caja como «servicio»). Mientras no salgan, el kardex queda alto y el costo de ventas estimado queda bajo, y eso infla el ISR del tablero. Elegí qué hacer con cada una: «Descontar» la saca del inventario con la fecha y el costo de ese día; «Ya salió» la liga a una venta directa sin factura anterior, porque esa mercadería ya salió (no descuenta otra vez).</p>
+    `<p style="margin:0 0 10px;font-size:13px;color:var(--tinta-suave)">Estas facturas de venta tienen productos que no se descontaron del inventario (por ejemplo, se cargaron antes de ligar la descripción, o la factura marcó la caja como «servicio»). Mientras no salgan, el kardex queda alto y el costo de ventas estimado queda bajo, y eso infla el ISR del tablero. Elegí qué hacer con cada una: «Descontar» la saca del inventario con la fecha y el costo de ese día; «Ya salió» solo si es la misma mercadería de una venta directa sin factura del mes anterior (no descuenta otra vez).</p>
     <div style="max-height:52vh;overflow:auto"><table style="font-size:13px"><thead><tr><th>Factura</th><th>Producto</th><th class="num">Cantidad</th><th>Qué hacer</th></tr></thead><tbody>
     ${lista.map((x,i)=>`<tr${x.cerrado?' style="opacity:.55"':''}>
       <td>${fFecha(x.doc.fecha)}<br>${esc(x.doc.dte||'')}<br><span style="font-size:12px;color:var(--tinta-suave)">${esc(x.doc.nombre||'')}</span></td>
       <td>${esc(x.producto)}${x.ventaDirecta?`<br><span style="font-size:12px;color:var(--haber)">Venta directa sin factura del ${fFecha(x.ventaDirecta.fecha)} (${Q(x.ventaDirecta.cantidad).replace(/\.00$/,'')} u.)</span>`:''}${x.cerrado?'<br><span style="font-size:12px">Ejercicio cerrado</span>':''}</td>
       <td class="num">${Q(x.cantidad).replace(/\.00$/,'')}</td>
       <td><select style="width:auto;min-width:0;max-width:115px" name="v_${i}" aria-label="Qué hacer con ${esc(x.producto)}"${x.cerrado?' disabled':''}>
-        <option value="descontar"${!x.ventaDirecta?' selected':''}>Descontar</option>
-        ${x.ventaDirecta?'<option value="vd" selected>Ya salió</option>':''}
+        <option value="descontar" selected>Descontar</option>
+        ${x.ventaDirecta?'<option value="vd">Ya salió</option>':''}
         <option value="">Nada</option></select></td></tr>`).join('')}</tbody></table></div>`,
     f=>{
       const elegidas=lista.map((x,i)=>({...x,que:f['v_'+i]||''})).filter(x=>x.que&&!x.cerrado);

@@ -22,7 +22,7 @@ function cuerpoVentasDirectas(){
   const filaVentaDirecta=s=>`<tr><td>${fFecha(s.fecha)}</td><td>${esc(s.producto)}</td>
     <td class="num">${s.cantidad}</td><td class="num">${Q(s.costoUnitario)}</td><td class="num">${Q(s.costoTotal)}</td>
     <td>${s.documentoId?'Desde la factura':(s.facturas||[]).length?`Facturada${facturadoVentaDirecta(s)<s.cantidad-1e-9?' en parte':''} (${esc(s.facturas.map(f=>f.ref).join(', '))})`:'<span style="color:var(--tinta-suave)">Sin factura cargada</span>'}</td>
-    <td class="num">${(s.facturas||[]).length||s.documentoId?'':`<button class="btn mini sec" data-accion="editarVentaDirecta" data-id="${s.id}">Editar</button>`}</td></tr>`;
+    <td class="num">${s.documentoId?'':(s.facturas||[]).length?`<button class="btn mini sec" data-accion="desligarVentaDirecta" data-id="${s.id}" title="Las facturas no son de esta mercadería">Desligar</button>`:`<button class="btn mini sec" data-accion="editarVentaDirecta" data-id="${s.id}">Editar</button>`}</td></tr>`;
   return `<h3 style="color:var(--verde);margin:0 0 8px">Ventas directas</h3>
     <div class="aviso">Para descontar del inventario una venta rápida sin pedido. El ingreso, el IVA y el costo de
       cada venta se registran, como siempre, en "Cargar facturas".</div>
@@ -40,6 +40,19 @@ function cuerpoVentasDirectas(){
       <th class="num">Comisión</th><th class="num"></th></tr></thead>
       <tbody>${vendidas.map(filaVendida).join('')}</tbody></table>`
      : `<div class="vacio">Todavía no se ha vendido nada de consignación.</div>`}`;
+};
+
+/* Una venta directa que el sistema tomó como la misma mercadería de unas facturas, cuando en realidad son salidas
+   distintas: se suelta, y esas facturas pasan a «Ventas que no salieron del inventario» para descontarlas. */
+ACCIONES.desligarVentaDirecta=d=>{
+  const e=emp(), s=(e.salidasInventario||[]).find(x=>x.id===d.id); if(!s||!(s.facturas||[]).length) return;
+  if(anioCerrado(e,s.fecha.slice(0,4))){avisar(`El ejercicio ${s.fecha.slice(0,4)} ya tiene cierre de libros.`);return}
+  confirmar(`¿Desligar la venta directa del ${fFecha(s.fecha)} (${s.producto}) de las facturas ${s.facturas.map(f=>f.ref).join(', ')}? Usalo si esas facturas son ventas distintas: después podrás descontarlas del inventario desde Existencias.`,()=>{
+    const refs=s.facturas.map(f=>f.ref).join(', '); s.facturas=[];
+    registrarLog('Desligó venta directa de sus facturas',`${s.producto} del ${s.fecha} — ${refs}`);
+    guardar(); pintar();
+    avisar('Listo. Esas facturas ahora aparecen en Existencias → «Revisar y descargar» para que salgan del inventario.','Venta directa desligada');
+  },'Desligar');
 };
 
 /* El desplegable de producto es el mismo para venta directa y consignación:
